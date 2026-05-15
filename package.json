@@ -21,7 +21,7 @@
     "sb:stop": "supabase stop",
     "sb:status": "supabase status",
     "sb:restart": "npm run sb:stop && npm run sb:start",
-    "kb:export": "echo '🐺 ESPORTAZIONE KNOWLEDGE BASE...' && rm -rf ../WOLF_EXPORTS && mkdir -p ../WOLF_EXPORTS && cp .gemini/*.md ../WOLF_EXPORTS/ && cp GEMINI.md ../WOLF_EXPORTS/ && echo '✅ File esportati in WOLF_EXPORTS pronti per Gemini!'",
+    "kb:export": "echo '🐺 ESPORTAZIONE KNOWLEDGE BASE...' && rm -rf ./WOLF_EXPORTS && mkdir -p ./WOLF_EXPORTS && cp .gemini/*.md ./WOLF_EXPORTS/ && cp GEMINI.md ./WOLF_EXPORTS/ && echo '✅ File esportati in WOLF_EXPORTS pronti per Gemini!'",
     "// --- 🐺 WOLF PROTOCOL: MIGRATIONS & TYPES ---": "",
     "sb:mig:new": "supabase migration new",
     "sb:mig:list": "supabase migration list",
