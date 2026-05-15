@@ -1,6 +1,6 @@
-description = "Executes the full autonomous WOLF-FLOW release: bump, commit, push code, push DB migrations, export KB, and sound."
+Description = "Executes the full autonomous WOLF-FLOW release: bump, commit, push code, push DB migrations, export KB, and sound."
 
-prompt = """
+Instruction = """
 You are initiating the final WOLF-FLOW Release Cycle. Execute these steps strictly and autonomously:
 
 1. PRE-FLIGHT KNOWLEDGE AUDIT (MANDATORY): Run `git diff HEAD` (or inspect changed files) to analyze the actual codebase changes made during this session. Cross-reference these changes against the `.gemini/` Knowledge Base (`SOTA.md`, `EVOLUTION.md`, `SCHEMA.md`, `FEATURES.md`).

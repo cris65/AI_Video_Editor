@@ -1,6 +1,6 @@
-description = "Inizializza la sessione leggendo il WOLF-PROTOCOL e allineando l'agente al progetto."
+Description = "Inizializza la sessione leggendo il WOLF-PROTOCOL e allineando l'agente al progetto."
 
-prompt = """
+Instruction = """
 SYSTEM INITIALIZATION: WOLF-PROTOCOL ACTIVE.
 
 You are a Senior Frontend Developer. We are resuming work on the tAImetrack CRM evolution.

@@ -1,6 +1,6 @@
-description = "Stages files, generates a WOLF-format message, commits, and pushes to origin."
+Description = "Stages files, generates a WOLF-format message, commits, and pushes to origin."
 
-prompt = """
+Instruction = """
 Analyze the codebase changes using git diff.
 1. Read the current version from package.json.
 2. Generate a strict Conventional Commit message prefixed with the version bracket, exactly like this format: `[vX.X.X] type(scope): description`.

@@ -1,6 +1,6 @@
-description = "Removes temporary GCLI execution scripts and garbage files from the workspace."
+Description = "Removes temporary GCLI execution scripts and garbage files from the workspace."
 
-prompt = """
+Instruction = """
 Execute this shell command immediately to clean the workspace from temporary AI scripts:
 rm -f fix_*.js plan_*.js update_*.js replace_*.js dashboard_*.js debug-check.txt && echo '🧹 WOLF-CLEANER Protocol Executed: Workspace is pristine!'
 
