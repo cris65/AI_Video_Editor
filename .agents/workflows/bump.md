@@ -1,7 +1,7 @@
-Description = "Bumps the package.json version directly via shell."
+---
+description: Bumps the package.json version directly via shell.
+---
 
-Instruction = """
 Execute the shell command `npm version patch --no-git-tag-version` immediately. 
 If I explicitly requested 'minor' or 'major' in my previous message, use that instead. 
 Do NOT ask for confirmation. Execute the shell command and report the new version.
-"""

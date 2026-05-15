@@ -1,6 +1,7 @@
-Description = "Executes the full autonomous WOLF-FLOW release: bump, commit, push code, push DB migrations, export KB, and sound."
+---
+description: Executes the full autonomous WOLF-FLOW release: bump, commit, push code, push DB migrations, export KB, and sound.
+---
 
-Instruction = """
 You are initiating the final WOLF-FLOW Release Cycle. Execute these steps strictly and autonomously:
 
 1. PRE-FLIGHT KNOWLEDGE AUDIT (MANDATORY): Run `git diff HEAD` (or inspect changed files) to analyze the actual codebase changes made during this session. Cross-reference these changes against the `.gemini/` Knowledge Base (`SOTA.md`, `EVOLUTION.md`, `SCHEMA.md`, `FEATURES.md`).
@@ -8,8 +9,7 @@ You are initiating the final WOLF-FLOW Release Cycle. Execute these steps strict
 3. BUMP: Run `npm version patch --no-git-tag-version` (unless I explicitly asked for minor/major).
 4. MESSAGE: Read the new version and the git diff. Generate a strict Conventional Commit message format: `[vX.X.X] type(scope): description`.
 5. EXECUTE: Run this exact chained command in the shell:
-   `git add . && git commit -m "<your_generated_message>" && git push origin develop && npm run sb:push && mkdir -p ~/Desktop/WOLF_KB && cp .gemini/*.md ~/Desktop/WOLF_KB/ && cp GEMINI.md ~/Desktop/WOLF_KB/ && echo '✅ WOLF_KB Export Completed!' && afplay /System/Library/Sounds/Glass.aiff`
+   `git add . && git commit -m "<your_generated_message>" && git push origin develop && mkdir -p ~/Desktop/WOLF_KB && cp .gemini/*.md ~/Desktop/WOLF_KB/ && cp GEMINI.md ~/Desktop/WOLF_KB/ && echo '✅ WOLF_KB Export Completed!' && afplay /System/Library/Sounds/Glass.aiff`
 6. AUTONOMOUS HEALING (CRITICAL): If the shell command fails because Husky pre-commit hooks (Linter, TS, or E2E tests) blocked the commit, DO NOT STOP. According to GEMINI.md Section 7, you have a budget of 3 consecutive attempts. Read the terminal error, fix the exact file, and autonomously re-run step 5. 
 
 Report the final outcome only when the cycle is fully closed or if the 3 healing attempts are exhausted.
-"""

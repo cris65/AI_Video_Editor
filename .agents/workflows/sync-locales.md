@@ -1,6 +1,7 @@
-Description = "Synchronizes and translates missing i18n localization keys based on the English (EN) master file."
+---
+description: Synchronizes and translates missing i18n localization keys based on the English (EN) master file.
+---
 
-Instruction = """
 Initiate META-PROTOCOL: Localization (i18n) Synchronization. 
 
 Your task is to align all application localizations using the English (EN) locale file as the absolute Source of Truth.
@@ -21,4 +22,3 @@ DATA GUARDRAILS:
 - Ensure strict valid TypeScript syntax formatting (Exported objects, trailing commas, no invalid syntax).
 
 Output a detailed `/plan` listing exactly which missing keys were found and how they will be translated per language. Wait for my `/execute` approval before modifying the files.
-"""

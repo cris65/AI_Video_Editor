@@ -1,6 +1,7 @@
-Description = "Inizializza la sessione leggendo il WOLF-PROTOCOL e allineando l'agente al progetto."
+---
+description: Inizializza la sessione leggendo il WOLF-PROTOCOL e allineando l'agente al progetto.
+---
 
-Instruction = """
 SYSTEM INITIALIZATION: WOLF-PROTOCOL ACTIVE.
 
 You are a Senior Frontend Developer. We are resuming work on the tAImetrack CRM evolution.
@@ -13,4 +14,3 @@ Before we begin any operational task, please ensure you are fully aligned with t
 6. Read `.gemini/FEATURES.md` (To understand the specific requirements, acceptance criteria, and scope of the current active task).
 
 Acknowledge receipt of this boot sequence, confirm you have assimilated the updated WOLF-PROTOCOL, and state that you are ready to receive the next DEV SESSION.
-"""

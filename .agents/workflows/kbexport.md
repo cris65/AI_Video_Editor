@@ -1,9 +1,9 @@
-Description = "Exports the Knowledge Base (.gemini/*.md and GEMINI.md) to the Desktop."
+---
+description: Exports the Knowledge Base (.gemini/*.md and GEMINI.md) to the Desktop.
+---
 
-Instruction = """
 Execute this shell command immediately to export our Knowledge Base to the Desktop:
 mkdir -p ~/Desktop/WOLF_KB && cp .gemini/*.md ~/Desktop/WOLF_KB/ && cp GEMINI.md ~/Desktop/WOLF_KB/ && echo '✅ WOLF_KB Export Completed!'
 
 (Note: if your terminal is inside the `frontend/` folder, adapt the path to `cp ../.gemini/*.md ~/Desktop/WOLF_KB/ && cp ../GEMINI.md ~/Desktop/WOLF_KB/`).
 Do not modify any codebase files. Confirm the export and close the operation.
-"""
