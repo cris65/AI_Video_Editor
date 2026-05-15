@@ -1,0 +1,7 @@
+- `[x]` Backup legacy tAImetrack files into `_legacy_backup/`
+- `[x]` Scaffold clean Vite + React + TypeScript boilerplate manually
+- `[x]` Scaffold TailwindCSS configuration (tailwind.config.js, postcss.config.js, index.css)
+- `[x]` Initialize Supabase config.toml mapped to isolated ports (54421-54428)
+- `[x]` Restore `package.json` with all dependencies and Wolf Protocol scripts
+- `[x]` Scaffold empty `.gemini` Knowledge Base templates (VISION, SCHEMA, FEATURES, SOTA)
+- `[x]` Restore core `.gemini` files (GEMINI.md, WOLF_PROTOCOL.md, TESTING.md)

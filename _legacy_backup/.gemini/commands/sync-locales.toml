@@ -1,0 +1,24 @@
+description = "Synchronizes and translates missing i18n localization keys based on the English (EN) master file."
+
+prompt = """
+Initiate META-PROTOCOL: Localization (i18n) Synchronization. 
+
+Your task is to align all application localizations using the English (EN) locale file as the absolute Source of Truth.
+1. Locate the localization directory (e.g., `frontend/src/locales/` or `frontend/src/i18n/`).
+2. Read the master English file (e.g., `en.ts`).
+3. Scan all other target language files (e.g., `it.ts`, `es.ts`).
+4. Identify any missing keys or nested structures that exist in EN but are absent in the target languages.
+5. Autonomously translate the missing English values into the respective target languages.
+6. Inject the translated key-value pairs into the target files, perfectly matching the nested structure of the EN file.
+
+CRITICAL EXECUTION GUARDRAILS (ANTI-TIMEOUT):
+- DO NOT write custom regex parsers, `eval()`, or arbitrary Node.js scripts (like `diff_locales.ts`) to find missing keys. 
+- Process the files purely through your LLM context window reading, OR use strictly standard, safe file-reading commands without executing untrusted parsed code.
+- If context size is an issue, process the target language files ONE BY ONE iteratively. Do not try to compile or diff all 14 languages in a single shell command.
+
+DATA GUARDRAILS: 
+- Do NOT overwrite, modify, or delete any existing translated keys in the target files. ONLY append missing keys.
+- Ensure strict valid TypeScript syntax formatting (Exported objects, trailing commas, no invalid syntax).
+
+Output a detailed `/plan` listing exactly which missing keys were found and how they will be translated per language. Wait for my `/execute` approval before modifying the files.
+"""

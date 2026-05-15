@@ -1,0 +1,24 @@
+# A string used to distinguish different Supabase projects on the same host. Defaults to the working directory name when running `supabase init`.
+project_id = "ai-video-editor"
+
+[api]
+enabled = true
+port = 54421
+
+[db]
+port = 54422
+
+[studio]
+enabled = true
+port = 54423
+
+[inbucket]
+enabled = true
+port = 54424
+smtp_port = 54425
+pop3_port = 54426
+
+[analytics]
+enabled = false
+port = 54427
+backend_port = 54428
