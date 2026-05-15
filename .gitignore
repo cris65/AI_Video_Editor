@@ -7,3 +7,5 @@ _legacy_backup/
 supabase/.temp
 supabase/.branches
 WOLF_EXPORTS/
+engine/.env
+engine/output/

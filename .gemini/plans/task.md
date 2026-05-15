@@ -1,7 +1,10 @@
-- `[x]` Backup legacy tAImetrack files into `_legacy_backup/`
-- `[x]` Scaffold clean Vite + React + TypeScript boilerplate manually
-- `[x]` Scaffold TailwindCSS configuration (tailwind.config.js, postcss.config.js, index.css)
-- `[x]` Initialize Supabase config.toml mapped to isolated ports (54421-54428)
-- `[x]` Restore `package.json` with all dependencies and Wolf Protocol scripts
-- `[x]` Scaffold empty `.gemini` Knowledge Base templates (VISION, SCHEMA, FEATURES, SOTA)
-- `[x]` Restore core `.gemini` files (GEMINI.md, WOLF_PROTOCOL.md, TESTING.md)
+- [x] Update `.gemini/VISION.md`
+- [x] Update `.gemini/SCHEMA.md`
+- [x] Generate Supabase migration for `video_tasks`
+- [x] Write SQL in the generated migration file
+- [x] Create `engine/requirements.txt`
+- [x] Create `engine/.env.example`
+- [x] Create `engine/quick_edit.py`
+- [x] Update `.gitignore`
+- [x] Run Linter validation
+- [x] Play audio cue
