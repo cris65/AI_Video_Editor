@@ -2,7 +2,7 @@ import os
 import sys
 import requests
 import cv2
-from moviepy.editor import VideoFileClip
+from moviepy import VideoFileClip
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -83,10 +83,14 @@ def process_video(task: dict):
     thumb_path = os.path.join(OUTPUT_DIR, f"thumb_{task_id}.jpg")
     
     try:
-        # 1. Download
-        success = download_frameio_proxy(asset_id, input_vid_path)
-        if not success:
-            raise Exception("Failed to download proxy from Frame.io")
+        # 1. Download or use local file
+        if os.path.exists(input_vid_path):
+            print(f"🎬 File locale trovato ({input_vid_path}). Salto il download dalle API bloccate!")
+        else:
+            success = download_frameio_proxy(asset_id, input_vid_path)
+            if not success:
+                print(f"\n⚠️ L'API di Frame.io è bloccata. Per testare l'engine, scarica il video manualmente e salvalo come:\n👉 {input_vid_path}\nE poi rilancia questo script!\n")
+                raise Exception("Failed to download proxy from Frame.io")
             
         # 2. Edit with MoviePy
         print(f"Cutting video from {start_sec}s to {end_sec}s...")
