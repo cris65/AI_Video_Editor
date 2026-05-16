@@ -1,4 +1,15 @@
 # 📘 VISION
 
 > [!NOTE]
-> AG: Progetto SaaS Local-First per AI Video Editing. Utilizza Frame.io come backend di ingestione tramite proxy video per ridurre i carichi di banda, e MoviePy/OpenCV in Python per l'elaborazione.
+> AG: Progetto Local-First per AI Video Editing incentrato su automazione offline e alta professionalità (zero cloud dependencies).
+
+## Il Modello "Symmetrical EDL Workflow"
+
+L'architettura del sistema si fonda su un flusso simmetrico basato unicamente sullo standard industriale **EDL CMX3600**, garantendo una comunicazione nativa ed esatta con Adobe Premiere Pro (o qualsiasi NLE affine). 
+
+Il ciclo vitale del progetto prevede:
+1. **Ingestione Simmetrica:** Il motore importa la mappa temporale della sequenza esportata da Premiere tramite file `.edl`.
+2. **AI Processing:** Attraverso modelli avanzati YOLOv8n e algoritmi OpenCV, il sistema scansiona il proxy offline, classificando dinamicamente il girato in una *Main Track* (solista) e una *B-Roll Track* (dettagli e coperture), con filtri adattivi di "Dynamic Backtrack" per tolleranza mosso/sfocato.
+3. **Esportazione Simmetrica:** L'AI rigenera la timeline delle decisioni confezionando un nuovo file `.edl` in uscita, che re-injetterà nella NLE la sequenza pre-montata ricollegandola automaticamente e chirurgicamente ai file RAW originali ad altissima risoluzione (tramite i commenti CMX3600 nativi).
+
+Questo ecosistema consente al montatore umano di abbattere i tempi di pre-selezione, mantenendo una gestione dei dati strettamente locale, sicura, e pienamente in sintonia con i workflow televisivi e cinematografici broadcast-grade a 50fps.
