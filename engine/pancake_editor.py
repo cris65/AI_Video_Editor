@@ -5,275 +5,453 @@ import numpy as np
 from moviepy import VideoFileClip, concatenate_videoclips
 from ultralytics import YOLO
 
-# ==============================================================================
-# SOGLIE E PARAMETRI (Calibrabili Iterativamente)
-# ==============================================================================
-# V5: Dynamic Backtrack. Tolleranze allargate, ma potatura sicura in uscita.
-BLUR_THRESHOLD = 60.0        # Mantenuto a 60.0 per la profondità di campo
-MOTION_THRESHOLD = 15.0      # Ripristinato da 10 a 15 (ingresso tollerato, tagliato via dopo)
-MIN_CLIP_DURATION = 0.5      # Durata minima di una subclip (in secondi)
-BACKTRACK_SECONDS = 0.5      # Secondi da sottrarre alla coda del segmento interrotto
-
-# Soglie per la deduzione del Pacing Profile (Media Movimento)
-PACING_CINEMATIC_MAX = 5.0   # Se media < 5 -> "cinematic"
-PACING_STANDARD_MAX = 15.0   # Se media fra 5 e 15 -> "standard", oltre -> "social_fast"
-
-# ==============================================================================
-# CONFIGURAZIONE PATH E MODELLO
-# ==============================================================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_VIDEO_PATH = os.path.join(BASE_DIR, 'input.mp4')
-OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
-
-# Output Path ora generati dinamicamente dentro process_pancake_video
-
-def ensure_output_dir():
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-
-# Inizializzazione YOLO
-yolo_model = YOLO('yolov8n.pt')
-
-# ==============================================================================
-# FUNZIONI DI ANALISI E CONTROLLO
-# ==============================================================================
-def variance_of_laplacian(image):
-    """Calcola la varianza del Laplaciano per misurare la nitidezza (focus)."""
-    return cv2.Laplacian(image, cv2.CV_64F).var()
-
-def analyze_video(video_path):
-    """
-    Analizza il video per estrarre due tracce separate:
-    - Main Track (Solista)
-    - B-Roll Track (Dettagli)
-    """
-    print(f"🔍 Avvio analisi V5 (Dynamic Backtrack) di: {video_path}")
-    cap = cv2.VideoCapture(video_path)
-    
-    if not cap.isOpened():
-        raise ValueError(f"Impossibile aprire il file video: {video_path}")
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    # Invece di 'is_valid', memorizziamo lo stato per Main e B-Roll
-    frame_data_main = []
-    frame_data_broll = []
-    global_motion_diffs = []
-    
-    ret, prev_frame = cap.read()
-    if not ret:
-        cap.release()
-        return [], [], 0.0
+class PancakeEditor:
+    def __init__(self, sequence_name="Pancake_Sequence"):
+        self.sequence_name = sequence_name
         
-    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-    
-    frame_idx = 1
-    
-    # Analizza il primo frame
-    lap_var = variance_of_laplacian(prev_gray)
-    is_blur = lap_var < BLUR_THRESHOLD
-    
-    is_main = False
-    is_broll = False
-    
-    if not is_blur:
-        # V5: Confidence tornata al default (niente paranoia mode)
-        results = yolo_model(prev_frame, verbose=False)
-        boxes = results[0].boxes
-        person_count = sum(1 for box in boxes if int(box.cls[0]) == 0)
+        # 1. Parametri di Soglia
+        self.BLUR_THRESHOLD = 10.0
+        self.SOFT_FOCUS_THRESHOLD = 25.0
+        self.MOTION_THRESHOLD = 40.0
+        self.CONFIDENCE_MIN = 0.20
+        self.SAFE_LEFT = 0.30
+        self.SAFE_RIGHT = 0.70
         
-        if person_count == 1:
-            is_main = True
-        elif person_count == 0:
-            is_broll = True
-            
-    frame_data_main.append((0.0, is_main))
-    frame_data_broll.append((0.0, is_broll))
-    
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-            
-        timestamp_sec = frame_idx / fps
+        self.yolo_model = YOLO('yolov8n.pt')
+        
+        self.base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.output_dir = os.path.join(self.base_dir, 'output', sequence_name)
+        os.makedirs(self.output_dir, exist_ok=True)
+        
+        self.json_out = os.path.join(self.output_dir, f"{sequence_name}_stringout.json")
+        self.preview_out = os.path.join(self.output_dir, f"{sequence_name}_preview_stringout.mp4")
+        self.trash_preview_out = os.path.join(self.output_dir, f"{sequence_name}_preview_TRASH.mp4")
+        self.storyboard_dir = os.path.join(self.output_dir, 'storyboards')
+        os.makedirs(self.storyboard_dir, exist_ok=True)
+
+    def get_frame_tag(self, frame, prev_frame):
+        """
+        2. Nuova Funzione di Tagging
+        """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
         
-        # 1. Calcolo Nitidezza e Movimento
-        lap_var = variance_of_laplacian(gray)
+        # Filtro Cecità (Center-Weighted Focus)
+        h, w = gray.shape
+        center_gray = gray[int(h*0.25):int(h*0.75), int(w*0.25):int(w*0.75)]
+        lap_var = cv2.Laplacian(center_gray, cv2.CV_64F).var()
+        if lap_var < self.BLUR_THRESHOLD:
+            return 'TRASH_BLUR', lap_var
+            
+        is_soft = (self.BLUR_THRESHOLD <= lap_var < self.SOFT_FOCUS_THRESHOLD)
+            
+        # Filtro Sballottamento
         diff = cv2.absdiff(gray, prev_gray)
         motion_diff = np.mean(diff)
-        global_motion_diffs.append(motion_diff)
-        
-        # 2. Controllo Tecnico
-        is_blur = lap_var < BLUR_THRESHOLD
-        is_shaky = motion_diff > MOTION_THRESHOLD
-        
-        is_main = False
-        is_broll = False
-        
-        if not is_blur and not is_shaky:
-            # Esecuzione YOLO a confidence standard
-            results = yolo_model(frame, verbose=False)
-            boxes = results[0].boxes
-            person_count = sum(1 for box in boxes if int(box.cls[0]) == 0)
+        if motion_diff > self.MOTION_THRESHOLD:
+            return 'TRASH_MOTION', lap_var
             
-            # Doppio Binario
-            if person_count == 1:
-                is_main = True
-            elif person_count == 0:
-                is_broll = True
-            # Se person_count > 1, entrambi restano False (Scarto/Interruzione)
+        # Analisi YOLO (classe 0 = person)
+        results = self.yolo_model(frame, verbose=False, conf=self.CONFIDENCE_MIN)
+        boxes = results[0].boxes
+        person_boxes = [box for box in boxes if int(box.cls[0]) == 0]
         
-        frame_data_main.append((timestamp_sec, is_main))
-        frame_data_broll.append((timestamp_sec, is_broll))
+        suffix = '_SOFT' if is_soft else ''
         
-        prev_gray = gray
-        frame_idx += 1
-        
-        # Log progresso
-        if frame_idx % 100 == 0:
-            print(f"  Analizzati {frame_idx}/{total_frames} frames...")
-
-    cap.release()
-    print("✅ Analisi OpenCV e YOLO completata.")
-    
-    mean_motion = np.mean(global_motion_diffs) if global_motion_diffs else 0.0
-    return frame_data_main, frame_data_broll, mean_motion
-
-def extract_valid_segments(frame_data, min_duration, apply_backtrack=False):
-    """
-    Raggruppa i frame validi in segmenti continui e scarta quelli troppo corti.
-    Se apply_backtrack è True, quando un segmento viene interrotto da un'anomalia,
-    ne pota la coda sottraendo BACKTRACK_SECONDS al timecode finale.
-    """
-    segments = []
-    in_segment = False
-    start_time = 0.0
-    
-    for timestamp, is_valid in frame_data:
-        if is_valid and not in_segment:
-            in_segment = True
-            start_time = timestamp
-        elif not is_valid and in_segment:
-            in_segment = False
-            end_time = timestamp
+        if not person_boxes:
+            return 'B-ROLL' + suffix, lap_var
             
-            # V5: Dynamic Backtrack (sottrae margine in uscita)
-            if apply_backtrack:
-                end_time = max(start_time, end_time - BACKTRACK_SECONDS)
+        # Analisi Spaziale
+        frame_width = frame.shape[1]
+        for box in person_boxes:
+            x1, y1, x2, y2 = box.xyxy[0]
+            center_x = (x1 + x2) / 2.0
+            norm_x = center_x / frame_width
+            
+            if self.SAFE_LEFT <= norm_x <= self.SAFE_RIGHT:
+                return 'MAIN_A' + suffix, lap_var
                 
-            duration = end_time - start_time
-            if duration >= min_duration:
-                segments.append({"start_sec": float(round(start_time, 3)), "end_sec": float(round(end_time, 3))})
+        return 'EDGE_DANGER' + suffix, lap_var
+
+    def extract_cinematic_palette(self, frames_list):
+        """
+        Estrae 5 colori dominanti da una lista di frame combinati.
+        Ritorna una lista di stringhe HEX.
+        """
+        if not frames_list:
+            return []
+            
+        pixels = []
+        for f in frames_list:
+            if f is not None:
+                # Convertiamo da BGR a RGB per avere i colori corretti in HEX
+                rgb_frame = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+                pixels.append(rgb_frame.reshape((-1, 3)))
                 
-    # Gestione chiusura ultimo segmento (fine video, niente anomalia intrusa solitamente, ma potiamo per uniformità)
-    if in_segment:
-        end_time = frame_data[-1][0]
-        if apply_backtrack:
-            end_time = max(start_time, end_time - BACKTRACK_SECONDS)
+        if not pixels:
+            return []
             
-        duration = end_time - start_time
-        if duration >= min_duration:
-            segments.append({"start_sec": float(round(start_time, 3)), "end_sec": float(round(end_time, 3))})
-            
-    return segments
-
-def deduce_pacing_profile(mean_motion):
-    if mean_motion < PACING_CINEMATIC_MAX:
-        return "cinematic"
-    elif mean_motion < PACING_STANDARD_MAX:
-        return "standard"
-    else:
-        return "social_fast"
-
-def generate_moviepy_preview(input_video, cuts, output_video):
-    """Genera un'anteprima concatenando le clip valide."""
-    if not cuts:
-        print(f"⚠️ Nessun taglio valido per generare {os.path.basename(output_video)}")
-        return
+        pixel_data = np.vstack(pixels)
+        pixel_data = np.float32(pixel_data)
         
-    print(f"🎬 Generazione bozza {os.path.basename(output_video)} con {len(cuts)} clip...")
-    try:
-        with VideoFileClip(input_video) as video:
-            subclips = []
-            for cut in cuts:
-                clip = video.subclipped(cut['start_sec'], cut['end_sec'])
-                subclips.append(clip)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        K = 5
+        
+        if len(pixel_data) < K:
+            return []
             
-            final_clip = concatenate_videoclips(subclips)
-            final_clip.write_videofile(
-                output_video,
-                codec="libx264",
-                audio_codec="aac",
-                logger=None
-            )
+        _, _, centers = cv2.kmeans(pixel_data, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+        
+        palette_hex = []
+        for center in centers:
+            r, g, b = [int(c) for c in center]
+            hex_color = f"#{r:02x}{g:02x}{b:02x}"
+            palette_hex.append(hex_color)
             
-            for c in subclips:
-                c.close()
-            final_clip.close()
-        print(f"✅ Anteprima creata con successo: {output_video}")
-    except Exception as e:
-        print(f"❌ Errore durante la generazione dell'anteprima {output_video}: {e}")
+        return palette_hex
+
+    def extract_motion_vectors(self, prev_gray, gray):
+        """
+        Calcola l'Optical Flow (Farneback) su 160x90 per estrarre intensità e direzione.
+        Restituisce magnitudo media e direzione stringa.
+        """
+        flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        
+        avg_mag = np.mean(mag)
+        avg_ang = np.mean(ang)
+        
+        angle_deg = avg_ang * 180 / np.pi
+        
+        if avg_mag < 0.5:
+            direction = "STATIC"
+        else:
+            if (angle_deg <= 45 or angle_deg >= 315):
+                direction = "PAN_LEFT"
+            elif (135 <= angle_deg <= 225):
+                direction = "PAN_RIGHT"
+            elif (45 < angle_deg < 135):
+                direction = "TILT_UP"
+            else:
+                direction = "TILT_DOWN"
+
+        return avg_mag, direction
+
+    def process_video(self, video_path):
+        """
+        3. Logica di Costruzione Stringout
+        """
+        print(f"🔍 Avvio analisi PancakeEditor (Blacklist) di: {video_path}")
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError(f"Impossibile aprire il file video: {video_path}")
+            
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        timeline = []
+        trash_timeline = []
+        current_block = None
+        current_trash = None
+        
+        ret, prev_frame = cap.read()
+        if not ret:
+            cap.release()
+            return []
+            
+        # Inizializziamo il primo blocco (frame a 0s)
+        tag, lap_var = self.get_frame_tag(prev_frame, prev_frame)
+        if not tag.startswith('TRASH'):
+            small_frame = cv2.resize(prev_frame, (100, 100))
+            sb_frame = cv2.resize(prev_frame, (480, 270))
+            current_block = {
+                "start": 0.0, 
+                "end": 0.0, 
+                "tag": tag, 
+                "best_moment": 0.0, 
+                "_max_lap": lap_var,
+                "_frame_in": small_frame,
+                "_frame_best": small_frame,
+                "_sb_in": sb_frame,
+                "_sb_best": sb_frame,
+                "_motion_samples": [],
+                "_prev_gray_flow": cv2.cvtColor(cv2.resize(prev_frame, (160, 90)), cv2.COLOR_BGR2GRAY)
+            }
+            
+        step = 10  # Mantieni ottimizzazione: 1 frame ogni 10
+        
+        while True:
+            current_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
+            next_pos = current_pos + step - 1
+            
+            if next_pos >= total_frames:
+                break
+                
+            cap.set(cv2.CAP_PROP_POS_FRAMES, next_pos)
+            ret, frame = cap.read()
+            if not ret:
+                break
+                
+            timestamp_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            
+            tag, lap_var = self.get_frame_tag(frame, prev_frame)
+            
+            if tag.startswith('TRASH'):
+                if current_block is not None:
+                    current_block["end"] = timestamp_sec
+                    duration = current_block["end"] - current_block["start"]
+                    if duration >= 1.0:
+                        current_block["_frame_out"] = cv2.resize(frame, (100, 100))
+                        current_block["_sb_out"] = cv2.resize(frame, (480, 270))
+                        
+                        frames_for_palette = [
+                            current_block.get("_frame_in"),
+                            current_block.get("_frame_best"),
+                            current_block.get("_frame_out")
+                        ]
+                        current_block["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
+                        
+                        storyboard_img = np.hstack((
+                            current_block.get("_sb_in"),
+                            current_block.get("_sb_best"),
+                            current_block.get("_sb_out")
+                        ))
+                        sb_filename = f"clip_{int(current_block['start']*1000)}.jpg"
+                        sb_path = os.path.join(self.storyboard_dir, sb_filename)
+                        cv2.imwrite(sb_path, storyboard_img)
+                        current_block["storyboard_path"] = sb_path
+                        
+                        samples = current_block.get("_motion_samples", [])
+                        if samples:
+                            avg_intensity = float(np.mean([s[0] for s in samples]))
+                            directions = [s[1] for s in samples]
+                            dom_dir = max(set(directions), key=directions.count)
+                        else:
+                            avg_intensity = 0.0
+                            dom_dir = "STATIC"
+                        current_block["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
+                        
+                        current_block.pop("_max_lap", None)
+                        current_block.pop("_frame_in", None)
+                        current_block.pop("_frame_best", None)
+                        current_block.pop("_frame_out", None)
+                        current_block.pop("_sb_in", None)
+                        current_block.pop("_sb_best", None)
+                        current_block.pop("_sb_out", None)
+                        current_block.pop("_motion_samples", None)
+                        current_block.pop("_prev_gray_flow", None)
+                        
+                        timeline.append(current_block)
+                    current_block = None
+                    
+                if current_trash is None:
+                    current_trash = {"start": timestamp_sec, "end": timestamp_sec, "tag": tag}
+                else:
+                    current_trash["end"] = timestamp_sec
+            else:
+                if current_trash is not None:
+                    current_trash["end"] = timestamp_sec
+                    duration = current_trash["end"] - current_trash["start"]
+                    if duration >= 0.5:
+                        trash_timeline.append(current_trash)
+                    current_trash = None
+                    
+                if current_block is None:
+                    small_frame = cv2.resize(frame, (100, 100))
+                    sb_frame = cv2.resize(frame, (480, 270))
+                    current_block = {
+                        "start": timestamp_sec, 
+                        "end": timestamp_sec, 
+                        "tag": tag, 
+                        "best_moment": timestamp_sec, 
+                        "_max_lap": lap_var,
+                        "_frame_in": small_frame,
+                        "_frame_best": small_frame,
+                        "_sb_in": sb_frame,
+                        "_sb_best": sb_frame,
+                        "_motion_samples": [],
+                        "_prev_gray_flow": cv2.cvtColor(cv2.resize(frame, (160, 90)), cv2.COLOR_BGR2GRAY)
+                    }
+                else:
+                    current_block["end"] = timestamp_sec
+                    if lap_var > current_block.get("_max_lap", 0):
+                        current_block["_max_lap"] = lap_var
+                        current_block["best_moment"] = timestamp_sec
+                        current_block["_frame_best"] = cv2.resize(frame, (100, 100))
+                        current_block["_sb_best"] = cv2.resize(frame, (480, 270))
+                        
+                    curr_gray_flow = cv2.cvtColor(cv2.resize(frame, (160, 90)), cv2.COLOR_BGR2GRAY)
+                    if current_block.get("_prev_gray_flow") is not None:
+                        mag, d_dir = self.extract_motion_vectors(current_block["_prev_gray_flow"], curr_gray_flow)
+                        current_block["_motion_samples"].append((mag, d_dir))
+                    current_block["_prev_gray_flow"] = curr_gray_flow
+                        
+                    # Transizioni interne: Upgrade a MAIN_A
+                    if current_block["tag"] == 'B-ROLL' and tag == 'MAIN_A':
+                        current_block["tag"] = 'MAIN_A'
+                        
+            prev_frame = frame
+            
+            if next_pos % 500 < step:
+                print(f"  Analizzati {int(next_pos)}/{total_frames} frames...")
+                
+        if current_block is not None:
+            duration = current_block["end"] - current_block["start"]
+            if duration >= 1.0:
+                current_block["_frame_out"] = cv2.resize(prev_frame, (100, 100))
+                current_block["_sb_out"] = cv2.resize(prev_frame, (480, 270))
+                
+                frames_for_palette = [
+                    current_block.get("_frame_in"),
+                    current_block.get("_frame_best"),
+                    current_block.get("_frame_out")
+                ]
+                current_block["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
+                
+                storyboard_img = np.hstack((
+                    current_block.get("_sb_in"),
+                    current_block.get("_sb_best"),
+                    current_block.get("_sb_out")
+                ))
+                sb_filename = f"clip_{int(current_block['start']*1000)}.jpg"
+                sb_path = os.path.join(self.storyboard_dir, sb_filename)
+                cv2.imwrite(sb_path, storyboard_img)
+                current_block["storyboard_path"] = sb_path
+                
+                samples = current_block.get("_motion_samples", [])
+                if samples:
+                    avg_intensity = float(np.mean([s[0] for s in samples]))
+                    directions = [s[1] for s in samples]
+                    dom_dir = max(set(directions), key=directions.count)
+                else:
+                    avg_intensity = 0.0
+                    dom_dir = "STATIC"
+                current_block["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
+                
+                current_block.pop("_max_lap", None)
+                current_block.pop("_frame_in", None)
+                current_block.pop("_frame_best", None)
+                current_block.pop("_frame_out", None)
+                current_block.pop("_sb_in", None)
+                current_block.pop("_sb_best", None)
+                current_block.pop("_sb_out", None)
+                current_block.pop("_motion_samples", None)
+                current_block.pop("_prev_gray_flow", None)
+                
+                timeline.append(current_block)
+                
+        if current_trash is not None:
+            duration = current_trash["end"] - current_trash["start"]
+            if duration >= 0.5:
+                trash_timeline.append(current_trash)
+                
+        cap.release()
+        print(f"✅ Analisi Stringout completata. Trovati {len(timeline)} segmenti validi e {len(trash_timeline)} scarti.")
+        return timeline, trash_timeline
+
+    def generate_json(self, timeline):
+        """
+        4. Output JSON
+        """
+        data = {
+            "stringout_timeline": timeline
+        }
+        with open(self.json_out, 'w') as f:
+            json.dump(data, f, indent=2)
+        print(f"💾 Esportato JSON: {self.json_out}")
+        return self.json_out
+        
+    def generate_preview(self, video_path, timeline):
+        if not timeline:
+            return self.preview_out
+            
+        print(f"🎬 Generazione anteprima {os.path.basename(self.preview_out)}...")
+        try:
+            with VideoFileClip(video_path) as video:
+                subclips = []
+                for cut in timeline:
+                    # Rinominato 'start' e 'end' rispetto al vecchio codice per rispettare la nuova struttura
+                    clip = video.subclipped(cut['start'], cut['end'])
+                    subclips.append(clip)
+                
+                final_clip = concatenate_videoclips(subclips)
+                final_clip.write_videofile(
+                    self.preview_out,
+                    codec="libx264",
+                    audio_codec="aac",
+                    logger=None
+                )
+                
+                for c in subclips:
+                    c.close()
+                final_clip.close()
+            print(f"✅ Anteprima creata con successo: {self.preview_out}")
+        except Exception as e:
+            print(f"❌ Errore durante la generazione dell'anteprima: {e}")
+            
+        return self.preview_out
+
+    def generate_trash_preview(self, video_path, trash_timeline):
+        if not trash_timeline:
+            print("⚠️ Nessuno scarto rilevato. Trash Reel ignorato.")
+            return None
+            
+        print(f"🎬 Generazione Trash Reel {os.path.basename(self.trash_preview_out)}...")
+        try:
+            with VideoFileClip(video_path) as video:
+                subclips = []
+                for cut in trash_timeline:
+                    clip = video.subclipped(cut['start'], cut['end'])
+                    subclips.append(clip)
+                
+                final_clip = concatenate_videoclips(subclips)
+                final_clip.write_videofile(
+                    self.trash_preview_out,
+                    codec="libx264",
+                    audio_codec="aac",
+                    logger=None
+                )
+                
+                for c in subclips:
+                    c.close()
+                final_clip.close()
+            print(f"✅ Trash Reel creato con successo: {self.trash_preview_out}")
+            return self.trash_preview_out
+        except Exception as e:
+            print(f"❌ Errore durante la generazione del Trash Reel: {e}")
+            return None
+
+    def _export_director_package(self):
+        import shutil
+        print(f"📦 Confezionamento Valigetta del Regista (Export Package)...")
+        package_dir = os.path.join(self.output_dir, 'LLM_Export_Package')
+        os.makedirs(package_dir, exist_ok=True)
+        
+        if os.path.exists(self.json_out):
+            shutil.copy2(self.json_out, os.path.join(package_dir, os.path.basename(self.json_out)))
+            
+        dest_storyboard_dir = os.path.join(package_dir, 'storyboards')
+        if os.path.exists(self.storyboard_dir):
+            if os.path.exists(dest_storyboard_dir):
+                shutil.rmtree(dest_storyboard_dir)
+            shutil.copytree(self.storyboard_dir, dest_storyboard_dir)
+            
+        print(f"✅ Export Package salvato in: {package_dir}")
+        return package_dir
 
 # ==============================================================================
-# MAIN PIPELINE
+# ENTRY POINT PER L'ORCHESTRATORE
 # ==============================================================================
 def process_pancake_video(video_path, sequence_name="Pancake_Sequence"):
-    ensure_output_dir()
-    
-    if not os.path.exists(video_path):
-        print(f"❌ Errore: File {video_path} non trovato.")
-        return None, None, 0
-        
-    # Creazione Path Dinamici
-    json_main = os.path.join(OUTPUT_DIR, f"{sequence_name}_main_cuts.json")
-    json_broll = os.path.join(OUTPUT_DIR, f"{sequence_name}_broll_cuts.json")
-    preview_main = os.path.join(OUTPUT_DIR, f"{sequence_name}_preview_main.mp4")
-    preview_broll = os.path.join(OUTPUT_DIR, f"{sequence_name}_preview_broll.mp4")
-
-    # 1. Analisi Doppio Binario con Soglie Rilassate
-    frame_data_main, frame_data_broll, mean_motion = analyze_video(video_path)
-    
-    # 2. Estrazione (Applica Backtrack solo alla MAIN per eliminare l'intruso in coda)
-    print(f"✂️ Estrazione Main Track (Backtrack = {BACKTRACK_SECONDS}s)...")
-    main_cuts = extract_valid_segments(frame_data_main, MIN_CLIP_DURATION, apply_backtrack=True)
-    
-    print(f"✂️ Estrazione B-Roll Track (No Backtrack)...")
-    broll_cuts = extract_valid_segments(frame_data_broll, MIN_CLIP_DURATION, apply_backtrack=False)
-    
-    pacing_profile = deduce_pacing_profile(mean_motion)
-    print(f"📊 Metriche Globali: Movimento Medio = {mean_motion:.2f} -> Profilo Dedotto: '{pacing_profile}'")
-    
-    # 3. Salvataggio JSON (Main)
-    main_data = {
-        "pacing_profile": pacing_profile,
-        "global_mean_motion": float(round(mean_motion, 3)),
-        "track_type": "main",
-        "total_cuts": len(main_cuts),
-        "cuts": main_cuts
-    }
-    with open(json_main, 'w') as f:
-        json.dump(main_data, f, indent=2)
-        
-    # 4. Salvataggio JSON (B-Roll)
-    broll_data = {
-        "pacing_profile": pacing_profile,
-        "global_mean_motion": float(round(mean_motion, 3)),
-        "track_type": "b-roll",
-        "total_cuts": len(broll_cuts),
-        "cuts": broll_cuts
-    }
-    with open(json_broll, 'w') as f:
-        json.dump(broll_data, f, indent=2)
-        
-    print(f"💾 Esportati: {json_main} e {json_broll}")
-    
-    # 5. Generazione Anteprime
-    generate_moviepy_preview(video_path, main_cuts, preview_main)
-    generate_moviepy_preview(video_path, broll_cuts, preview_broll)
-    
-    return json_main, preview_main, len(main_cuts)
+    editor = PancakeEditor(sequence_name)
+    timeline, trash_timeline = editor.process_video(video_path)
+    json_path = editor.generate_json(timeline)
+    preview_path = editor.generate_preview(video_path, timeline)
+    trash_path = editor.generate_trash_preview(video_path, trash_timeline)
+    editor._export_director_package()
+    return json_path, preview_path, len(timeline), trash_path
 
 if __name__ == "__main__":
-    process_pancake_video(INPUT_VIDEO_PATH)
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    INPUT_VIDEO_PATH = os.path.join(BASE_DIR, 'input', 'input.mp4')
+    if os.path.exists(INPUT_VIDEO_PATH):
+        process_pancake_video(INPUT_VIDEO_PATH)

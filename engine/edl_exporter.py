@@ -14,16 +14,16 @@ def find_source_clip(timeline_start, clip_map):
     """
     Dato un timecode in secondi del proxy (timeline_start),
     trova la clip RAW corrispondente nella clip_map estratta da edl_parser.
-    Ritorna: (file_name, source_start_sec_effettivo)
+    Ritorna: (file_name, source_start_sec_effettivo, clip_timeline_end_sec)
     """
     for clip in clip_map:
         if clip["timeline_start_sec"] <= timeline_start <= clip["timeline_end_sec"]:
             # Calcola l'offset dall'inizio della clip proxy
             offset_in_clip = timeline_start - clip["timeline_start_sec"]
             actual_source_start = clip["source_start_sec"] + offset_in_clip
-            return clip["file_name"], actual_source_start
+            return clip["file_name"], actual_source_start, clip["timeline_end_sec"]
             
-    return "UNKNOWN_CLIP.mp4", 0.0
+    return None, 0.0, 0.0
 
 def export_to_edl(json_path, sequence_name, clip_map, output_edl_path, fps=50):
     """
@@ -39,8 +39,11 @@ def export_to_edl(json_path, sequence_name, clip_map, output_edl_path, fps=50):
         
     # Risoluzione lista tagli dal nostro formato JSON
     cuts_list = []
-    if isinstance(data, dict) and "cuts" in data:
-        cuts_list = data["cuts"]
+    if isinstance(data, dict):
+        if "cuts" in data:
+            cuts_list = data["cuts"]
+        elif "stringout_timeline" in data:
+            cuts_list = data["stringout_timeline"]
     elif isinstance(data, list):
         cuts_list = data
         
@@ -57,43 +60,58 @@ def export_to_edl(json_path, sequence_name, clip_map, output_edl_path, fps=50):
     
     # Il "Record In" del pancake parte da zero ed è sequenziale
     rec_in_sec = 0.0
+    event_counter = 1
     
-    for idx, cut in enumerate(cuts_list):
-        proxy_start = cut.get("start_sec", 0.0)
-        proxy_end = cut.get("end_sec", 0.0)
-        duration_sec = proxy_end - proxy_start
+    for cut in cuts_list:
+        proxy_start = cut.get("start_sec", cut.get("start", 0.0))
+        proxy_end = cut.get("end_sec", cut.get("end", 0.0))
         
-        if duration_sec <= 0:
+        if proxy_end <= proxy_start:
             continue
             
-        # Trova la source clip originale
-        src_file, src_in_sec = find_source_clip(proxy_start, clip_map)
-        src_out_sec = src_in_sec + duration_sec
-        
-        # Calcola Record Out (timeline compilata sequenzialmente)
-        rec_out_sec = rec_in_sec + duration_sec
-        
-        # Converti tutto in SMPTE Timecode
-        tc_src_in = seconds_to_timecode(src_in_sec, fps)
-        tc_src_out = seconds_to_timecode(src_out_sec, fps)
-        tc_rec_in = seconds_to_timecode(rec_in_sec, fps)
-        tc_rec_out = seconds_to_timecode(rec_out_sec, fps)
-        
-        # Costruzione entry CMX3600 (Tape id AX = generico)
-        edl_event_num = f"{idx + 1:03d}"
-        
-        # Line 1: Numero Evento | Tape | Channel | Type | Src In | Src Out | Rec In | Rec Out
-        line_1 = f"{edl_event_num}  AX       V     C        {tc_src_in} {tc_src_out} {tc_rec_in} {tc_rec_out}"
-        
-        # Line 2: Note per collegare nativamente in Premiere (usando il nome del file)
-        line_2 = f"* FROM CLIP NAME: {src_file}"
-        
-        edl_lines.append(line_1)
-        edl_lines.append(line_2)
-        edl_lines.append("") # riga vuota separatrice
-        
-        # Aggiorna il playhead di registrazione
-        rec_in_sec = rec_out_sec
+        current_start = proxy_start
+        while current_start < proxy_end:
+            # Trova la source clip originale
+            src_file, src_in_sec, global_clip_end = find_source_clip(current_start, clip_map)
+            
+            if not src_file:
+                # Fallback: clip non trovata nella mappa, saltiamo
+                break
+                
+            current_end = min(proxy_end, global_clip_end)
+            duration_sec = current_end - current_start
+            
+            if duration_sec <= 0:
+                break
+                
+            src_out_sec = src_in_sec + duration_sec
+            
+            # Calcola Record Out (timeline compilata sequenzialmente)
+            rec_out_sec = rec_in_sec + duration_sec
+            
+            # Converti tutto in SMPTE Timecode
+            tc_src_in = seconds_to_timecode(src_in_sec, fps)
+            tc_src_out = seconds_to_timecode(src_out_sec, fps)
+            tc_rec_in = seconds_to_timecode(rec_in_sec, fps)
+            tc_rec_out = seconds_to_timecode(rec_out_sec, fps)
+            
+            # Costruzione entry CMX3600 (Tape id AX = generico)
+            edl_event_num = f"{event_counter:03d}"
+            
+            # Line 1: Numero Evento | Tape | Channel | Type | Src In | Src Out | Rec In | Rec Out
+            line_1 = f"{edl_event_num}  AX       V     C        {tc_src_in} {tc_src_out} {tc_rec_in} {tc_rec_out}"
+            
+            # Line 2: Note per collegare nativamente in Premiere (usando il nome del file)
+            line_2 = f"* FROM CLIP NAME: {src_file}"
+            
+            edl_lines.append(line_1)
+            edl_lines.append(line_2)
+            edl_lines.append("") # riga vuota separatrice
+            
+            # Aggiorna il playhead di registrazione e avanza
+            rec_in_sec = rec_out_sec
+            current_start = current_end
+            event_counter += 1
         
     # Scrittura File
     os.makedirs(os.path.dirname(os.path.abspath(output_edl_path)), exist_ok=True)
