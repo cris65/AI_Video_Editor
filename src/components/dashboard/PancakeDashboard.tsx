@@ -1,4 +1,4 @@
-
+import { useState } from 'react';
 import { usePancakeData } from '../../hooks/usePancakeData';
 import { ClipCard } from './ClipCard';
 import { LayoutGrid, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
@@ -9,6 +9,7 @@ interface PancakeDashboardProps {
 
 export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const { data, loading, error } = usePancakeData(sequenceName);
+  const [activeTab, setActiveTab] = useState<'valid' | 'trash'>('valid');
 
   if (loading) {
     return (
@@ -43,18 +44,21 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   }
 
   const clips = data.stringout_timeline;
+  const validClips = clips.filter(c => c.is_usable !== false);
+  const trashClips = clips.filter(c => c.is_usable === false);
+  const activeClips = activeTab === 'valid' ? validClips : trashClips;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
         <div className="flex items-center gap-3">
           <div className="bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20 shadow-inner">
             <LayoutGrid className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Pancake HITL Dashboard</h1>
-            <p className="text-xs text-slate-500 font-mono mt-0.5">{sequenceName} • {clips.length} segmenti rilevati</p>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">{sequenceName} • {clips.length} segmenti totali rilevati</p>
           </div>
         </div>
         <div className="flex items-center gap-3 self-start sm:self-auto">
@@ -65,12 +69,47 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         </div>
       </header>
 
+      {/* Tabs */}
+      <div className="max-w-screen-2xl mx-auto px-6 pt-6 flex gap-3">
+        <button 
+          onClick={() => setActiveTab('valid')}
+          className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+            activeTab === 'valid' 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 border shadow-inner' 
+              : 'bg-slate-900/50 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200 shadow-sm'
+          }`}
+        >
+          Clip Selezionate
+          <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'valid' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+            {validClips.length}
+          </span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('trash')}
+          className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+            activeTab === 'trash' 
+              ? 'bg-red-500/10 text-red-400 border-red-500/30 border shadow-inner' 
+              : 'bg-slate-900/50 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200 shadow-sm'
+          }`}
+        >
+          Cestino (Scarti)
+          <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'trash' ? 'bg-red-500/20 text-red-300' : 'bg-slate-800 text-slate-400'}`}>
+            {trashClips.length}
+          </span>
+        </button>
+      </div>
+
       {/* Grid */}
       <main className="p-6 max-w-screen-2xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {clips.map((clip, idx) => (
+          {activeClips.map((clip, idx) => (
             <ClipCard key={`${clip.start}-${idx}`} clip={clip} sequenceName={sequenceName} />
           ))}
+          {activeClips.length === 0 && (
+            <div className="col-span-full py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+              Nessuna clip in questa categoria.
+            </div>
+          )}
         </div>
       </main>
     </div>
