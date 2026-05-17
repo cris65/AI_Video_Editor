@@ -7,6 +7,34 @@ import path from 'path'
 const engineAssetsPlugin = () => ({
   name: 'engine-assets',
   configureServer(server: any) {
+    server.middlewares.use('/api/save-hitl', (req: any, res: any, next: any) => {
+      if (req.method === 'POST') {
+        const url = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+        const sequence = url.searchParams.get('sequence');
+        if (!sequence) {
+          res.statusCode = 400;
+          return res.end('Missing sequence parameter');
+        }
+        
+        let body = '';
+        req.on('data', (chunk: any) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const hitlDataPath = path.join(process.cwd(), 'engine', 'output', sequence, 'LLM_Export_Package', `${sequence}_hitl_data.json`);
+            fs.writeFileSync(hitlDataPath, body);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify({ success: true }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(err.message);
+          }
+        });
+      } else {
+        next();
+      }
+    });
+
     server.middlewares.use('/engine/output', (req: any, res: any, next: any) => {
       const filePath = path.join(process.cwd(), 'engine', 'output', req.url.split('?')[0]);
       if (fs.existsSync(filePath)) {

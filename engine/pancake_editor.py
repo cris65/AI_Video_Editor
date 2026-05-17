@@ -170,12 +170,16 @@ class PancakeEditor:
         if not cap.isOpened():
             raise ValueError(f"Impossibile aprire il file video: {video_path}")
             
+        self.fps = cap.get(cv2.CAP_PROP_FPS)
+        self.width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self.height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         timeline = []
         trash_timeline = []
         current_block = None
         current_trash = None
+        last_timestamp = 0.0
         
         ret, prev_frame = cap.read()
         if not ret:
@@ -188,7 +192,7 @@ class PancakeEditor:
             small_frame = cv2.resize(prev_frame, (100, 100))
             sb_frame = cv2.resize(prev_frame, (480, 270))
             current_block = {
-                "start": 0.0, 
+                "start": last_timestamp, 
                 "end": 0.0, 
                 "tag": tag, 
                 "best_moment": 0.0, 
@@ -224,57 +228,67 @@ class PancakeEditor:
                 if current_block is not None:
                     current_block["end"] = timestamp_sec
                     duration = current_block["end"] - current_block["start"]
+                    
+                    # Populating metadata for preview
+                    current_block["_frame_out"] = cv2.resize(frame, (100, 100))
+                    current_block["_sb_out"] = cv2.resize(frame, (480, 270))
+                    
+                    frames_for_palette = [
+                        current_block.get("_frame_in"),
+                        current_block.get("_frame_best"),
+                        current_block.get("_frame_out")
+                    ]
+                    current_block["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
+                    
+                    storyboard_img = np.hstack((
+                        current_block.get("_sb_in"),
+                        current_block.get("_sb_best"),
+                        current_block.get("_sb_out")
+                    ))
+                    naming_base = self.get_clip_naming(current_block['start'])
+                    sb_filename = f"{naming_base}.jpg"
+                    sb_path = os.path.join(self.storyboard_dir, sb_filename)
+                    cv2.imwrite(sb_path, storyboard_img)
+                    current_block["storyboard_path"] = sb_path
+                    
+                    samples = current_block.get("_motion_samples", [])
+                    if samples:
+                        avg_intensity = float(np.mean([s[0] for s in samples]))
+                        directions = [s[1] for s in samples]
+                        dom_dir = max(set(directions), key=directions.count)
+                    else:
+                        avg_intensity = 0.0
+                        dom_dir = "STATIC"
+                    current_block["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
+                    
+                    current_block.pop("_max_lap", None)
+                    current_block.pop("_frame_in", None)
+                    current_block.pop("_frame_best", None)
+                    current_block.pop("_frame_out", None)
+                    current_block.pop("_sb_in", None)
+                    current_block.pop("_sb_best", None)
+                    current_block.pop("_sb_out", None)
+                    current_block.pop("_motion_samples", None)
+                    current_block.pop("_prev_gray_flow", None)
+                    
                     if duration >= 1.0:
-                        current_block["_frame_out"] = cv2.resize(frame, (100, 100))
-                        current_block["_sb_out"] = cv2.resize(frame, (480, 270))
-                        
-                        frames_for_palette = [
-                            current_block.get("_frame_in"),
-                            current_block.get("_frame_best"),
-                            current_block.get("_frame_out")
-                        ]
-                        current_block["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
-                        
-                        storyboard_img = np.hstack((
-                            current_block.get("_sb_in"),
-                            current_block.get("_sb_best"),
-                            current_block.get("_sb_out")
-                        ))
-                        naming_base = self.get_clip_naming(current_block['start'])
-                        sb_filename = f"{naming_base}.jpg"
-                        sb_path = os.path.join(self.storyboard_dir, sb_filename)
-                        cv2.imwrite(sb_path, storyboard_img)
-                        current_block["storyboard_path"] = sb_path
-                        
-                        samples = current_block.get("_motion_samples", [])
-                        if samples:
-                            avg_intensity = float(np.mean([s[0] for s in samples]))
-                            directions = [s[1] for s in samples]
-                            dom_dir = max(set(directions), key=directions.count)
-                        else:
-                            avg_intensity = 0.0
-                            dom_dir = "STATIC"
-                        current_block["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
-                        
-                        current_block.pop("_max_lap", None)
-                        current_block.pop("_frame_in", None)
-                        current_block.pop("_frame_best", None)
-                        current_block.pop("_frame_out", None)
-                        current_block.pop("_sb_in", None)
-                        current_block.pop("_sb_best", None)
-                        current_block.pop("_sb_out", None)
-                        current_block.pop("_motion_samples", None)
-                        current_block.pop("_prev_gray_flow", None)
-                        
                         current_block["is_usable"] = True
                         timeline.append(current_block)
+                    else:
+                        # Micro-clip or gap: force into trash to prevent black holes
+                        current_block["is_usable"] = False
+                        current_block["tag"] = "TRASH_GAP"
+                        current_block["technical_flaws"] = "TRASH_GAP"
+                        trash_timeline.append(current_block)
+                        
+                    last_timestamp = current_block["end"]
                     current_block = None
                     
                 if current_trash is None:
                     small_frame = cv2.resize(frame, (100, 100))
                     sb_frame = cv2.resize(frame, (480, 270))
                     current_trash = {
-                        "start": timestamp_sec, 
+                        "start": last_timestamp, 
                         "end": timestamp_sec, 
                         "tag": tag, 
                         "best_moment": timestamp_sec, 
@@ -305,58 +319,63 @@ class PancakeEditor:
                 if current_trash is not None:
                     current_trash["end"] = timestamp_sec
                     duration = current_trash["end"] - current_trash["start"]
-                    if duration >= 0.5:
-                        current_trash["_frame_out"] = cv2.resize(frame, (100, 100))
-                        current_trash["_sb_out"] = cv2.resize(frame, (480, 270))
-                        
-                        frames_for_palette = [
-                            current_trash.get("_frame_in"),
-                            current_trash.get("_frame_best"),
-                            current_trash.get("_frame_out")
-                        ]
-                        current_trash["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
-                        
-                        storyboard_img = np.hstack((
-                            current_trash.get("_sb_in"),
-                            current_trash.get("_sb_best"),
-                            current_trash.get("_sb_out")
-                        ))
-                        naming_base = self.get_clip_naming(current_trash['start'])
-                        sb_filename = f"{naming_base}.jpg"
-                        sb_path = os.path.join(self.storyboard_dir, sb_filename)
-                        cv2.imwrite(sb_path, storyboard_img)
-                        current_trash["storyboard_path"] = sb_path
-                        
-                        samples = current_trash.get("_motion_samples", [])
-                        if samples:
-                            avg_intensity = float(np.mean([s[0] for s in samples]))
-                            directions = [s[1] for s in samples]
-                            dom_dir = max(set(directions), key=directions.count)
-                        else:
-                            avg_intensity = 0.0
-                            dom_dir = "STATIC"
-                        current_trash["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
-                        
-                        current_trash.pop("_max_lap", None)
-                        current_trash.pop("_frame_in", None)
-                        current_trash.pop("_frame_best", None)
-                        current_trash.pop("_frame_out", None)
-                        current_trash.pop("_sb_in", None)
-                        current_trash.pop("_sb_best", None)
-                        current_trash.pop("_sb_out", None)
-                        current_trash.pop("_motion_samples", None)
-                        current_trash.pop("_prev_gray_flow", None)
+                    
+                    current_trash["_frame_out"] = cv2.resize(frame, (100, 100))
+                    current_trash["_sb_out"] = cv2.resize(frame, (480, 270))
+                    
+                    frames_for_palette = [
+                        current_trash.get("_frame_in"),
+                        current_trash.get("_frame_best"),
+                        current_trash.get("_frame_out")
+                    ]
+                    current_trash["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
+                    
+                    storyboard_img = np.hstack((
+                        current_trash.get("_sb_in"),
+                        current_trash.get("_sb_best"),
+                        current_trash.get("_sb_out")
+                    ))
+                    naming_base = self.get_clip_naming(current_trash['start'])
+                    sb_filename = f"{naming_base}.jpg"
+                    sb_path = os.path.join(self.storyboard_dir, sb_filename)
+                    cv2.imwrite(sb_path, storyboard_img)
+                    current_trash["storyboard_path"] = sb_path
+                    
+                    samples = current_trash.get("_motion_samples", [])
+                    if samples:
+                        avg_intensity = float(np.mean([s[0] for s in samples]))
+                        directions = [s[1] for s in samples]
+                        dom_dir = max(set(directions), key=directions.count)
+                    else:
+                        avg_intensity = 0.0
+                        dom_dir = "STATIC"
+                    current_trash["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
+                    
+                    current_trash.pop("_max_lap", None)
+                    current_trash.pop("_frame_in", None)
+                    current_trash.pop("_frame_best", None)
+                    current_trash.pop("_frame_out", None)
+                    current_trash.pop("_sb_in", None)
+                    current_trash.pop("_sb_best", None)
+                    current_trash.pop("_sb_out", None)
+                    current_trash.pop("_motion_samples", None)
+                    current_trash.pop("_prev_gray_flow", None)
 
-                        current_trash["is_usable"] = False
-                        current_trash["technical_flaws"] = current_trash["tag"]
-                        trash_timeline.append(current_trash)
+                    current_trash["is_usable"] = False
+                    if duration < 0.5:
+                        current_trash["tag"] = "TRASH_GAP"
+                        
+                    current_trash["technical_flaws"] = current_trash["tag"]
+                    trash_timeline.append(current_trash)
+                    
+                    last_timestamp = current_trash["end"]
                     current_trash = None
                     
                 if current_block is None:
                     small_frame = cv2.resize(frame, (100, 100))
                     sb_frame = cv2.resize(frame, (480, 270))
                     current_block = {
-                        "start": timestamp_sec, 
+                        "start": last_timestamp, 
                         "end": timestamp_sec, 
                         "tag": tag, 
                         "best_moment": timestamp_sec, 
@@ -394,99 +413,113 @@ class PancakeEditor:
                 print(f"  Analizzati {int(next_pos)}/{total_frames} frames...")
                 
         if current_block is not None:
+            # Forziamo l'end all'ultimo timestamp disponibile per coprire l'intera durata video
+            current_block["end"] = total_frames / self.fps
             duration = current_block["end"] - current_block["start"]
+            
+            current_block["_frame_out"] = cv2.resize(prev_frame, (100, 100))
+            current_block["_sb_out"] = cv2.resize(prev_frame, (480, 270))
+            
+            frames_for_palette = [
+                current_block.get("_frame_in"),
+                current_block.get("_frame_best"),
+                current_block.get("_frame_out")
+            ]
+            current_block["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
+            
+            storyboard_img = np.hstack((
+                current_block.get("_sb_in"),
+                current_block.get("_sb_best"),
+                current_block.get("_sb_out")
+            ))
+            naming_base = self.get_clip_naming(current_block['start'])
+            sb_filename = f"{naming_base}.jpg"
+            sb_path = os.path.join(self.storyboard_dir, sb_filename)
+            cv2.imwrite(sb_path, storyboard_img)
+            current_block["storyboard_path"] = sb_path
+            
+            samples = current_block.get("_motion_samples", [])
+            if samples:
+                avg_intensity = float(np.mean([s[0] for s in samples]))
+                directions = [s[1] for s in samples]
+                dom_dir = max(set(directions), key=directions.count)
+            else:
+                avg_intensity = 0.0
+                dom_dir = "STATIC"
+            current_block["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
+            
+            current_block.pop("_max_lap", None)
+            current_block.pop("_frame_in", None)
+            current_block.pop("_frame_best", None)
+            current_block.pop("_frame_out", None)
+            current_block.pop("_sb_in", None)
+            current_block.pop("_sb_best", None)
+            current_block.pop("_sb_out", None)
+            current_block.pop("_motion_samples", None)
+            current_block.pop("_prev_gray_flow", None)
+            
             if duration >= 1.0:
-                current_block["_frame_out"] = cv2.resize(prev_frame, (100, 100))
-                current_block["_sb_out"] = cv2.resize(prev_frame, (480, 270))
-                
-                frames_for_palette = [
-                    current_block.get("_frame_in"),
-                    current_block.get("_frame_best"),
-                    current_block.get("_frame_out")
-                ]
-                current_block["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
-                
-                storyboard_img = np.hstack((
-                    current_block.get("_sb_in"),
-                    current_block.get("_sb_best"),
-                    current_block.get("_sb_out")
-                ))
-                naming_base = self.get_clip_naming(current_block['start'])
-                sb_filename = f"{naming_base}.jpg"
-                sb_path = os.path.join(self.storyboard_dir, sb_filename)
-                cv2.imwrite(sb_path, storyboard_img)
-                current_block["storyboard_path"] = sb_path
-                
-                samples = current_block.get("_motion_samples", [])
-                if samples:
-                    avg_intensity = float(np.mean([s[0] for s in samples]))
-                    directions = [s[1] for s in samples]
-                    dom_dir = max(set(directions), key=directions.count)
-                else:
-                    avg_intensity = 0.0
-                    dom_dir = "STATIC"
-                current_block["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
-                
-                current_block.pop("_max_lap", None)
-                current_block.pop("_frame_in", None)
-                current_block.pop("_frame_best", None)
-                current_block.pop("_frame_out", None)
-                current_block.pop("_sb_in", None)
-                current_block.pop("_sb_best", None)
-                current_block.pop("_sb_out", None)
-                current_block.pop("_motion_samples", None)
-                current_block.pop("_prev_gray_flow", None)
-                
                 current_block["is_usable"] = True
                 timeline.append(current_block)
+            else:
+                current_block["is_usable"] = False
+                current_block["tag"] = "TRASH_GAP"
+                current_block["technical_flaws"] = "TRASH_GAP"
+                trash_timeline.append(current_block)
+                
                 
         if current_trash is not None:
+            # Forziamo l'end all'ultimo timestamp disponibile per coprire l'intera durata video
+            current_trash["end"] = total_frames / self.fps
             duration = current_trash["end"] - current_trash["start"]
-            if duration >= 0.5:
-                current_trash["_frame_out"] = cv2.resize(prev_frame, (100, 100))
-                current_trash["_sb_out"] = cv2.resize(prev_frame, (480, 270))
-                
-                frames_for_palette = [
-                    current_trash.get("_frame_in"),
-                    current_trash.get("_frame_best"),
-                    current_trash.get("_frame_out")
-                ]
-                current_trash["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
-                
-                storyboard_img = np.hstack((
-                    current_trash.get("_sb_in"),
-                    current_trash.get("_sb_best"),
-                    current_trash.get("_sb_out")
-                ))
-                naming_base = self.get_clip_naming(current_trash['start'])
-                sb_filename = f"{naming_base}.jpg"
-                sb_path = os.path.join(self.storyboard_dir, sb_filename)
-                cv2.imwrite(sb_path, storyboard_img)
-                current_trash["storyboard_path"] = sb_path
-                
-                samples = current_trash.get("_motion_samples", [])
-                if samples:
-                    avg_intensity = float(np.mean([s[0] for s in samples]))
-                    directions = [s[1] for s in samples]
-                    dom_dir = max(set(directions), key=directions.count)
-                else:
-                    avg_intensity = 0.0
-                    dom_dir = "STATIC"
-                current_trash["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
-                
-                current_trash.pop("_max_lap", None)
-                current_trash.pop("_frame_in", None)
-                current_trash.pop("_frame_best", None)
-                current_trash.pop("_frame_out", None)
-                current_trash.pop("_sb_in", None)
-                current_trash.pop("_sb_best", None)
-                current_trash.pop("_sb_out", None)
-                current_trash.pop("_motion_samples", None)
-                current_trash.pop("_prev_gray_flow", None)
+            
+            current_trash["_frame_out"] = cv2.resize(prev_frame, (100, 100))
+            current_trash["_sb_out"] = cv2.resize(prev_frame, (480, 270))
+            
+            frames_for_palette = [
+                current_trash.get("_frame_in"),
+                current_trash.get("_frame_best"),
+                current_trash.get("_frame_out")
+            ]
+            current_trash["cinematic_palette"] = self.extract_cinematic_palette(frames_for_palette)
+            
+            storyboard_img = np.hstack((
+                current_trash.get("_sb_in"),
+                current_trash.get("_sb_best"),
+                current_trash.get("_sb_out")
+            ))
+            naming_base = self.get_clip_naming(current_trash['start'])
+            sb_filename = f"{naming_base}.jpg"
+            sb_path = os.path.join(self.storyboard_dir, sb_filename)
+            cv2.imwrite(sb_path, storyboard_img)
+            current_trash["storyboard_path"] = sb_path
+            
+            samples = current_trash.get("_motion_samples", [])
+            if samples:
+                avg_intensity = float(np.mean([s[0] for s in samples]))
+                directions = [s[1] for s in samples]
+                dom_dir = max(set(directions), key=directions.count)
+            else:
+                avg_intensity = 0.0
+                dom_dir = "STATIC"
+            current_trash["motion"] = {"intensity": round(avg_intensity, 2), "direction": dom_dir}
+            
+            current_trash.pop("_max_lap", None)
+            current_trash.pop("_frame_in", None)
+            current_trash.pop("_frame_best", None)
+            current_trash.pop("_frame_out", None)
+            current_trash.pop("_sb_in", None)
+            current_trash.pop("_sb_best", None)
+            current_trash.pop("_sb_out", None)
+            current_trash.pop("_motion_samples", None)
+            current_trash.pop("_prev_gray_flow", None)
 
-                current_trash["is_usable"] = False
-                current_trash["technical_flaws"] = current_trash["tag"]
-                trash_timeline.append(current_trash)
+            current_trash["is_usable"] = False
+            if duration < 0.5:
+                current_trash["tag"] = "TRASH_GAP"
+                
+            current_trash["technical_flaws"] = current_trash["tag"]
+            trash_timeline.append(current_trash)
                 
         cap.release()
         print(f"✅ Analisi Stringout completata. Trovati {len(timeline)} segmenti validi e {len(trash_timeline)} scarti.")
@@ -497,6 +530,13 @@ class PancakeEditor:
         4. Output JSON
         """
         data = {
+            "metadata": {
+                "fps": getattr(self, 'fps', 50.0),
+                "resolution": {
+                    "width": getattr(self, 'width', 1920),
+                    "height": getattr(self, 'height', 1080)
+                }
+            },
             "stringout_timeline": timeline,
             "trash_timeline": trash_timeline or []
         }

@@ -5,9 +5,11 @@ interface InteractiveTimelineProps {
   timeline: PancakeClip[];
   videoRef: React.RefObject<HTMLVideoElement>;
   duration: number;
+  userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>>;
+  clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
 }
 
-export function InteractiveTimeline({ timeline, videoRef, duration }: InteractiveTimelineProps) {
+export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {} }: InteractiveTimelineProps) {
   const playheadRef = useRef<HTMLDivElement>(null);
   const timeTextRef = useRef<HTMLSpanElement>(null);
 
@@ -41,11 +43,24 @@ export function InteractiveTimeline({ timeline, videoRef, duration }: Interactiv
     }
   };
 
-  const getSegmentColor = (tag: string, isUsable?: boolean) => {
-    if (isUsable === false) return 'bg-red-500/80 hover:bg-red-400';
-    if (tag.includes('MAIN_A')) return 'bg-emerald-500/80 hover:bg-emerald-400';
-    if (tag.includes('B-ROLL')) return 'bg-blue-500/80 hover:bg-blue-400';
-    return 'bg-slate-500/80 hover:bg-slate-400';
+  const getSegmentColor = (tag: string, isUsable?: boolean, override?: 'KEEP' | 'TRASH' | 'BROLL') => {
+    let finalUsable = isUsable !== false;
+    let isBroll = tag.includes('B-ROLL');
+
+    if (override === 'KEEP') { finalUsable = true; isBroll = false; }
+    if (override === 'TRASH') { finalUsable = false; }
+    if (override === 'BROLL') { finalUsable = true; isBroll = true; }
+    
+    if (!finalUsable) {
+      if (override === 'TRASH') return 'bg-red-600 border-2 border-red-400 hover:bg-red-500 z-10'; // Forced trash
+      return 'bg-red-500/80 hover:bg-red-400'; // Native trash
+    }
+    
+    if (override === 'KEEP') return 'bg-emerald-400 border-2 border-emerald-300 hover:bg-emerald-300 z-10'; // Forced keep
+    if (override === 'BROLL') return 'bg-blue-400 border-2 border-blue-300 hover:bg-blue-300 z-10'; // Forced B-Roll
+
+    if (isBroll) return 'bg-blue-500/80 hover:bg-blue-400';
+    return 'bg-emerald-500/80 hover:bg-emerald-400'; // MAIN_A or default Valid
   };
 
   return (
@@ -63,14 +78,34 @@ export function InteractiveTimeline({ timeline, videoRef, duration }: Interactiv
         {timeline.map((clip, idx) => {
           const left = (clip.start / duration) * 100;
           const width = ((clip.end - clip.start) / duration) * 100;
+          const constraints = userConstraints[clip.start.toString()] || [];
+
+          const override = clipOverrides[clip.start.toString()];
 
           return (
             <div
               key={idx}
-              className={`absolute top-0 bottom-0 border-r border-slate-950 transition-colors ${getSegmentColor(clip.tag, clip.is_usable)}`}
+              className={`absolute top-0 bottom-0 border-r border-slate-950 transition-colors ${getSegmentColor(clip.tag, clip.is_usable, override)}`}
               style={{ left: `${left}%`, width: `${width}%` }}
               title={`[${clip.tag}] ${formatTime(clip.start)} - ${formatTime(clip.end)}`}
-            />
+            >
+              {/* Constraint Markers */}
+              {constraints.map((constraint, cIdx) => (
+                <div 
+                  key={cIdx}
+                  className="absolute top-1/2 text-[12px] font-black drop-shadow-md z-20 pointer-events-none transition-transform"
+                  style={{ 
+                    left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`, 
+                    transform: 'translate(-50%, -50%)',
+                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#eab308')
+                  }}
+                >
+                  {constraint.type === 'IN' && '['}
+                  {constraint.type === 'OUT' && ']'}
+                  {constraint.type === 'BM' && '★'}
+                </div>
+              ))}
+            </div>
           );
         })}
 

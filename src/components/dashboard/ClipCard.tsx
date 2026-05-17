@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Users, Info, Activity } from 'lucide-react';
+import { Users, Info, Activity, X } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
 interface ClipCardProps {
@@ -7,23 +7,30 @@ interface ClipCardProps {
   sequenceName: string;
   isActive?: boolean;
   onClick?: () => void;
+  constraints?: Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>;
+  onRemoveConstraint?: (time: number) => void;
+  overrideMode?: 'KEEP' | 'TRASH' | 'BROLL';
 }
 
-export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick }: ClipCardProps) {
-  const isRejected = clip.is_usable === false;
-  const [expanded, setExpanded] = useState(isActive || isRejected);
+export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, overrideMode }: ClipCardProps) {
+  let finalUsable = clip.is_usable !== false;
+  let isBroll = clip.tag.includes('B-ROLL');
+  
+  if (overrideMode === 'KEEP') { finalUsable = true; isBroll = false; }
+  if (overrideMode === 'TRASH') { finalUsable = false; }
+  if (overrideMode === 'BROLL') { finalUsable = true; isBroll = true; }
+  
+  const isRejected = !finalUsable;
+  const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isActive) {
-      setExpanded(true);
       if (cardRef.current) {
         cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    } else {
-      setExpanded(isRejected); // Ripristina lo stato compatto (tranne per il cestino che resta in allerta)
     }
-  }, [isActive, isRejected]);
+  }, [isActive]);
 
   const getBadgeColor = (tag: string) => {
     if (tag.includes('MAIN_A')) return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -42,13 +49,26 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
   const fileName = clip.storyboard_path ? clip.storyboard_path.split('/').pop() : '';
   const imageUrl = `/engine/output/${sequenceName}/storyboards/${fileName}`;
   const clipName = fileName ? fileName.split('_')[0] : 'Unknown';
+  const duration = (clip.end - clip.start).toFixed(1);
 
-  const baseWrapperClass = isRejected 
-    ? "bg-red-950/10 border-red-500/30 hover:border-red-500/50" 
-    : "bg-slate-900 border-slate-800 hover:border-slate-700";
+  const baseWrapperClass = overrideMode === 'KEEP'
+    ? "bg-emerald-950/10 border-emerald-500/40 hover:border-emerald-500/60"
+    : overrideMode === 'BROLL'
+      ? "bg-blue-950/10 border-blue-500/40 hover:border-blue-500/60"
+      : overrideMode === 'TRASH'
+        ? "bg-red-950/20 border-red-500/50 hover:border-red-500/70"
+        : isRejected 
+          ? "bg-red-950/10 border-red-500/30 hover:border-red-500/50" 
+          : isBroll
+            ? "bg-blue-950/10 border-blue-500/30 hover:border-blue-500/50"
+            : "bg-slate-900 border-slate-800 hover:border-slate-700";
 
   const activeGlow = isActive 
-    ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-slate-950 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] z-10" 
+    ? (isRejected 
+        ? "ring-2 ring-red-500 ring-offset-2 ring-offset-slate-950 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)] z-10" 
+        : isBroll
+          ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-950 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.3)] z-10"
+          : "ring-2 ring-emerald-500 ring-offset-2 ring-offset-slate-950 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] z-10")
     : "";
 
   const cardWrapperClass = `cursor-pointer border rounded-xl overflow-hidden shadow-lg transition-all group flex flex-col ${baseWrapperClass} ${activeGlow}`;
@@ -70,18 +90,50 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           </div>
         )}
 
-        {/* Minimal REJECTED Badge */}
-        {isRejected && (
+        {/* Override Badge OR Minimal REJECTED Badge */}
+        {overrideMode ? (
+          <div className="absolute top-2 right-2 flex items-center justify-center z-30">
+            <span className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border backdrop-blur-md shadow-sm
+              ${overrideMode === 'KEEP' ? 'bg-emerald-950/90 text-emerald-400 border-emerald-500/50' 
+                : overrideMode === 'BROLL' ? 'bg-blue-950/90 text-blue-400 border-blue-500/50'
+                : 'bg-red-950/90 text-red-400 border-red-500/50'}
+            `}>
+              {overrideMode === 'KEEP' ? 'FORCED KEEP' : overrideMode === 'BROLL' ? 'FORCED B-ROLL' : 'FORCED TRASH'}
+            </span>
+          </div>
+        ) : isRejected ? (
           <div className="absolute top-2 right-2 flex items-center justify-center z-30">
             <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-950/90 text-red-400 text-[10px] font-bold border border-red-500/30 backdrop-blur-md shadow-sm">
               <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
               REJECTED
             </span>
           </div>
+        ) : null}
+
+        {/* Constraints Badge */}
+        {constraints && constraints.length > 0 && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center justify-center z-30">
+            {constraints.length === 1 ? (
+              <span className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md shadow-lg
+                ${constraints[0].type === 'IN' ? 'bg-blue-500/90 text-white border-blue-400' : ''}
+                ${constraints[0].type === 'OUT' ? 'bg-purple-500/90 text-white border-purple-400' : ''}
+                ${constraints[0].type === 'BM' ? 'bg-yellow-500/90 text-yellow-950 border-yellow-400' : ''}
+              `}>
+                {constraints[0].type === 'IN' && 'FORCED IN'}
+                {constraints[0].type === 'OUT' && 'FORCED OUT'}
+                {constraints[0].type === 'BM' && '🔥 ANCHOR'}
+                <span className="opacity-80 ml-1">[{constraints[0].time.toFixed(2)}s]</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md shadow-lg bg-slate-900/90 text-emerald-400 border-emerald-500/50">
+                🔥 {constraints.length} ANCHORS SET
+              </span>
+            )}
+          </div>
         )}
         
         {/* Top Badges */}
-        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-20">
+        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-20 pointer-events-none">
           <div className="flex flex-col gap-1.5">
             <span className="px-2 py-1 rounded bg-slate-950/80 text-white text-xs font-bold font-mono border border-slate-800 backdrop-blur-md shadow-sm w-fit">
               {clipName}
@@ -110,7 +162,7 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           </div>
           <div className="flex items-center gap-2">
              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'text-slate-300 bg-slate-950/80 border-slate-800'}`}>
-               {clip.start.toFixed(1)}s - {clip.end.toFixed(1)}s
+               {clip.start.toFixed(1)}s - {clip.end.toFixed(1)}s <span className="ml-1 opacity-70">({duration}s)</span>
              </span>
           </div>
         </div>
@@ -135,6 +187,43 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
             />
           </div>
         </div>
+
+        {/* Actionable Constraints List */}
+        {constraints && constraints.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {constraints.map((c, idx) => (
+              <div 
+                key={`${c.time}-${idx}`}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold shadow-sm transition-colors group/badge
+                  ${c.type === 'IN' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : ''}
+                  ${c.type === 'OUT' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : ''}
+                  ${c.type === 'BM' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' : ''}
+                `}
+              >
+                <span>
+                  {c.type === 'IN' && 'IN'}
+                  {c.type === 'OUT' && 'OUT'}
+                  {c.type === 'BM' && '★'}
+                  <span className="opacity-80 ml-1">[{c.time.toFixed(2)}s]</span>
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRemoveConstraint) onRemoveConstraint(c.time);
+                  }}
+                  className={`opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded
+                    ${c.type === 'IN' ? 'hover:bg-blue-500/20 text-blue-400' : ''}
+                    ${c.type === 'OUT' ? 'hover:bg-purple-500/20 text-purple-400' : ''}
+                    ${c.type === 'BM' ? 'hover:bg-yellow-500/20 text-yellow-500' : ''}
+                  `}
+                  title="Remove Marker"
+                >
+                  <X size={12} strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <button 
           onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}

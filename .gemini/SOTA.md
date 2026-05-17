@@ -15,7 +15,7 @@
 3. **edl_exporter.py**: Esportatore Premiere-ready (CMX3600), gestisce dinamicamente i "Boundary Crossing".
 4. **mlx_client.py**: Microservizio Sincrono che agisce come gateway LLM Vision. Interroga l'API locale `127.0.0.1:8080/v1/chat/completions` (OpenAI format, modello gemma-4-e4b) caricando i base64 per arricchire il JSON con punteggio e analisi semantica continuativa. Dotato di auto-retry e salvataggio incrementale atomico.
 5. **main.py**: Orchestratore CLI interamente automatizzato (Zero-Click Pipeline). Passa attraverso tre fasi (Taglio YOLO, Inferenza LLM Vision su MLX, e Scrittura EDL).
-6. **Frontend HITL (React/Vite)**: Interfaccia utente Human-In-The-Loop. Architettura Split-View NLE-style con Video Player sincronizzato e Timeline Interattiva. Integra un'ingegneria Anti-Lag spinta (60fps): il data-binding temporale usa `requestAnimationFrame` scavalcando lo state React globale, e implementa navigazione tastiera e Vertical Playlist con `React.memo` per azzerare i re-render non necessari.
+6. **Frontend HITL (React/Vite)**: Interfaccia utente Human-In-The-Loop. Architettura Split-View NLE-style con Video Player sincronizzato e Timeline Interattiva. Integra un'ingegneria Anti-Lag spinta (60fps): il data-binding temporale usa `requestAnimationFrame` scavalcando lo state React globale, e implementa navigazione tastiera e Vertical Playlist con `React.memo`. Include un sistema Multi-Anchor (vincoli multipli per clip) e un sistema di Override Non-Distruttivo (KEEP/TRASH/BROLL) con filtri avanzati per la timeline, salvando i dati su sidecar JSON (`_hitl_data.json`) via endpoint Node locale.
 
 ## Automazione (Open Agent Manager)
 - I flussi di rilascio (`/wolf_flow`) validano e wrappano commit complessi sul repo `origin develop`.

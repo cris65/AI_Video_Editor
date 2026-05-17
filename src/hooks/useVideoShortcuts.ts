@@ -3,7 +3,10 @@ import type { PancakeClip } from './usePancakeData';
 
 export function useVideoShortcuts(
   videoRef: React.RefObject<HTMLVideoElement>,
-  timeline: PancakeClip[]
+  timeline: PancakeClip[],
+  fps: number,
+  onConstraint: (type: 'IN' | 'OUT' | 'BM' | 'CLEAR' | 'CLEAR_ALL', time: number) => void,
+  onOverride: (type: 'KEEP' | 'TRASH' | 'BROLL' | 'CLEAR', time: number) => void
 ) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -14,6 +17,8 @@ export function useVideoShortcuts(
 
       const video = videoRef.current;
       if (!video) return;
+
+      const frameDuration = 1 / (fps || 25);
 
       switch (e.code) {
         case 'Space':
@@ -27,17 +32,16 @@ export function useVideoShortcuts(
 
         case 'ArrowLeft':
           e.preventDefault();
-          video.currentTime = Math.max(0, video.currentTime - 2);
+          video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? frameDuration : 10 * frameDuration));
           break;
 
         case 'ArrowRight':
           e.preventDefault();
-          video.currentTime = Math.min(video.duration, video.currentTime + 2);
+          video.currentTime = Math.min(video.duration, video.currentTime + (e.shiftKey ? frameDuration : 10 * frameDuration));
           break;
 
         case 'ArrowUp': {
           e.preventDefault();
-          // Cerca la prima clip il cui 'start' è minore del currentTime corrente (con un buffer per permettere doppi salti rapidi)
           const currentTime = video.currentTime;
           const prevClip = timeline.slice().reverse().find(c => c.start < currentTime - 0.5);
           if (prevClip) {
@@ -50,7 +54,6 @@ export function useVideoShortcuts(
 
         case 'ArrowDown': {
           e.preventDefault();
-          // Cerca la prima clip il cui 'start' è maggiore del currentTime corrente
           const currentTime = video.currentTime;
           const nextClip = timeline.find(c => c.start > currentTime + 0.1);
           if (nextClip) {
@@ -58,6 +61,47 @@ export function useVideoShortcuts(
           }
           break;
         }
+
+        case 'KeyI':
+          e.preventDefault();
+          onConstraint('IN', video.currentTime);
+          break;
+
+        case 'KeyO':
+          e.preventDefault();
+          onConstraint('OUT', video.currentTime);
+          break;
+
+        case 'KeyM':
+          e.preventDefault();
+          onConstraint('BM', video.currentTime);
+          break;
+
+        case 'KeyX':
+        case 'Backspace':
+          e.preventDefault();
+          if (e.shiftKey) {
+            onConstraint('CLEAR_ALL', video.currentTime);
+            onOverride('CLEAR', video.currentTime);
+          } else {
+            onConstraint('CLEAR', video.currentTime);
+          }
+          break;
+
+        case 'KeyK':
+          e.preventDefault();
+          onOverride('KEEP', video.currentTime);
+          break;
+
+        case 'KeyT':
+          e.preventDefault();
+          onOverride('TRASH', video.currentTime);
+          break;
+
+        case 'KeyB':
+          e.preventDefault();
+          onOverride('BROLL', video.currentTime);
+          break;
       }
     };
 
@@ -65,5 +109,5 @@ export function useVideoShortcuts(
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [videoRef, timeline]);
+  }, [videoRef, timeline, fps, onConstraint]);
 }

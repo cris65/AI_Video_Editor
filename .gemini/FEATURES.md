@@ -32,7 +32,9 @@ L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard Op
 ## Frontend (React HITL Dashboard)
 
 ### 1. NLE-Style Split-View
-- **Interactive Timeline**: Barra temporale sincronizzata al millisecondo, renderizza cromaticamente i segmenti validi (Verde MAIN, Blu B-ROLL) e scartati (Rosso).
+- **Interactive Timeline**: Barra temporale sincronizzata al millisecondo, renderizza cromaticamente i segmenti validi (Verde MAIN, Blu B-ROLL) e scartati (Rosso). Supporta Filtri dinamici (ALL/VALID/BROLL/TRASH) che lasciano spazi vuoti ("buchi neri") fisici per rispettare il timing.
 - **Vertical Playlist Auto-Scrollante**: L'ispettore laterale scorre autonomamente e tiene sempre a fuoco la clip attiva nel video, garantendo una UX immersiva.
+- **Multi-Anchor System (BM/IN/OUT)**: Gli editor umani possono applicare molteplici vincoli temporali (markers) sulla stessa clip premendo `M`, `I`, `O`. Rimuovibili in modo chirurgico e frame-accurate tramite `X`, o visualizzati come lista interattiva direttamente nella ClipCard.
+- **Forced Overrides Non-Distruttivi**: Tasti `K` (Keep), `T` (Trash), e `B` (B-Roll) permettono all'umano di scavalcare l'Intelligenza Artificiale, forzando lo stato di una clip. Le modifiche sono visualizzate istantaneamente con glow e badge (es. `FORCED B-ROLL`), e salvate in parallelo su sidecar JSON.
 - **Keyboard Shortcuts Professionali**: Integrazione standard per il montaggio. Spazio per Play/Pausa, frecce orizzontali per lo scrubbing, frecce verticali per "saltare" istantaneamente ai tagli successivi/precedenti calcolati dall'Engine.
 - **Anti-Lag Engine (60fps)**: Data-binding del tempo completamente sganciato dal React State e demandato a un `requestAnimationFrame` diretto sul DOM. I re-render React sono bloccati tramite `React.memo` tranne quando il video sorpassa un effettivo "taglio" dell'EDL virtuale.
