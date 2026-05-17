@@ -43,16 +43,20 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 
 ## 🟡 FASE 2: Frontend HITL (Human-In-The-Loop) & Supabase
 
-- [ ] Inizializzazione ambiente React puro (root) purificato dal vecchio
-      template CRM.
-- [ ] Dashboard HITL per ispezione visiva del JSON: l'utente deve poter leggere
-      l'analisi di MLX, vedere i frame estratti, e forzare manualmente i valori
-      (es. correggere il `people_count` o lo score).
+- [x] Inizializzazione ambiente React puro (root) purificato dal vecchio template CRM.
+- [x] Dashboard HITL per ispezione visiva del JSON (in sola lettura per ora).
+- [ ] Override e forzatura manuale dei valori da parte dell'utente (Salvataggio in Dexie).
 - [ ] Integrazione Supabase per il salvataggio degli stati di avanzamento delle
       timeline.
 
-## 🔴 FASE 3: Orchestrazione Avanzata (FUTURA)
+## 🔴 FASE 3: Il "Regista" & Orchestrazione
 
 - [ ] Rilevamento di anomalie video avanzate (micro-mosso, drop frame).
 - [ ] Esportazione XML multi-track per NLE alternativi (DaVinci/FCPX).
 - [ ] Packaging e automazione esecuzione batch in background.
+
+## 🟣 FASE 4: Integrazione Nativa & Distribuzione (Endgame)
+
+- [ ] Refactoring del Frontend React in Adobe CEP Extension (Manifest XML, ExtendScript).
+- [ ] Automazione I/O: Sincronizzazione automatica della timeline attiva tramite script JSX.
+- [ ] Packaging MLX: Creazione di un installer "One-Click" (macOS .pkg o PyInstaller) per rendere il server MLX locale invisibile e friction-less per l'utente finale non tecnico.

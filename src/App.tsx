@@ -1,10 +1,11 @@
+
+import { PancakeDashboard } from './components/dashboard/PancakeDashboard';
+
 export default function App() {
+  // Hardcoded per la Fase 2 HITL
+  const sequenceName = "RAW_BASE_SEQ_AMICI_DONDOLO";
+
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-4">🐺 Wolf Stack</h1>
-        <p className="text-slate-400">Vite + React + Tailwind + Dexie + Supabase</p>
-      </div>
-    </div>
+    <PancakeDashboard sequenceName={sequenceName} />
   );
 }
