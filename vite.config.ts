@@ -11,10 +11,37 @@ const engineAssetsPlugin = () => ({
       const filePath = path.join(process.cwd(), 'engine', 'output', req.url.split('?')[0]);
       if (fs.existsSync(filePath)) {
         const ext = path.extname(filePath).toLowerCase();
-        if (ext === '.json') res.setHeader('Content-Type', 'application/json');
-        if (ext === '.jpg' || ext === '.jpeg') res.setHeader('Content-Type', 'image/jpeg');
+        const stat = fs.statSync(filePath);
+        const fileSize = stat.size;
+        const range = req.headers.range;
+
         res.setHeader('Access-Control-Allow-Origin', '*');
-        fs.createReadStream(filePath).pipe(res);
+        res.setHeader('Accept-Ranges', 'bytes');
+
+        let contentType = 'application/octet-stream';
+        if (ext === '.json') contentType = 'application/json';
+        else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+        else if (ext === '.mp4') contentType = 'video/mp4';
+
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+          const chunksize = (end - start) + 1;
+
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Content-Length': chunksize,
+            'Content-Type': contentType,
+          });
+          fs.createReadStream(filePath, { start, end }).pipe(res);
+        } else {
+          res.writeHead(200, {
+            'Content-Length': fileSize,
+            'Content-Type': contentType,
+          });
+          fs.createReadStream(filePath).pipe(res);
+        }
       } else {
         next();
       }

@@ -38,7 +38,14 @@ export function usePancakeData(sequenceName: string) {
           throw new Error(`Errore HTTP: ${res.status} - Impossibile caricare il JSON. Assicurati che l'Engine abbia esportato correttamente in LLM_Export_Package.`);
         }
         const json = await res.json();
-        setData(json);
+        
+        // Uniamo cronologicamente le clip valide e il cestino
+        const combinedTimeline = [
+          ...(json.stringout_timeline || []),
+          ...(json.trash_timeline || [])
+        ].sort((a, b) => a.start - b.start);
+
+        setData({ stringout_timeline: combinedTimeline });
       } catch (err: any) {
         setError(err.message || 'Errore sconosciuto durante il caricamento dei dati');
       } finally {

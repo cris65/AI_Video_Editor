@@ -28,3 +28,11 @@ L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard Op
 - **Ingest Agnostico:** Supporto esteso a `.mp4`, `.mov`, `.mxf`, `.avi`, `.mkv`.
 - **Auto-Cleanup:** Una volta emesso il file EDL (`_Stringout_Cut.edl`), i file originali nella drop zone vengono puliti e spostati direttamente nella cartella di output della rispettiva sequenza per evitare strascichi.
 - **Esportazione Diretta:** Eliminato il gate manuale [Y/N]; il motore macina proxy, calcola scarti e genera CMX3600 in autonomia totale a 50fps.
+
+## Frontend (React HITL Dashboard)
+
+### 1. NLE-Style Split-View
+- **Interactive Timeline**: Barra temporale sincronizzata al millisecondo, renderizza cromaticamente i segmenti validi (Verde MAIN, Blu B-ROLL) e scartati (Rosso).
+- **Vertical Playlist Auto-Scrollante**: L'ispettore laterale scorre autonomamente e tiene sempre a fuoco la clip attiva nel video, garantendo una UX immersiva.
+- **Keyboard Shortcuts Professionali**: Integrazione standard per il montaggio. Spazio per Play/Pausa, frecce orizzontali per lo scrubbing, frecce verticali per "saltare" istantaneamente ai tagli successivi/precedenti calcolati dall'Engine.
+- **Anti-Lag Engine (60fps)**: Data-binding del tempo completamente sganciato dal React State e demandato a un `requestAnimationFrame` diretto sul DOM. I re-render React sono bloccati tramite `React.memo` tranne quando il video sorpassa un effettivo "taglio" dell'EDL virtuale.

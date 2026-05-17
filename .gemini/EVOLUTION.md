@@ -44,7 +44,9 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 ## 🟡 FASE 2: Frontend HITL (Human-In-The-Loop) & Supabase
 
 - [x] Inizializzazione ambiente React puro (root) purificato dal vecchio template CRM.
-- [x] Dashboard HITL per ispezione visiva del JSON (in sola lettura per ora).
+- [x] Dashboard HITL Split-View con Video Player Sincronizzato e Timeline Interattiva.
+- [x] Sincronizzazione Anti-Lag a 60fps con requestAnimationFrame e disaccoppiamento dello stato temporale.
+- [x] Navigazione avanzata tramite Keyboard Shortcuts (NLE Style) e Vertical Playlist auto-scrollante.
 - [ ] Override e forzatura manuale dei valori da parte dell'utente (Salvataggio in Dexie).
 - [ ] Integrazione Supabase per il salvataggio degli stati di avanzamento delle
       timeline.

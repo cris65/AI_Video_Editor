@@ -1,15 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Users, Info, Activity } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
 interface ClipCardProps {
   clip: PancakeClip;
   sequenceName: string;
+  isActive?: boolean;
+  onClick?: () => void;
 }
 
-export function ClipCard({ clip, sequenceName }: ClipCardProps) {
+export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick }: ClipCardProps) {
   const isRejected = clip.is_usable === false;
-  const [expanded, setExpanded] = useState(isRejected); // Auto-expand se rejected
+  const [expanded, setExpanded] = useState(isActive || isRejected);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isActive) {
+      setExpanded(true);
+      if (cardRef.current) {
+        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      setExpanded(isRejected); // Ripristina lo stato compatto (tranne per il cestino che resta in allerta)
+    }
+  }, [isActive, isRejected]);
 
   const getBadgeColor = (tag: string) => {
     if (tag.includes('MAIN_A')) return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -29,19 +43,25 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
   const imageUrl = `/engine/output/${sequenceName}/storyboards/${fileName}`;
   const clipName = fileName ? fileName.split('_')[0] : 'Unknown';
 
-  const cardWrapperClass = isRejected 
-    ? "bg-red-950/10 border border-red-500/30 rounded-xl overflow-hidden shadow-lg transition-all hover:border-red-500/50 group flex flex-col"
-    : "bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg transition-all hover:border-slate-700 group flex flex-col";
+  const baseWrapperClass = isRejected 
+    ? "bg-red-950/10 border-red-500/30 hover:border-red-500/50" 
+    : "bg-slate-900 border-slate-800 hover:border-slate-700";
+
+  const activeGlow = isActive 
+    ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-slate-950 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] z-10" 
+    : "";
+
+  const cardWrapperClass = `cursor-pointer border rounded-xl overflow-hidden shadow-lg transition-all group flex flex-col ${baseWrapperClass} ${activeGlow}`;
 
   return (
-    <div className={cardWrapperClass}>
+    <div className={cardWrapperClass} ref={cardRef} onClick={onClick}>
       {/* Thumbnail */}
       <div className="relative aspect-video bg-slate-950 overflow-hidden">
         {fileName ? (
           <img 
             src={imageUrl} 
             alt="Storyboard" 
-            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isRejected ? 'opacity-50 grayscale-[50%]' : ''}`}
+            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isRejected ? 'opacity-80' : ''}`}
             loading="lazy"
           />
         ) : (
@@ -50,12 +70,13 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
           </div>
         )}
 
-        {/* REJECTED Badge Overlay */}
+        {/* Minimal REJECTED Badge */}
         {isRejected && (
-          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-             <div className="transform -rotate-12 border-4 border-red-500/60 text-red-500/80 font-black text-3xl tracking-widest px-4 py-1 rounded-lg backdrop-blur-sm shadow-2xl bg-slate-950/20">
-               REJECTED
-             </div>
+          <div className="absolute top-2 right-2 flex items-center justify-center z-30">
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-950/90 text-red-400 text-[10px] font-bold border border-red-500/30 backdrop-blur-md shadow-sm">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              REJECTED
+            </span>
           </div>
         )}
         
@@ -71,10 +92,12 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
           </div>
           
           <div className="flex gap-2">
-            <span className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-slate-950/80 text-slate-300 backdrop-blur-md border border-slate-800/50">
-              <Users size={12} />
-              {clip.people_count || 0}
-            </span>
+            {!isRejected && (
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-slate-950/80 text-slate-300 backdrop-blur-md border border-slate-800/50">
+                <Users size={12} />
+                {clip.people_count || 0}
+              </span>
+            )}
           </div>
         </div>
         
@@ -86,7 +109,7 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
             ))}
           </div>
           <div className="flex items-center gap-2">
-             <span className="text-xs font-mono text-slate-300 bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800">
+             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'text-slate-300 bg-slate-950/80 border-slate-800'}`}>
                {clip.start.toFixed(1)}s - {clip.end.toFixed(1)}s
              </span>
           </div>
@@ -114,7 +137,7 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
         </div>
 
         <button 
-          onClick={() => setExpanded(!expanded)}
+          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
           className={`mt-auto w-full flex items-center justify-between text-xs py-2 border-t transition-colors ${
             isRejected ? 'text-red-400 hover:text-red-300 border-red-500/20' : 'text-slate-400 hover:text-slate-200 border-slate-800/50'
           }`}
@@ -144,4 +167,4 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
       </div>
     </div>
   );
-}
+});
