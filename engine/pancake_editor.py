@@ -6,8 +6,9 @@ from moviepy import VideoFileClip, concatenate_videoclips
 from ultralytics import YOLO
 
 class PancakeEditor:
-    def __init__(self, sequence_name="Pancake_Sequence"):
+    def __init__(self, sequence_name="Pancake_Sequence", clip_map=None):
         self.sequence_name = sequence_name
+        self.clip_map = clip_map or []
         
         # 1. Parametri di Soglia
         self.BLUR_THRESHOLD = 10.0
@@ -137,6 +138,27 @@ class PancakeEditor:
 
         return avg_mag, direction
 
+    def seconds_to_timecode_safe(self, seconds, fps=50):
+        """Converte secondi in timecode stringa safe (es. 00-01-29-14)"""
+        frames = int(round(seconds * fps))
+        ff = frames % fps
+        total_sec = frames // fps
+        ss = total_sec % 60
+        total_min = total_sec // 60
+        mm = total_min % 60
+        hh = total_min // 60
+        return f"{hh:02d}-{mm:02d}-{ss:02d}-{ff:02d}"
+
+    def get_clip_naming(self, timestamp_sec):
+        """Ricava il root name {clip}_{tc_safe} analizzando la clip_map EDL."""
+        clip_base = self.sequence_name
+        tc_safe = self.seconds_to_timecode_safe(timestamp_sec)
+        for clip in self.clip_map:
+            if clip["timeline_start_sec"] <= timestamp_sec < clip["timeline_end_sec"]:
+                clip_base = clip.get("clip_name_base", clip_base)
+                break
+        return f"{clip_base}_{tc_safe}"
+
     def process_video(self, video_path):
         """
         3. Logica di Costruzione Stringout
@@ -215,7 +237,8 @@ class PancakeEditor:
                             current_block.get("_sb_best"),
                             current_block.get("_sb_out")
                         ))
-                        sb_filename = f"clip_{int(current_block['start']*1000)}.jpg"
+                        naming_base = self.get_clip_naming(current_block['start'])
+                        sb_filename = f"{naming_base}.jpg"
                         sb_path = os.path.join(self.storyboard_dir, sb_filename)
                         cv2.imwrite(sb_path, storyboard_img)
                         current_block["storyboard_path"] = sb_path
@@ -312,7 +335,8 @@ class PancakeEditor:
                     current_block.get("_sb_best"),
                     current_block.get("_sb_out")
                 ))
-                sb_filename = f"clip_{int(current_block['start']*1000)}.jpg"
+                naming_base = self.get_clip_naming(current_block['start'])
+                sb_filename = f"{naming_base}.jpg"
                 sb_path = os.path.join(self.storyboard_dir, sb_filename)
                 cv2.imwrite(sb_path, storyboard_img)
                 current_block["storyboard_path"] = sb_path
@@ -441,8 +465,8 @@ class PancakeEditor:
 # ==============================================================================
 # ENTRY POINT PER L'ORCHESTRATORE
 # ==============================================================================
-def process_pancake_video(video_path, sequence_name="Pancake_Sequence"):
-    editor = PancakeEditor(sequence_name)
+def process_pancake_video(video_path, sequence_name="Pancake_Sequence", clip_map=None):
+    editor = PancakeEditor(sequence_name, clip_map)
     timeline, trash_timeline = editor.process_video(video_path)
     json_path = editor.generate_json(timeline)
     preview_path = editor.generate_preview(video_path, timeline)

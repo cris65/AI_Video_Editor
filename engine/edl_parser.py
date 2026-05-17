@@ -62,7 +62,10 @@ def parse_ingest_edl(edl_path, fps=50):
             
         # Match riga del nome del file: "* FROM CLIP NAME: filename.mxf"
         if line.startswith("* FROM CLIP NAME:") and current_clip:
-            current_clip["file_name"] = line.replace("* FROM CLIP NAME:", "").strip()
+            raw_name = line.replace("* FROM CLIP NAME:", "").strip()
+            base_name = os.path.splitext(raw_name)[0]
+            current_clip["file_name"] = raw_name
+            current_clip["clip_name_base"] = base_name
             clip_map.append(current_clip)
             current_clip = {} # svuotiamo per il prossimo giro
             

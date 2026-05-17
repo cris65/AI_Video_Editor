@@ -10,10 +10,11 @@
 - **Topologia Stagna:** Gli output sono confinati in `engine/output/` con nomenclatura `_Stringout_Cut.edl`, e i file d'ingresso vengono automaticamente spostati in `engine/archive/` al termine del processo.
 
 ## Moduli a Microservizi
-1. **edl_parser.py**: Ingest EDL puro, calcolo TC-to-Float a 50fps.
-2. **pancake_editor.py**: Motore semantico di analisi frame (Blacklist filtering, Center-Weighted Focus, Action Peak, Dual Threshold Soft Focus, Cinematic Palette K-Means, Optical Flow Sparse, Semantic Storyboard). Gestisce anche l'estrazione di un Trash Reel diagnostico e l'impacchettamento finale.
-3. **edl_exporter.py**: Esportatore Premiere-ready (CMX3600), gestisce dinamicamente i "Boundary Crossing" spezzando eventi a cavallo di clip multiple.
-4. **main.py**: Orchestratore CLI interamente automatizzato (Zero-Click Pipeline). Gestisce il routing granulare degli I/O, convogliando gli output e l'auto-cleanup per sequence_name.
+1. **edl_parser.py**: Ingest EDL puro. Estrae la mappa temporale (Record IN / Source IN) e rileva automaticamente il Naming Base dalla root della clip ("* FROM CLIP NAME").
+2. **pancake_editor.py**: Motore semantico di analisi frame (Blacklist filtering, Center-Weighted Focus, Action Peak, Dual Threshold Soft Focus, Cinematic Palette K-Means, Optical Flow Sparse, Semantic Storyboard). Intercetta i Timecode IN sicuri e calcola dinamicamente il nome univoco per ciascun JPEG generato.
+3. **edl_exporter.py**: Esportatore Premiere-ready (CMX3600), gestisce dinamicamente i "Boundary Crossing".
+4. **mlx_client.py**: Microservizio Sincrono che agisce come gateway LLM Vision. Interroga l'API locale `127.0.0.1:8080/v1/chat/completions` (OpenAI format, modello gemma-4-e4b) caricando i base64 per arricchire il JSON con punteggio e analisi semantica continuativa. Dotato di auto-retry e salvataggio incrementale atomico.
+5. **main.py**: Orchestratore CLI interamente automatizzato (Zero-Click Pipeline). Passa attraverso tre fasi (Taglio YOLO, Inferenza LLM Vision su MLX, e Scrittura EDL).
 
 ## Automazione (Open Agent Manager)
 - I flussi di rilascio (`/wolf_flow`) validano e wrappano commit complessi sul repo `origin develop`.

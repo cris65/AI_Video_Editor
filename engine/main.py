@@ -7,6 +7,7 @@ import shutil
 import edl_parser
 import pancake_editor
 import edl_exporter
+import mlx_client
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIR_INPUT = os.path.join(BASE_DIR, 'input')
@@ -84,9 +85,9 @@ def run_pipeline():
         print("⏳ Lettura Ingest EDL...")
         sequence_name, clip_map = edl_parser.parse_ingest_edl(FILE_EDL_IN)
         
-        # Esecuzione Engine Video AI con Propagazione Sequence Name
+        # Esecuzione Engine Video AI con Propagazione Sequence Name e Mappa
         print("⏳ Avvio Elaborazione Pancake Editor (YOLO + OpenCV)...")
-        json_main_path, preview_main_path, valid_cuts_count, trash_preview_path = pancake_editor.process_pancake_video(FILE_PROXY_IN, sequence_name)
+        json_main_path, preview_main_path, valid_cuts_count, trash_preview_path = pancake_editor.process_pancake_video(FILE_PROXY_IN, sequence_name, clip_map)
         
     except Exception as e:
         print(f"❌ ERRORE CRITICO in Fase A: {e}")
@@ -123,9 +124,19 @@ def run_pipeline():
     print("==========================================================")
         
     # ============================================================
-    # 3. FASE B: EXPORT
+    # 3. FASE B: ANALISI SEMANTICA (MLX Server - Vision LLM)
     # ============================================================
-    print("\n--- FASE B: Generazione Timeline EDL ---")
+    print("\n--- FASE B: Analisi Semantica Vision (MLX Server) ---")
+    if mlx_client.check_mlx_server_health():
+        print("✅ Server MLX rilevato e attivo. Avvio arricchimento metadati...")
+        mlx_client.process_stringout_batch(json_main_path)
+    else:
+        print("⚠️ Server MLX (127.0.0.1:8080) offline o irraggiungibile. Skip arricchimento semantico.")
+        
+    # ============================================================
+    # 4. FASE C: EXPORT EDL
+    # ============================================================
+    print("\n--- FASE C: Generazione Timeline EDL ---")
     try:
         # Crea la cartella se non esiste
         seq_output_dir = os.path.join(DIR_OUTPUT, sequence_name)

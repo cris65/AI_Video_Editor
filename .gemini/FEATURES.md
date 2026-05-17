@@ -15,10 +15,16 @@ Il sistema estrapola un'unica timeline ottimizzata per massimizzare la velocità
 - **Boundary Crossing Split:** Tagli proxy che scavallano il bordo della clip originale vengono spezzati dinamicamente durante l'export EDL per prevenire errori "Media Offline" o pattern zebrati su Adobe Premiere.
 - **DNA Cromatico (Cinematic Palette):** Tramite K-Means Clustering su OpenCV, l'algoritmo estrae al volo i 5 colori HEX dominanti di ogni clip. Il campionamento fonde 3 matrici (IN, OUT, e BEST) per una color-continuity perfetta senza pesare sulle performance CPU e RAM (Zero-Seeking).
 - **Optical Flow (Motion Scoring):** Calcolo vettoriale `Farneback` ultraleggero a 160x90 per ogni blocco. Restituisce `intensity` e `camera_direction` (PAN, TILT, STATIC) nello `stringout.json`.
-- **Semantic Storyboard:** Estrazione al volo di tre frame (IN, BEST, OUT) a risoluzione 480x270, uniti orizzontalmente in un'unica stringa JPEG per agevolare l'ingest degli LLM Vision.
-- **Valigetta del Regista (Export Package):** Tutti i file processati (JSON, EDL, Storyboard, Proxy e Scarti) vengono ora convogliati e ordinati automaticamente in `engine/output/{sequence_name}`. La cartella LLM è predisposta pronta all'uso senza file intermedi orfani.
+- **Semantic Storyboard & Smart Naming:** Estrazione al volo di tre frame (IN, BEST, OUT) a 480x270, uniti orizzontalmente. I frame estratti non sono più anonimi, ma intercettano dalla mappa EDL il VERO nome nativo (`C4369`) e il Timecode sicuro calcolato dal motore, generando `{clip_name}_{tc_safe}.jpg`.
 
-### 3. Automazione Drop-Zone Flessibile
+### 3. FASE B - Vision LLM Inference (MLX Server)
+L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard OpenAI-compatible (`http://127.0.0.1:8080/v1/chat/completions`), il sistema analizza la timeline di Stringout:
+- Convertendo al volo lo Semantic Storyboard in `base64`.
+- Iniettando il Context Prompt specifico sulla Continuità Cronologica.
+- Salvando il risultato validato nel dict JSON tramite una logica tollerante e autonoma (retry x3, regex cleaning e salvataggio JSON progressivo).
+- Bypass morfologico (Skip Morbido) per l'ingest automatico se il server non è avviato.
+
+### 4. Automazione Drop-Zone Flessibile
 - **Ingest Agnostico:** Supporto esteso a `.mp4`, `.mov`, `.mxf`, `.avi`, `.mkv`.
 - **Auto-Cleanup:** Una volta emesso il file EDL (`_Stringout_Cut.edl`), i file originali nella drop zone vengono puliti e spostati direttamente nella cartella di output della rispettiva sequenza per evitare strascichi.
 - **Esportazione Diretta:** Eliminato il gate manuale [Y/N]; il motore macina proxy, calcola scarti e genera CMX3600 in autonomia totale a 50fps.
