@@ -42,7 +42,7 @@ class PancakeEditor:
         center_gray = gray[int(h*0.25):int(h*0.75), int(w*0.25):int(w*0.75)]
         lap_var = cv2.Laplacian(center_gray, cv2.CV_64F).var()
         if lap_var < self.BLUR_THRESHOLD:
-            return 'TRASH_BLUR', lap_var
+            return 'TRASH_BLUR', lap_var, 0
             
         is_soft = (self.BLUR_THRESHOLD <= lap_var < self.SOFT_FOCUS_THRESHOLD)
             
@@ -50,17 +50,19 @@ class PancakeEditor:
         diff = cv2.absdiff(gray, prev_gray)
         motion_diff = np.mean(diff)
         if motion_diff > self.MOTION_THRESHOLD:
-            return 'TRASH_MOTION', lap_var
+            return 'TRASH_MOTION', lap_var, 0
             
         # Analisi YOLO (classe 0 = person)
         results = self.yolo_model(frame, verbose=False, conf=self.CONFIDENCE_MIN)
         boxes = results[0].boxes
         person_boxes = [box for box in boxes if int(box.cls[0]) == 0]
         
+        people_count = len(person_boxes)
+        
         suffix = '_SOFT' if is_soft else ''
         
         if not person_boxes:
-            return 'B-ROLL' + suffix, lap_var
+            return 'B-ROLL' + suffix, lap_var, people_count
             
         # Analisi Spaziale
         frame_width = frame.shape[1]
@@ -70,9 +72,9 @@ class PancakeEditor:
             norm_x = center_x / frame_width
             
             if self.SAFE_LEFT <= norm_x <= self.SAFE_RIGHT:
-                return 'MAIN_A' + suffix, lap_var
+                return 'MAIN_A' + suffix, lap_var, people_count
                 
-        return 'EDGE_DANGER' + suffix, lap_var
+        return 'EDGE_DANGER' + suffix, lap_var, people_count
 
     def extract_cinematic_palette(self, frames_list):
         """
@@ -181,7 +183,7 @@ class PancakeEditor:
             return []
             
         # Inizializziamo il primo blocco (frame a 0s)
-        tag, lap_var = self.get_frame_tag(prev_frame, prev_frame)
+        tag, lap_var, people_count = self.get_frame_tag(prev_frame, prev_frame)
         if not tag.startswith('TRASH'):
             small_frame = cv2.resize(prev_frame, (100, 100))
             sb_frame = cv2.resize(prev_frame, (480, 270))
@@ -190,6 +192,7 @@ class PancakeEditor:
                 "end": 0.0, 
                 "tag": tag, 
                 "best_moment": 0.0, 
+                "people_count": people_count,
                 "_max_lap": lap_var,
                 "_frame_in": small_frame,
                 "_frame_best": small_frame,
@@ -215,7 +218,7 @@ class PancakeEditor:
                 
             timestamp_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
             
-            tag, lap_var = self.get_frame_tag(frame, prev_frame)
+            tag, lap_var, people_count = self.get_frame_tag(frame, prev_frame)
             
             if tag.startswith('TRASH'):
                 if current_block is not None:
@@ -286,6 +289,7 @@ class PancakeEditor:
                         "end": timestamp_sec, 
                         "tag": tag, 
                         "best_moment": timestamp_sec, 
+                        "people_count": people_count,
                         "_max_lap": lap_var,
                         "_frame_in": small_frame,
                         "_frame_best": small_frame,
@@ -299,6 +303,7 @@ class PancakeEditor:
                     if lap_var > current_block.get("_max_lap", 0):
                         current_block["_max_lap"] = lap_var
                         current_block["best_moment"] = timestamp_sec
+                        current_block["people_count"] = people_count
                         current_block["_frame_best"] = cv2.resize(frame, (100, 100))
                         current_block["_sb_best"] = cv2.resize(frame, (480, 270))
                         

@@ -5,7 +5,7 @@ description: Synchronizes and translates missing i18n localization keys based on
 Initiate META-PROTOCOL: Localization (i18n) Synchronization. 
 
 Your task is to align all application localizations using the English (EN) locale file as the absolute Source of Truth.
-1. Locate the localization directory (e.g., `frontend/src/locales/` or `frontend/src/i18n/`).
+1. Locate the localization directory (e.g., `src/locales/` or `src/i18n/`).
 2. Read the master English file (e.g., `en.ts`).
 3. Scan all other target language files (e.g., `it.ts`, `es.ts`).
 4. Identify any missing keys or nested structures that exist in EN but are absent in the target languages.

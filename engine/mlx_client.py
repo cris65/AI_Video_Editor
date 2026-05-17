@@ -60,11 +60,22 @@ def clean_json_response(raw_text):
             
     return None
 
-def analyze_frame(image_path):
+def parse_quality_score(raw_score):
+    """Estrae solo il primo numero intero da 1 a 10. Fallback a 5."""
+    try:
+        match = re.search(r'\b(10|[1-9])\b', str(raw_score))
+        if match:
+            return int(match.group(1))
+    except Exception:
+        pass
+    return 5
+
+def analyze_frame(image_path, people_count=0):
     """Interroga il server MLX passando l'immagine base64 (Retry Sync)."""
     base64_image = encode_image_to_base64(image_path)
     if not base64_image:
         return None
+    dynamic_prompt = PROMPT_TEXT + f"\nContesto tecnico: Il sistema ha rilevato {people_count} persona/e in scena."
         
     payload = {
         "model": "mlx-community/gemma-4-e4b-it-4bit", # Identificativo completo HuggingFace per MLX
@@ -72,7 +83,7 @@ def analyze_frame(image_path):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": PROMPT_TEXT},
+                    {"type": "text", "text": dynamic_prompt},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -135,14 +146,15 @@ def process_stringout_batch(json_path):
         print(f"   ► Analisi [{idx+1}/{len(timeline)}]: {os.path.basename(storyboard_path)} ...", end="", flush=True)
         
         # CHIAMATA SINCRONA MLX API
-        semantic_data = analyze_frame(storyboard_path)
+        people_count = clip.get("people_count", 0)
+        semantic_data = analyze_frame(storyboard_path, people_count)
         
         if semantic_data:
             print(" ✅ OK")
             # Iniezione chiavi forzata
             clip["scene_and_lighting"] = semantic_data.get("scene_and_lighting", "")
             clip["action_continuity"] = semantic_data.get("action_continuity", "")
-            clip["visual_quality_score"] = semantic_data.get("visual_quality_score", 0)
+            clip["visual_quality_score"] = parse_quality_score(semantic_data.get("visual_quality_score", 0))
             clip["technical_flaws"] = semantic_data.get("technical_flaws", "")
             clip["is_usable"] = semantic_data.get("is_usable", True)
             success_count += 1

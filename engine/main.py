@@ -89,6 +89,9 @@ def run_pipeline():
         print("⏳ Avvio Elaborazione Pancake Editor (YOLO + OpenCV)...")
         json_main_path, preview_main_path, valid_cuts_count, trash_preview_path = pancake_editor.process_pancake_video(FILE_PROXY_IN, sequence_name, clip_map)
         
+        # Override del json_main_path per puntare rigorosamente al "Director Package"
+        json_main_path = os.path.join(DIR_OUTPUT, sequence_name, "LLM_Export_Package", f"{sequence_name}_stringout.json")
+        
     except Exception as e:
         print(f"❌ ERRORE CRITICO in Fase A: {e}")
         sys.exit(1)

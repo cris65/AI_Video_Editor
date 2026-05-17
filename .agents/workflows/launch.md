@@ -4,7 +4,7 @@ description: Inizializza la sessione leggendo il WOLF-PROTOCOL e allineando l'ag
 
 SYSTEM INITIALIZATION: WOLF-PROTOCOL ACTIVE.
 
-You are a Senior Frontend Developer. We are resuming work on the tAImetrack CRM evolution.
+You are a Senior Frontend Developer. We are resuming work on the AI Video Editor.
 Before we begin any operational task, please ensure you are fully aligned with the current architecture and product goals. As `GEMINI.md` is already loaded in your context, please silently read the remaining core instructions in your workspace:
 1. Read `.gemini/VISION.md` (Crucial to understand the Offline-First architecture and Financial Bridge concepts).
 2. Read `.gemini/SOTA.md` (For the current state of the art).

@@ -1,6 +1,6 @@
 # 🐺 THE WOLF PROTOCOL: The Trinity Ecosystem & Definitive Workflow
 
-This document defines the immutable lifecycle of every feature or bugfix within the **tAImetrack** project. Responsibilities are strictly divided among a "Trinity" of entities collaborating in perfect synchronization. 
+This document defines the immutable lifecycle of every feature or bugfix within the **AI Video Editor** project. Responsibilities are strictly divided among a "Trinity" of entities collaborating in perfect synchronization. 
 
 As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. You must adhere strictly to these operational boundaries.
 
@@ -10,8 +10,8 @@ As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. 
 3. **The Multi-Agent Platform (Google Antigravity - YOU):** The Autonomous Engine. Working across the Editor, Manager, and Browser views, you act as the **Architect** (for deep analysis) or the **Armed Branch/Executor** (for surgical code modifications via Atomic File Protocol). You generate Artifacts to build trust, maintain the Historical Memory (Knowledge Base), and execute local commits.
 
 ### 📍 Rule Zero: Terminal Geography
-* **ROOT Directory** (`~/Development/TimeTrackCrm`): Used exclusively for Git commands (`git push`).
-* **FRONTEND Directory** (`.../frontend`): The Command Center. All `npm run` commands (including Supabase `sb:*` tasks) are executed here.
+* **ROOT Directory** (`~/Development/AI_Video_Editor`): The Command Center for the web frontend. All `npm run` commands (including Supabase `sb:*` tasks) and `git` commands are executed here.
+* **ENGINE Directory** (`engine/`): The core of the AI Video Editor. This isolated Python environment contains all MLX API logic, YOLO/OpenCV scripts, and EDL processing workflows (`main.py`, `mlx_client.py`).
 
 ### 🛠️ PHASE 1: Architecture (The Mind, The Senior Dev & AG)
 1. The Tech Lead explains the vision to the Senior Dev (Gemini).
@@ -26,7 +26,7 @@ As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. 
 
 ### 👁️ PHASE 3: Human Validation & Prep (The Tech Lead)
 1. **Human QA (Manual Testing):** The Tech Lead opens the browser (`localhost:5173`) and physically tests the feature. Verifies UI, UX, console, and network. **Nothing proceeds if this test fails.**
-2. If QA passes, the Tech Lead runs the God Command from the `frontend` terminal:
+2. If QA passes, the Tech Lead runs the God Command from the `root` terminal:
    `npm run wolf:prep`
    *(This validates TSC/ESLint and updates/sanitizes the seed.sql with the freshly tested data).*
 
@@ -38,6 +38,6 @@ As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. 
 
 ### 🚀 PHASE 5: Production Launch (The Tech Lead)
 1. **Database Push (Only if migrations exist):**
-   From the `frontend` terminal run `npm run sb:push`
+   From the `root` terminal run `npm run sb:push`
 2. **Code Deploy:**
    From the `root` terminal run `git push origin develop --no-verify`
