@@ -26,6 +26,7 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
   const score = clip.visual_quality_score || 0;
   const fileName = clip.storyboard_path ? clip.storyboard_path.split('/').pop() : '';
   const imageUrl = `/engine/output/${sequenceName}/storyboards/${fileName}`;
+  const clipName = fileName ? fileName.split('_')[0] : 'Unknown';
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg transition-all hover:border-slate-700 group flex flex-col">
@@ -46,9 +47,14 @@ export function ClipCard({ clip, sequenceName }: ClipCardProps) {
         
         {/* Top Badges */}
         <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
-          <span className={`px-2.5 py-1 rounded-md text-xs font-bold border backdrop-blur-md ${getBadgeColor(clip.tag)}`}>
-            {clip.tag}
-          </span>
+          <div className="flex flex-col gap-1.5">
+            <span className="px-2 py-1 rounded bg-slate-950/80 text-white text-xs font-bold font-mono border border-slate-800 backdrop-blur-md shadow-sm w-fit">
+              {clipName}
+            </span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border backdrop-blur-md w-fit ${getBadgeColor(clip.tag)}`}>
+              {clip.tag}
+            </span>
+          </div>
           
           <div className="flex gap-2">
             <span className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-slate-950/80 text-slate-300 backdrop-blur-md border border-slate-800/50">
