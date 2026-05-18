@@ -47,14 +47,16 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 - [x] Dashboard HITL Split-View con Video Player Sincronizzato e Timeline Interattiva.
 - [x] Sincronizzazione Anti-Lag a 60fps con requestAnimationFrame e disaccoppiamento dello stato temporale.
 - [x] Navigazione avanzata tramite Keyboard Shortcuts (NLE Style) e Vertical Playlist auto-scrollante.
-- [ ] Override e forzatura manuale dei valori da parte dell'utente (Salvataggio in Dexie).
+- [x] Override e forzatura manuale dei valori da parte dell'utente (Salvataggio in JSON locale).
+- [ ] Drag & Drop (dnd-kit) nella timeline Director's Cut per il riordino manuale delle clip e dei BM.
 - [ ] Integrazione Supabase per il salvataggio degli stati di avanzamento delle
       timeline.
 
 ## 🔴 FASE 3: Il "Regista" & Orchestrazione
 
+- [ ] Supporto ai "Pinned Anchors": Gemma 4 rispetta il riordino manuale forzato (Drag & Drop) proveniente dall'HITL.
 - [ ] Rilevamento di anomalie video avanzate (micro-mosso, drop frame).
-- [ ] Esportazione XML multi-track per NLE alternativi (DaVinci/FCPX).
+- [ ] Esportazione XML multi-track per NLE alternativi (Premiere Pro / DaVinci / FCPX).
 - [ ] Packaging e automazione esecuzione batch in background.
 
 ## 🟣 FASE 4: Integrazione Nativa & Distribuzione (Endgame)

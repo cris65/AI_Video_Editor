@@ -77,26 +77,22 @@ export function useVideoShortcuts(
 
         case 'KeyI':
           e.preventDefault();
-          if (isPreviewMode) return;
           onConstraint('IN', video.currentTime);
           break;
 
         case 'KeyO':
           e.preventDefault();
-          if (isPreviewMode) return;
           onConstraint('OUT', video.currentTime);
           break;
 
         case 'KeyM':
           e.preventDefault();
-          if (isPreviewMode) return;
           onConstraint('BM', video.currentTime);
           break;
 
         case 'KeyX':
         case 'Backspace':
           e.preventDefault();
-          if (isPreviewMode) return;
           if (e.shiftKey) {
             onConstraint('CLEAR_ALL', video.currentTime);
             onOverride('CLEAR', video.currentTime);
@@ -107,19 +103,16 @@ export function useVideoShortcuts(
 
         case 'KeyK':
           e.preventDefault();
-          if (isPreviewMode) return;
           onOverride('KEEP', video.currentTime);
           break;
 
         case 'KeyT':
           e.preventDefault();
-          if (isPreviewMode) return;
           onOverride('TRASH', video.currentTime);
           break;
 
         case 'KeyB':
           e.preventDefault();
-          if (isPreviewMode) return;
           onOverride('BROLL', video.currentTime);
           break;
       }

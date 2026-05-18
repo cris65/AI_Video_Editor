@@ -516,29 +516,78 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             
             {isPreviewMode ? (
               // In Preview Mode, mostriamo le clip del Final Cut
-              finalCutTimeline.map((clip, idx) => (
-                <div 
-                  key={`fc-card-${idx}`} 
-                  onClick={() => {
-                    setIsPreviewMode(false);
-                    if (videoRef.current) {
-                      videoRef.current.currentTime = clip.source_in;
-                    }
-                  }}
-                  className={`p-3 rounded-lg border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${activeClipIndex === idx ? 'bg-slate-800 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-slate-900/50 border-slate-800'} transition-all`}
-                  title="Clicca per tornare allo Stringout e modificare questa clip"
-                >
-                   <div className="flex justify-between items-center mb-2 pointer-events-none">
-                     <span className={`text-xs font-bold px-2 py-0.5 rounded ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                       {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
-                     </span>
-                     <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
-                   </div>
-                   <div className="text-xs text-slate-300 pointer-events-none">
-                     Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
-                   </div>
-                </div>
-              ))
+              finalCutTimeline.map((clip, idx) => {
+                // Find constraints for this clip
+                let constraints: UserConstraint[] = [];
+                let matchedKey = clip.source_clip_start.toString();
+                for (const key of Object.keys(userConstraints)) {
+                  if (Math.abs(parseFloat(key) - clip.source_clip_start) < 0.1) {
+                    constraints = userConstraints[key];
+                    matchedKey = key;
+                    break;
+                  }
+                }
+
+                return (
+                  <div 
+                    key={`fc-card-${idx}`} 
+                    onClick={() => {
+                      setIsPreviewMode(false);
+                      if (videoRef.current) {
+                        videoRef.current.currentTime = clip.source_in;
+                      }
+                    }}
+                    className={`p-3 rounded-lg border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${activeClipIndex === idx ? 'bg-slate-800 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-slate-900/50 border-slate-800'} transition-all`}
+                    title="Clicca per tornare allo Stringout e modificare questa clip"
+                  >
+                     <div className="flex justify-between items-center mb-2 pointer-events-none">
+                       <span className={`text-xs font-bold px-2 py-0.5 rounded ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                         {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
+                       </span>
+                       <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
+                     </div>
+                     <div className="text-xs text-slate-300 pointer-events-none mb-2">
+                       Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                     </div>
+                     
+                     {/* Constraints List */}
+                     {constraints && constraints.length > 0 && (
+                       <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-800">
+                         {constraints.map((c, cIdx) => (
+                           <div 
+                             key={cIdx} 
+                             className="flex items-center justify-between bg-slate-950/50 px-2 py-1 rounded border border-slate-800/50"
+                             onClick={(e) => e.stopPropagation()}
+                           >
+                             <div className="flex items-center gap-2">
+                               <div className="w-4 flex justify-center">
+                                 {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
+                                 {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
+                                 {c.type === 'BM' && (
+                                   <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
+                                     <path d="M0 0H10V10L5 14L0 10V0Z" />
+                                   </svg>
+                                 )}
+                               </div>
+                               <span className="text-[10px] font-mono text-slate-400">{c.time.toFixed(2)}s</span>
+                             </div>
+                             <button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 handleRemoveSpecificConstraint(matchedKey, c.time);
+                               }}
+                               className="text-slate-500 hover:text-red-400 transition-colors p-1"
+                               title="Rimuovi"
+                             >
+                               <X size={12} />
+                             </button>
+                           </div>
+                         ))}
+                       </div>
+                     )}
+                  </div>
+                );
+              })
             ) : (
               filteredTimeline.map((clip) => (
                 <ClipCard 
