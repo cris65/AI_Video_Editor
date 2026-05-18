@@ -480,7 +480,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             ) : (
               <RefreshCw size={14} />
             )}
-            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Update Cut')}
+            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
           </button>
         </div>
         
@@ -666,6 +666,29 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                               onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
                               onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
                        />
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-800">
+                      <button
+                        onClick={handleRegenerateCut}
+                        disabled={isRegenerating || saveStatus === 'saving'}
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all ${
+                          isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
+                          : finalCutTimeline.length === 0 
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                            : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30'
+                        }`}
+                        title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
+                      >
+                        {isRegenerating ? (
+                          <RefreshCw size={14} className="animate-spin" />
+                        ) : finalCutTimeline.length === 0 ? (
+                          <Wand2 size={14} className="animate-pulse" />
+                        ) : (
+                          <RefreshCw size={14} />
+                        )}
+                        {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Initial Cut' : 'Regenerate Cut')}
+                      </button>
                     </div>
                   </div>
                 )}
