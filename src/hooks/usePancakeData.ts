@@ -1,5 +1,21 @@
 import { useState, useEffect } from 'react';
 
+export interface DirectorConfig {
+  target_duration: number;
+  style_prompt: string;
+}
+
+export interface FinalCutClip {
+  source_clip_start: number;
+  source_clip_end: number;
+  source_in: number;
+  source_out: number;
+  timeline_in: number;
+  timeline_out: number;
+  role: 'PILLAR' | 'FILLER';
+  tag: string;
+}
+
 export interface PancakeClip {
   start: number;
   end: number;
@@ -35,6 +51,9 @@ export interface PancakeData {
 export function usePancakeData(sequenceName: string) {
   const [data, setData] = useState<PancakeData | null>(null);
   const [hitlData, setHitlData] = useState<any>({});
+  const [finalCutTimeline, setFinalCutTimeline] = useState<FinalCutClip[]>([]);
+  const [gemmaRecipe, setGemmaRecipe] = useState<any[] | null>(null);
+  const [audioBpm, setAudioBpm] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,14 +70,19 @@ export function usePancakeData(sequenceName: string) {
         const json = await res.json();
         
         // 2. Tenta di caricare il file HITL parallelo (non distruttivo)
-        let loadedHitlData = { hitl_constraints: {}, clip_overrides: {} };
+        let loadedHitlData = { 
+          hitl_constraints: {}, 
+          clip_overrides: {},
+          director_config: { target_duration: 60, style_prompt: "" }
+        };
         try {
           const hitlRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_hitl_data.json`);
           if (hitlRes.ok) {
             const hitlJson = await hitlRes.json();
             loadedHitlData = {
               hitl_constraints: hitlJson.hitl_constraints || {},
-              clip_overrides: hitlJson.clip_overrides || {}
+              clip_overrides: hitlJson.clip_overrides || {},
+              director_config: hitlJson.director_config || { target_duration: 60, style_prompt: "" }
             };
           }
         } catch (e) {
@@ -76,6 +100,23 @@ export function usePancakeData(sequenceName: string) {
           metadata: json.metadata || { fps: 25, resolution: { width: 1920, height: 1080 } },
           stringout_timeline: combinedTimeline 
         });
+
+        // 3. Tenta di caricare il file _final_edit.json (Director's Cut)
+        await fetchFinalCut();
+        
+        // 4. Carica il BPM dal file _audio_beats.json
+        try {
+          const audioRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_audio_beats.json`);
+          if (audioRes.ok) {
+            const audioJson = await audioRes.json();
+            if (audioJson.tempo) {
+              setAudioBpm(Math.round(audioJson.tempo));
+            }
+          }
+        } catch (e) {
+          console.warn("Audio beats file not found or corrupted.");
+        }
+        
       } catch (err: any) {
         setError(err.message || 'Errore sconosciuto durante il caricamento dei dati');
       } finally {
@@ -86,5 +127,30 @@ export function usePancakeData(sequenceName: string) {
     fetchData();
   }, [sequenceName]);
 
-  return { data, hitlData, loading, error };
+  const fetchFinalCut = async () => {
+    try {
+      const finalRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_final_edit.json?t=${Date.now()}`);
+      if (finalRes.ok) {
+        const finalJson = await finalRes.json();
+        setFinalCutTimeline(finalJson.final_edit_timeline || []);
+      }
+    } catch (e) {
+      console.warn("Final edit file not found. Director's Cut Preview not available.");
+    }
+    
+    try {
+      const recipeRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_gemma_recipe.json?t=${Date.now()}`);
+      if (recipeRes.ok) {
+        const recipeJson = await recipeRes.json();
+        setGemmaRecipe(recipeJson);
+      } else {
+        setGemmaRecipe(null);
+      }
+    } catch (e) {
+      setGemmaRecipe(null);
+      console.warn("Gemma recipe file not found.");
+    }
+  };
+
+  return { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, loading, error, refetchFinalCut: fetchFinalCut };
 }

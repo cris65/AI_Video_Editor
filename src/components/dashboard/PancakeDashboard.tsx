@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePancakeData } from '../../hooks/usePancakeData';
+import { usePancakeData, DirectorConfig } from '../../hooks/usePancakeData';
 import { useVideoShortcuts } from '../../hooks/useVideoShortcuts';
 import { ClipCard } from './ClipCard';
 import { VideoPlayerSync } from './VideoPlayerSync';
 import { InteractiveTimeline } from './InteractiveTimeline';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter } from 'lucide-react';
+import { FinalCutTimeline } from './FinalCutTimeline';
+import { useSequencePlayer } from '../../hooks/useSequencePlayer';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X } from 'lucide-react';
 
 interface PancakeDashboardProps {
   sequenceName: string;
@@ -18,14 +20,20 @@ export interface UserConstraint {
 }
 
 export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
-  const { data, hitlData, loading, error } = usePancakeData(sequenceName);
+  const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, loading, error, refetchFinalCut } = usePancakeData(sequenceName);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [userConstraints, setUserConstraints] = useState<Record<string, UserConstraint[]>>({});
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [clipOverrides, setClipOverrides] = useState<Record<string, 'KEEP' | 'TRASH' | 'BROLL'>>({});
   const [filterMode, setFilterMode] = useState<'ALL' | 'VALID' | 'BROLL' | 'TRASH'>('ALL');
+  const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
+  const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
+  const hasAutoSuggested = useRef(false);
 
   useEffect(() => {
     if (hitlData && Object.keys(hitlData.hitl_constraints || {}).length > 0 && Object.keys(userConstraints).length === 0) {
@@ -43,7 +51,34 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     if (hitlData && hitlData.clip_overrides && Object.keys(hitlData.clip_overrides).length > 0 && Object.keys(clipOverrides).length === 0) {
       setClipOverrides(hitlData.clip_overrides);
     }
+    if (hitlData && hitlData.director_config) {
+      setDirectorConfig(hitlData.director_config);
+    }
   }, [hitlData]);
+
+  useEffect(() => {
+    if (audioBpm && !hasAutoSuggested.current) {
+      if (!directorConfig.style_prompt) {
+        hasAutoSuggested.current = true;
+        let suggestion = "";
+        if (audioBpm >= 110) {
+          suggestion = "Stile dinamico e frenetico, molti tagli rapidi, alta energia e ritmo incalzante.";
+        } else if (audioBpm <= 90) {
+          suggestion = "Stile cinematico, inquadrature lunghe, respiro emotivo e tagli lenti.";
+        } else {
+          suggestion = "Montaggio bilanciato, ritmo regolare e fluido in perfetta sincronia con la musica.";
+        }
+        
+        setDirectorConfig(prev => {
+          const next = { ...prev, style_prompt: suggestion };
+          triggerSave(userConstraints, clipOverrides, next);
+          return next;
+        });
+      } else {
+        hasAutoSuggested.current = true;
+      }
+    }
+  }, [audioBpm]);
 
   const combinedTimeline = data?.stringout_timeline || [];
   const fps = data?.metadata?.fps || 25;
@@ -88,7 +123,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         }
         
         // Trigger Async Save (Non-Destructive)
-        triggerSave(next, clipOverrides);
+        triggerSave(next, clipOverrides, directorConfig);
         
         return next;
       });
@@ -105,10 +140,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
       } else {
         next[clipKey] = updated;
       }
-      triggerSave(next, clipOverrides);
+      triggerSave(next, clipOverrides, directorConfig);
       return next;
     });
-  }, [clipOverrides]);
+  }, [clipOverrides, directorConfig]);
 
   const handleOverride = useCallback((type: 'KEEP' | 'TRASH' | 'BROLL' | 'CLEAR', time: number) => {
     const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
@@ -127,16 +162,20 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             next[clipKey] = type;
           }
         }
-        triggerSave(userConstraints, next);
+        triggerSave(userConstraints, next, directorConfig);
         return next;
       });
     }
-  }, [combinedTimeline, userConstraints]);
+  }, [combinedTimeline, userConstraints, directorConfig]);
 
-  const triggerSave = async (constraintsToSave: Record<string, UserConstraint[]>, overridesToSave: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>) => {
+  const triggerSave = async (
+    constraintsToSave: Record<string, UserConstraint[]>, 
+    overridesToSave: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>,
+    configToSave: DirectorConfig
+  ) => {
     setSaveStatus('saving');
     try {
-      const payload = { hitl_constraints: constraintsToSave, clip_overrides: overridesToSave };
+      const payload = { hitl_constraints: constraintsToSave, clip_overrides: overridesToSave, director_config: configToSave };
       const res = await fetch(`/api/save-hitl?sequence=${sequenceName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -147,11 +186,41 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('Failed to save HITL data:', err);
-      setSaveStatus('idle'); // Idealmente potremmo gestire l'errore visivamente
+      setSaveStatus('idle');
     }
   };
 
-  useVideoShortcuts(videoRef, combinedTimeline, fps, handleConstraint, handleOverride);
+  const handleRegenerateCut = async () => {
+    setIsRegenerating(true);
+    try {
+      const res = await fetch(`/api/regenerate-director-cut?sequence=${sequenceName}`, { method: 'POST' });
+      if (!res.ok) throw new Error('Regeneration failed');
+      await refetchFinalCut();
+      setIsPreviewMode(true);
+    } catch (err) {
+      console.error('Failed to regenerate cut:', err);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const { currentTimelineTime, activeClipIndex, seekToTimelineTime } = useSequencePlayer(
+    videoRef, 
+    audioRef, 
+    finalCutTimeline, 
+    isPreviewMode
+  );
+
+  useVideoShortcuts(
+    videoRef, 
+    combinedTimeline, 
+    fps, 
+    handleConstraint, 
+    handleOverride,
+    isPreviewMode,
+    currentTimelineTime,
+    seekToTimelineTime
+  );
 
   const videoDuration = combinedTimeline.length > 0 
     ? Math.max(...combinedTimeline.map(c => c.end)) 
@@ -177,6 +246,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   });
 
   useEffect(() => {
+    if (isPreviewMode) return; // Disabilita check standard in preview mode
+    
     let animationFrameId: number;
     let prevActiveIndex: number | null = null;
 
@@ -196,9 +267,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
     animationFrameId = requestAnimationFrame(checkActiveClip);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [combinedTimeline]);
+  }, [combinedTimeline, isPreviewMode]);
 
   const handleSeek = useCallback((time: number) => {
+    if (isPreviewMode) return; // Disabilita seek da cards in preview mode
     if (videoRef.current) {
       videoRef.current.currentTime = time;
     }
@@ -237,6 +309,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   }
 
   const videoUrl = `/engine/output/${sequenceName}/${sequenceName}.mp4`;
+  const audioUrl = `/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_bgm.wav`;
 
   return (
     <div className="h-screen bg-slate-950 text-slate-200 flex flex-col overflow-hidden">
@@ -259,6 +332,61 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             </div>
           </div>
         </div>
+        
+        {/* Master Toggle */}
+        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mx-4">
+          <button 
+            onClick={() => setIsPreviewMode(false)}
+            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-md transition-colors ${!isPreviewMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            <Film size={14} />
+            Stringout
+          </button>
+          <button 
+            onClick={() => setIsPreviewMode(true)}
+            disabled={finalCutTimeline.length === 0}
+            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={finalCutTimeline.length === 0 ? "Final Cut non ancora generato" : "Preview Director's Cut"}
+          >
+            <PlaySquare size={14} />
+            Director's Cut
+          </button>
+          
+          <button
+            onClick={() => setIsRecipeModalOpen(true)}
+            disabled={!gemmaRecipe || gemmaRecipe.length === 0}
+            className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 text-xs font-bold rounded-md transition-all ${
+              !gemmaRecipe || gemmaRecipe.length === 0 
+                ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' 
+                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+            }`}
+            title={!gemmaRecipe ? "Recipe non disponibile" : "View AI Recipe"}
+          >
+            <Eye size={14} />
+          </button>
+          
+          <button
+            onClick={handleRegenerateCut}
+            disabled={isRegenerating || saveStatus === 'saving'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 text-xs font-bold rounded-md transition-all ${
+              isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
+              : finalCutTimeline.length === 0 
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                : 'bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700'
+            }`}
+            title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
+          >
+            {isRegenerating ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : finalCutTimeline.length === 0 ? (
+              <Wand2 size={14} className="animate-pulse" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Update Cut')}
+          </button>
+        </div>
+        
         <div className="flex items-center gap-3">
            <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mr-2">
              <button 
@@ -298,20 +426,37 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         
         {/* Left Side: Player & Timeline */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          <div className="flex-1 min-h-0 flex items-center justify-center">
+          <div className="flex-1 min-h-0 flex items-center justify-center relative">
             <VideoPlayerSync 
               src={videoUrl} 
               ref={videoRef} 
+              hideControls={isPreviewMode}
             />
+            {isPreviewMode && (
+              <div className="absolute top-4 left-4 bg-red-500/90 text-white px-3 py-1 rounded-md text-xs font-bold shadow-lg flex items-center gap-2 backdrop-blur-sm">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                LIVE PREVIEW
+              </div>
+            )}
+            <audio ref={audioRef} src={audioUrl} preload="auto" />
           </div>
           <div className="shrink-0 mt-4">
-            <InteractiveTimeline 
-              timeline={filteredTimeline} 
-              videoRef={videoRef} 
-              duration={videoDuration} 
-              userConstraints={userConstraints}
-              clipOverrides={clipOverrides}
-            />
+            {isPreviewMode ? (
+              <FinalCutTimeline 
+                timeline={finalCutTimeline}
+                currentTime={currentTimelineTime}
+                onSeek={seekToTimelineTime}
+                userConstraints={userConstraints}
+              />
+            ) : (
+              <InteractiveTimeline 
+                timeline={filteredTimeline} 
+                videoRef={videoRef} 
+                duration={videoDuration} 
+                userConstraints={userConstraints}
+                clipOverrides={clipOverrides}
+              />
+            )}
           </div>
         </div>
 
@@ -324,23 +469,115 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             </h2>
           </div>
           
+          {!isPreviewMode && (
+            <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
+              <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-sm">
+                <h3 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wand2 size={14} className="text-amber-400" />
+                    AI Director Settings
+                  </div>
+                  {audioBpm && (
+                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
+                      🎵 Audio Tempo: {audioBpm} BPM
+                    </span>
+                  )}
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
+                     <input type="number" 
+                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
+                            value={directorConfig.target_duration}
+                            onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
+                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                     />
+                  </div>
+                  <div>
+                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
+                     <textarea 
+                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
+                            placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
+                            value={directorConfig.style_prompt}
+                            onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
+                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                     />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {filteredTimeline.map((clip) => (
-              <ClipCard 
-                key={`${clip.start}-${clip.end}`} 
-                clip={clip} 
-                sequenceName={sequenceName} 
-                isActive={combinedTimeline.indexOf(clip) === activeIndex}
-                onClick={() => handleSeek(clip.start)}
-                constraints={userConstraints[clip.start.toString()]}
-                onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
-                overrideMode={clipOverrides[clip.start.toString()]}
-              />
-            ))}
+            
+            {isPreviewMode ? (
+              // In Preview Mode, mostriamo le clip del Final Cut
+              finalCutTimeline.map((clip, idx) => (
+                <div 
+                  key={`fc-card-${idx}`} 
+                  onClick={() => {
+                    setIsPreviewMode(false);
+                    if (videoRef.current) {
+                      videoRef.current.currentTime = clip.source_in;
+                    }
+                  }}
+                  className={`p-3 rounded-lg border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${activeClipIndex === idx ? 'bg-slate-800 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-slate-900/50 border-slate-800'} transition-all`}
+                  title="Clicca per tornare allo Stringout e modificare questa clip"
+                >
+                   <div className="flex justify-between items-center mb-2 pointer-events-none">
+                     <span className={`text-xs font-bold px-2 py-0.5 rounded ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                       {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
+                     </span>
+                     <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
+                   </div>
+                   <div className="text-xs text-slate-300 pointer-events-none">
+                     Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                   </div>
+                </div>
+              ))
+            ) : (
+              filteredTimeline.map((clip) => (
+                <ClipCard 
+                  key={`${clip.start}-${clip.end}`} 
+                  clip={clip} 
+                  sequenceName={sequenceName} 
+                  isActive={combinedTimeline.indexOf(clip) === activeIndex}
+                  onClick={() => handleSeek(clip.start)}
+                  constraints={userConstraints[clip.start.toString()]}
+                  onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
+                  overrideMode={clipOverrides[clip.start.toString()]}
+                />
+              ))
+            )}
           </div>
         </aside>
 
       </main>
+
+      {/* QA Feature: AI Recipe Modal */}
+      {isRecipeModalOpen && gemmaRecipe && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsRecipeModalOpen(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/50">
+              <h3 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                <Eye className="w-4 h-4 text-emerald-400" />
+                Gemma 4 Raw Recipe
+              </h3>
+              <button 
+                onClick={() => setIsRecipeModalOpen(false)}
+                className="text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex-1">
+              <pre className="text-xs text-emerald-400 font-mono bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-inner overflow-x-auto whitespace-pre-wrap">
+                {JSON.stringify(gemmaRecipe, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

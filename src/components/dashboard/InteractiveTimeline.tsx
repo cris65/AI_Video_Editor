@@ -97,7 +97,7 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                   style={{ 
                     left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`, 
                     transform: 'translate(-50%, -50%)',
-                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#eab308')
+                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#ffffff')
                   }}
                 >
                   {constraint.type === 'IN' && '['}

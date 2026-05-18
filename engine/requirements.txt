@@ -46,3 +46,6 @@ typing_extensions==4.15.0
 ultralytics==8.4.51
 ultralytics-thop==2.0.19
 urllib3==2.7.0
+transformers==4.40.1
+librosa==0.10.2
+soundfile==0.12.1

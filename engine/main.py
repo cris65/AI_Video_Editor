@@ -8,6 +8,9 @@ import edl_parser
 import pancake_editor
 import edl_exporter
 import mlx_client
+import bgm_generator
+import audio_analyzer
+import director
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIR_INPUT = os.path.join(BASE_DIR, 'input')
@@ -137,9 +140,41 @@ def run_pipeline():
         print("⚠️ Server MLX (127.0.0.1:8080) offline o irraggiungibile. Skip arricchimento semantico.")
         
     # ============================================================
-    # 4. FASE C: EXPORT EDL
+    # 4. FASE C: GENERAZIONE AUDIO E BEAT EXTRACTION
     # ============================================================
-    print("\n--- FASE C: Generazione Timeline EDL ---")
+    print("\n--- FASE C: Generazione BGM e Analisi Beat ---")
+    try:
+        seq_llm_export_dir = os.path.join(DIR_OUTPUT, sequence_name, "LLM_Export_Package")
+        bgm_wav_path = bgm_generator.generate_bgm(json_main_path, seq_llm_export_dir, sequence_name)
+        if bgm_wav_path:
+            audio_analyzer.extract_beats(bgm_wav_path, seq_llm_export_dir, sequence_name)
+    except Exception as e:
+        print(f"❌ ERRORE in Fase C (Audio): {e}")
+
+    # ============================================================
+    # 5. FASE D: THE AI DIRECTOR (FINAL CUT)
+    # ============================================================
+    print("\n--- FASE D: L'AI Director (Risoluzione Vincoli) ---")
+    final_edit_json = None
+    try:
+        seq_llm_export_dir = os.path.join(DIR_OUTPUT, sequence_name, "LLM_Export_Package")
+        hitl_path = os.path.join(seq_llm_export_dir, f"{sequence_name}_hitl_data.json")
+        beats_path = os.path.join(seq_llm_export_dir, f"{sequence_name}_audio_beats.json")
+        
+        final_edit_json = director.generate_final_cut(
+            stringout_path=json_main_path, 
+            hitl_path=hitl_path, 
+            beats_path=beats_path, 
+            output_dir=seq_llm_export_dir, 
+            sequence_name=sequence_name
+        )
+    except Exception as e:
+        print(f"❌ ERRORE in Fase D (Director): {e}")
+
+    # ============================================================
+    # 6. FASE E: EXPORT EDL
+    # ============================================================
+    print("\n--- FASE E: Generazione Timeline EDL ---")
     try:
         # Crea la cartella se non esiste
         seq_output_dir = os.path.join(DIR_OUTPUT, sequence_name)

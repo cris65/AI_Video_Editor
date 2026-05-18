@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 import fs from 'fs'
 import path from 'path'
+import { exec } from 'child_process'
 
 const engineAssetsPlugin = () => ({
   name: 'engine-assets',
@@ -70,6 +71,33 @@ const engineAssetsPlugin = () => ({
           });
           fs.createReadStream(filePath).pipe(res);
         }
+      } else {
+        next();
+      }
+    });
+
+    server.middlewares.use('/api/regenerate-director-cut', (req: any, res: any, next: any) => {
+      if (req.method === 'POST') {
+        const url = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+        const sequence = url.searchParams.get('sequence');
+        if (!sequence) {
+          res.statusCode = 400;
+          return res.end('Missing sequence parameter');
+        }
+        
+        const pythonExecutable = path.join(process.cwd(), 'engine', 'venv', 'bin', 'python');
+        const script = `import sys; sys.path.append('engine'); import director; seq='${sequence}'; base='engine/output/'+seq+'/LLM_Export_Package/'; director.generate_final_cut(base+seq+'_stringout.json', base+seq+'_hitl_data.json', base+seq+'_audio_beats.json', base, seq)`;
+        
+        exec(`${pythonExecutable} -c "${script}"`, { cwd: process.cwd() }, (error: any, stdout: any, stderr: any) => {
+          if (error) {
+            console.error("Director Error:", stderr || error.message);
+            res.statusCode = 500;
+            return res.end(JSON.stringify({ success: false, error: stderr || error.message }));
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 200;
+          res.end(JSON.stringify({ success: true, output: stdout }));
+        });
       } else {
         next();
       }
