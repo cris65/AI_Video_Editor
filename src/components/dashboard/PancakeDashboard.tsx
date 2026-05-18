@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { usePancakeData, DirectorConfig, FinalCutClip } from '../../hooks/usePancakeData';
 import { useVideoShortcuts } from '../../hooks/useVideoShortcuts';
 import { ClipCard } from './ClipCard';
@@ -48,10 +48,12 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [clipOverrides, setClipOverrides] = useState<Record<string, 'KEEP' | 'TRASH' | 'BROLL'>>({});
   const [filterMode, setFilterMode] = useState<'ALL' | 'VALID' | 'BROLL' | 'TRASH'>('ALL');
   const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
+  const [isDirectorSettingsOpen, setIsDirectorSettingsOpen] = useState(false);
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   // Local mutable order — derived from immutable finalCutTimeline source.
   // Re-synced whenever the Director re-generates the cut.
   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
+  const [pendingSeek, setPendingSeek] = useState<number | null>(null);
   const hasAutoSuggested = useRef(false);
 
   useEffect(() => {
@@ -229,8 +231,11 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   };
 
   // Receives the arrayMove'd array from FinalCutTimeline and recalculates timeline positions.
-  const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[]) => {
+  const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[], seekToTimelineIn?: number) => {
     setOrderedFinalCut(recalcTimeline(newTimeline));
+    if (seekToTimelineIn !== undefined) {
+      setPendingSeek(seekToTimelineIn);
+    }
   }, []);
 
   // Persists the current clip order into _hitl_data.json under clip_order_override.
@@ -265,6 +270,34 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     orderedFinalCut,
     isPreviewMode
   );
+
+  // Execute pending seek ONLY after orderedFinalCut has been updated in state
+  useEffect(() => {
+    if (pendingSeek !== null) {
+      seekToTimelineTime(pendingSeek);
+      setPendingSeek(null);
+    }
+  }, [orderedFinalCut, pendingSeek, seekToTimelineTime]);
+
+  // Global marker numbers: PRIMARY namespace is the STRINGOUT (combinedTimeline).
+  // The user adds markers during Stringout review → those get M1, M2, M3...
+  // DC is a later refinement — DC clips inherit the SAME M# from the Stringout namespace.
+  // Key format: `${clip.start.toFixed(3)}_${mIdx}` (source time = unified anchor for both timelines).
+  const globalMarkerNumbers = useMemo(() => {
+    const map = new Map<string, number>();
+    let counter = 0;
+    combinedTimeline.forEach((clip) => {
+      const clipConstraints = userConstraints[clip.start.toString()] || [];
+      clipConstraints.forEach((c, mIdx) => {
+        const isOrphan = c.time < clip.start || c.time > clip.end;
+        if (!isOrphan) {
+          counter++;
+          map.set(`${clip.start.toFixed(3)}_${mIdx}`, counter);
+        }
+      });
+    });
+    return map;
+  }, [combinedTimeline, userConstraints]);
 
   useEffect(() => {
     if (isPreviewMode && activeClipIndex !== null) {
@@ -509,6 +542,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
               <>
                 <FinalCutTimeline
                   timeline={orderedFinalCut}
+                  originalTimeline={finalCutTimeline}
+                  markerNumbers={globalMarkerNumbers}
                   currentTime={currentTimelineTime}
                   onSeek={seekToTimelineTime}
                   onReorder={handleFinalCutReorder}
@@ -528,6 +563,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                   clipOverrides={clipOverrides}
                   audioWaveform={audioWaveform}
                   audioDuration={audioDuration}
+                  markerNumbers={globalMarkerNumbers}
                 />
               </>
             )}
@@ -544,93 +580,103 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           </div>
           
             <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-sm">
-                <h3 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+              <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-sm overflow-hidden">
+                <button 
+                  onClick={() => setIsDirectorSettingsOpen(!isDirectorSettingsOpen)}
+                  className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
+                >
+                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
                     <Wand2 size={14} className="text-amber-400" />
                     AI Director Settings
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    {audioBpm && (
+                      <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
+                        🎵 {audioBpm} BPM
+                      </span>
+                    )}
+                    <span className="text-slate-500 font-mono text-sm">{isDirectorSettingsOpen ? '-' : '+'}</span>
                   </div>
-                  {audioBpm && (
-                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
-                      🎵 Audio Tempo: {audioBpm} BPM
-                    </span>
-                  )}
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
-                     <input type="number" 
-                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                            value={directorConfig.target_duration}
-                            onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
-                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                     />
+                </button>
+                
+                {isDirectorSettingsOpen && (
+                  <div className="p-4 pt-0 space-y-3 border-t border-slate-800 mt-1">
+                    <div>
+                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
+                       <input type="number" 
+                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
+                              value={directorConfig.target_duration}
+                              onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
+                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                       />
+                    </div>
+                    <div>
+                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
+                       <select
+                          className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
+                          value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newRes = val === "custom" ? "1000x1000" : val;
+                            const newConfig = { ...directorConfig, export_resolution: newRes };
+                            setDirectorConfig(newConfig);
+                            triggerSave(userConstraints, clipOverrides, newConfig);
+                          }}
+                       >
+                         <option value="3840x2160">4K UHD (3840x2160)</option>
+                         <option value="1920x1080">Full HD (1920x1080)</option>
+                         <option value="1080x1920">Vertical (1080x1920)</option>
+                         <option value="custom">Custom...</option>
+                       </select>
+                       
+                       {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
+                         <div className="flex gap-2 mb-3">
+                           <input 
+                             type="number" 
+                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+                             placeholder="W"
+                             value={directorConfig.export_resolution?.split('x')[0] || ""}
+                             onChange={(e) => {
+                                const h = directorConfig.export_resolution?.split('x')[1] || "1080";
+                                setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
+                             }}
+                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                           />
+                           <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
+                           <input 
+                             type="number" 
+                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+                             placeholder="H"
+                             value={directorConfig.export_resolution?.split('x')[1] || ""}
+                             onChange={(e) => {
+                                const w = directorConfig.export_resolution?.split('x')[0] || "1920";
+                                setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
+                             }}
+                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                           />
+                         </div>
+                       )}
+                    </div>
+                    <div>
+                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
+                       <textarea 
+                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
+                              placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
+                              value={directorConfig.style_prompt}
+                              onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
+                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                       />
+                    </div>
                   </div>
-                  <div>
-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
-                     <select
-                        className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
-                        value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const newRes = val === "custom" ? "1000x1000" : val;
-                          const newConfig = { ...directorConfig, export_resolution: newRes };
-                          setDirectorConfig(newConfig);
-                          triggerSave(userConstraints, clipOverrides, newConfig);
-                        }}
-                     >
-                       <option value="3840x2160">4K UHD (3840x2160)</option>
-                       <option value="1920x1080">Full HD (1920x1080)</option>
-                       <option value="1080x1920">Vertical (1080x1920)</option>
-                       <option value="custom">Custom...</option>
-                     </select>
-                     
-                     {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
-                       <div className="flex gap-2 mb-3">
-                         <input 
-                           type="number" 
-                           className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                           placeholder="W"
-                           value={directorConfig.export_resolution?.split('x')[0] || ""}
-                           onChange={(e) => {
-                              const h = directorConfig.export_resolution?.split('x')[1] || "1080";
-                              setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
-                           }}
-                           onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                         />
-                         <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
-                         <input 
-                           type="number" 
-                           className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                           placeholder="H"
-                           value={directorConfig.export_resolution?.split('x')[1] || ""}
-                           onChange={(e) => {
-                              const w = directorConfig.export_resolution?.split('x')[0] || "1920";
-                              setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
-                           }}
-                           onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                         />
-                       </div>
-                     )}
-                  </div>
-                  <div>
-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
-                     <textarea 
-                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
-                            placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
-                            value={directorConfig.style_prompt}
-                            onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
-                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                     />
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             
             {isPreviewMode ? (
-              // In Preview Mode, mostriamo le clip del Final Cut
-              finalCutTimeline.map((clip, idx) => {
+              // In Preview Mode, mostriamo le clip nell'ordine CORRENTE (orderedFinalCut)
+              // CRITICAL: finalCutTimeline (immutabile) NON va usato qui — avrebbe timeline_in obsoleti post-DnD.
+              orderedFinalCut.map((clip, idx) => {
                 // Find constraints for this clip
                 let constraints: UserConstraint[] = [];
                 let matchedKey = clip.source_clip_start.toString();
@@ -641,6 +687,16 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                     break;
                   }
                 }
+                // Original Gemma index: position in the immutable source (for reference numbering)
+                const originalIdx = finalCutTimeline.findIndex(
+                  c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1 && Math.abs(c.source_in - clip.source_in) < 0.01
+                );
+                let pillarCount = 0; let fillerCount = 0;
+                for (let k = 0; k <= originalIdx && k < finalCutTimeline.length; k++) {
+                  if (finalCutTimeline[k].role === 'PILLAR') pillarCount++;
+                  else fillerCount++;
+                }
+                const seqLabel = clip.role === 'PILLAR' ? `P${pillarCount}` : `F${fillerCount}`;
 
                 return (
                   <div 
@@ -655,54 +711,69 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                     title="Clicca per spostare la playhead su questa clip nel Director's Cut"
                   >
                      <div className="flex justify-between items-center mb-2 pointer-events-none">
-                       <span className={`text-xs font-bold px-2 py-0.5 rounded ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                       <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1.5 ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                         <span className="text-[9px] opacity-60 font-mono">{seqLabel}</span>
                          {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
                        </span>
                        <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
                      </div>
                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
-                       Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+             Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
                      </div>
                      
                      {/* Constraints List */}
                      {constraints && constraints.length > 0 && (
                        <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-800">
                          {constraints.map((c, cIdx) => {
+                           const isOrphan = c.time < clip.source_in || c.time > clip.source_out;
                            const globalTime = clip.timeline_in + (c.time - clip.source_in);
-                           const isMarkerActive = isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
-                           
+                           const isMarkerActive = !isOrphan && isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
+                           const markerKey = `${clip.source_clip_start.toFixed(3)}_${cIdx}`;
+                           const markerNum = globalMarkerNumbers.get(markerKey);
                            return (
-                              <div 
-                                key={cIdx} 
-                                className={`flex items-center justify-between px-2 py-1 rounded border transition-all cursor-pointer hover:scale-[1.02] ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
+                              <div
+                                key={cIdx}
+                                className={`flex items-center justify-between px-2 py-1.5 rounded border transition-all ${isOrphan ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'} ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  if (isOrphan) return;
                                   seekToTimelineTime(globalTime);
                                 }}
+                                title={isOrphan ? `⚠️ Marker fuori range clip (${c.time.toFixed(2)}s non è in ${clip.source_in.toFixed(1)}–${clip.source_out.toFixed(1)})` : undefined}
                               >
-                               <div className="flex items-center gap-2">
-                                 <div className="w-4 flex justify-center">
-                                 {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
-                                 {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
-                                 {c.type === 'BM' && (
-                                   <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
-                                     <path d="M0 0H10V10L5 14L0 10V0Z" />
-                                   </svg>
+                               <div className="flex items-center gap-2 flex-1 min-w-0">
+                                 <div className="w-4 flex justify-center shrink-0">
+                                   {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
+                                   {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
+                                   {c.type === 'BM' && (
+                                     <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
+                                       <path d="M0 0H10V10L5 14L0 10V0Z" />
+                                     </svg>
+                                   )}
+                                 </div>
+                                 {markerNum !== undefined && (
+                                   <span className="text-[9px] font-bold font-mono bg-slate-700 text-slate-300 px-1 py-0.5 rounded shrink-0">
+                                     M{markerNum}
+                                   </span>
                                  )}
+                                 <span className="text-[11px] font-mono font-bold text-slate-100 shrink-0">
+                                   {isOrphan ? '⚠️' : `${globalTime.toFixed(2)}s`}
+                                 </span>
+                                 <span className="text-[9px] font-mono text-slate-500 truncate">
+                                   src {c.time.toFixed(2)}s
+                                 </span>
                                </div>
-                               <span className="text-[10px] font-mono text-slate-400">{c.time.toFixed(2)}s</span>
+                               <button
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   handleRemoveSpecificConstraint(matchedKey, c.time);
+                                 }}
+                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 shrink-0"
+                                 title="Rimuovi"
+                               >
+                                 <X size={12} />
+                               </button>
                              </div>
-                             <button
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 handleRemoveSpecificConstraint(matchedKey, c.time);
-                               }}
-                               className="text-slate-500 hover:text-red-400 transition-colors p-1"
-                               title="Rimuovi"
-                             >
-                               <X size={12} />
-                             </button>
-                           </div>
                            );
                          })}
                        </div>
@@ -721,6 +792,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                   constraints={userConstraints[clip.start.toString()]}
                   onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
                   overrideMode={clipOverrides[clip.start.toString()]}
+                  markerNumbers={globalMarkerNumbers}
                 />
               ))
             )}

@@ -10,9 +10,10 @@ interface ClipCardProps {
   constraints?: Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>;
   onRemoveConstraint?: (time: number) => void;
   overrideMode?: 'KEEP' | 'TRASH' | 'BROLL';
+  markerNumbers?: Map<string, number>;
 }
 
-export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, overrideMode }: ClipCardProps) {
+export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, overrideMode, markerNumbers }: ClipCardProps) {
   let finalUsable = clip.is_usable !== false;
   let isBroll = clip.tag.includes('B-ROLL');
   
@@ -191,7 +192,9 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
         {/* Actionable Constraints List */}
         {constraints && constraints.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2">
-            {constraints.map((c, idx) => (
+            {constraints.map((c, idx) => {
+              const markerNum = markerNumbers ? markerNumbers.get(`${clip.start.toFixed(3)}_${idx}`) : undefined;
+              return (
               <div 
                 key={`${c.time}-${idx}`}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold shadow-sm transition-colors group/badge
@@ -200,11 +203,20 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
                   ${c.type === 'BM' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' : ''}
                 `}
               >
-                <span>
+                <span className="flex items-center gap-1">
                   {c.type === 'IN' && 'IN'}
                   {c.type === 'OUT' && 'OUT'}
-                  {c.type === 'BM' && '★'}
-                  <span className="opacity-80 ml-1">[{c.time.toFixed(2)}s]</span>
+                  {c.type === 'BM' && (
+                    <svg width="7" height="9.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="inline-block">
+                      <path d="M0 0H10V10L5 14L0 10V0Z" />
+                    </svg>
+                  )}
+                  {markerNum !== undefined && (
+                    <span className="text-[9px] font-bold font-mono bg-slate-700/50 px-1 rounded ml-0.5">
+                      M{markerNum}
+                    </span>
+                  )}
+                  <span className="opacity-80 ml-0.5">[{c.time.toFixed(2)}s]</span>
                 </span>
                 <button
                   onClick={(e) => {
@@ -221,7 +233,8 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
                   <X size={12} strokeWidth={3} />
                 </button>
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
 

@@ -33,23 +33,27 @@ export function useVideoShortcuts(
           }
           break;
 
-        case 'ArrowLeft':
+        case 'ArrowLeft': {
           e.preventDefault();
+          const leftSkip = e.altKey ? 30 * frameDuration : (e.shiftKey ? frameDuration : 10 * frameDuration);
           if (isPreviewMode && seekToTimelineTime) {
-            seekToTimelineTime(Math.max(0, currentTimelineTime - (e.shiftKey ? frameDuration : 10 * frameDuration)));
+            seekToTimelineTime(Math.max(0, currentTimelineTime - leftSkip));
           } else {
-            video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? frameDuration : 10 * frameDuration));
+            video.currentTime = Math.max(0, video.currentTime - leftSkip);
           }
           break;
+        }
 
-        case 'ArrowRight':
+        case 'ArrowRight': {
           e.preventDefault();
+          const rightSkip = e.altKey ? 30 * frameDuration : (e.shiftKey ? frameDuration : 10 * frameDuration);
           if (isPreviewMode && seekToTimelineTime) {
-            seekToTimelineTime(currentTimelineTime + (e.shiftKey ? frameDuration : 10 * frameDuration));
+            seekToTimelineTime(currentTimelineTime + rightSkip);
           } else {
-            video.currentTime = Math.min(video.duration, video.currentTime + (e.shiftKey ? frameDuration : 10 * frameDuration));
+            video.currentTime = Math.min(video.duration, video.currentTime + rightSkip);
           }
           break;
+        }
 
         case 'ArrowUp': {
           e.preventDefault();

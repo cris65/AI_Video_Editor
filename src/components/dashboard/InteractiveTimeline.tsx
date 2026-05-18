@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
 interface InteractiveTimelineProps {
@@ -9,11 +10,13 @@ interface InteractiveTimelineProps {
   clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
   audioWaveform?: number[];
   audioDuration?: number;
+  markerNumbers?: Map<string, number>; // Global M# namespace from PancakeDashboard (Stringout-first)
 }
 
-export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0 }: InteractiveTimelineProps) {
+export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0, markerNumbers = new Map() }: InteractiveTimelineProps) {
   const playheadRef = useRef<HTMLDivElement>(null);
   const timeTextRef = useRef<HTMLSpanElement>(null);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -67,8 +70,47 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
 
   return (
     <div className="w-full flex flex-col gap-2">
-      <div className="flex justify-between items-center text-xs text-slate-400 font-mono">
-        <span ref={timeTextRef}>00:00</span>
+      <div className="flex justify-between items-center text-xs text-slate-400 font-mono relative z-[100]">
+        <span ref={timeTextRef} className="text-blue-400 font-bold">00:00</span>
+        
+        {/* Info Popup - Cliccabile e posizionato in alto */}
+        <div className="relative flex items-center justify-center">
+          <button 
+            onClick={() => setIsPopupOpen(!isPopupOpen)}
+            className="text-slate-400 flex items-center gap-2 hover:text-slate-300 transition-colors focus:outline-none"
+          >
+            STRINGOUT PREVIEW
+            <Info size={14} className="opacity-70" />
+          </button>
+          
+          {isPopupOpen && (
+            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[280px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Keyboard Shortcuts
+                </h4>
+                <button onClick={() => setIsPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
+              </div>
+              <div className="space-y-2 text-slate-400 text-[10px] font-sans">
+                <div className="flex justify-between items-center"><span>Play / Pause</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Space</kbd></div>
+                <div className="flex justify-between items-center"><span>10 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">← / →</kbd></div>
+                <div className="flex justify-between items-center"><span>1 Frame</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + ← / →</kbd></div>
+                <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
+                <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
+                <div className="w-full h-px bg-slate-800 my-1" />
+                <div className="flex justify-between items-center"><span>Marker IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">I / O</kbd></div>
+                <div className="flex justify-between items-center"><span>Marker Bookmark (M#)</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">M</kbd></div>
+                <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X / Backspace</kbd></div>
+                <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
+                <div className="w-full h-px bg-slate-800 my-1" />
+                <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
+                <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
+                <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <span>{formatTime(duration)}</span>
       </div>
 
@@ -91,26 +133,42 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
               style={{ left: `${left}%`, width: `${width}%` }}
               title={`[${clip.tag}] ${formatTime(clip.start)} - ${formatTime(clip.end)}`}
             >
-              {/* Constraint Markers */}
-              {constraints.map((constraint, cIdx) => (
-                <div 
-                  key={cIdx}
-                  className="absolute top-1/2 text-[12px] font-black drop-shadow-md z-20 pointer-events-none transition-transform"
-                  style={{ 
-                    left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`, 
-                    transform: 'translate(-50%, -50%)',
-                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#ffffff')
-                  }}
-                >
-                  {constraint.type === 'IN' && '['}
-                  {constraint.type === 'OUT' && ']'}
-                  {constraint.type === 'BM' && (
-                    <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
-                      <path d="M0 0H10V10L5 14L0 10V0Z" />
-                    </svg>
-                  )}
-                </div>
-              ))}
+              {/* Constraint Markers with global M# label */}
+              {constraints.map((constraint, cIdx) => {
+                const markerNum = markerNumbers.get(`${clip.start.toFixed(3)}_${cIdx}`);
+                return (
+                  <div
+                    key={cIdx}
+                    className="absolute flex flex-col items-center z-20 pointer-events-none"
+                    style={{
+                      left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`,
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <div
+                      className="text-[12px] font-black drop-shadow-md"
+                      style={{ color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#ffffff') }}
+                    >
+                      {constraint.type === 'IN' && '['}
+                      {constraint.type === 'OUT' && ']'}
+                      {constraint.type === 'BM' && (
+                        <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                          <path d="M0 0H10V10L5 14L0 10V0Z" />
+                        </svg>
+                      )}
+                    </div>
+                    {markerNum !== undefined && (
+                      <span
+                        className="text-[9px] font-bold font-mono leading-none mt-[2px]"
+                        style={{ color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
+                      >
+                        M{markerNum}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -151,11 +209,11 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
         {/* Playhead controlled by requestAnimationFrame */}
         <div 
           ref={playheadRef}
-          className="absolute top-0 bottom-0 w-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] z-10 pointer-events-none"
+          className="absolute top-0 bottom-0 w-[2px] bg-red-500 z-[30] pointer-events-none drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]"
           style={{ left: '0%' }}
         >
           {/* Playhead handle (triangle) */}
-          <div className="absolute top-0 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white drop-shadow-md" />
+          <div className="absolute top-0 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-red-500 drop-shadow-md" />
         </div>
         
       </div>
