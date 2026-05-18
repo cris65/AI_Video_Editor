@@ -7,9 +7,11 @@ interface Props {
   currentTime: number;
   onSeek: (time: number) => void;
   userConstraints?: Record<string, UserConstraint[]>;
+  audioWaveform?: number[];
+  audioDuration?: number;
 }
 
-export const FinalCutTimeline: React.FC<Props> = ({ timeline, currentTime, onSeek, userConstraints = {} }) => {
+export const FinalCutTimeline: React.FC<Props> = ({ timeline, currentTime, onSeek, userConstraints = {}, audioWaveform = [], audioDuration = 0 }) => {
   const totalDuration = useMemo(() => {
     if (!timeline.length) return 0;
     return timeline[timeline.length - 1].timeline_out;
@@ -70,7 +72,7 @@ export const FinalCutTimeline: React.FC<Props> = ({ timeline, currentTime, onSee
           return (
             <div
               key={`fc-${i}`}
-              className={`absolute top-0 bottom-0 ${bgColor} border-r border-slate-900 transition-colors opacity-90 hover:opacity-100 flex items-center justify-center overflow-hidden`}
+              className={`absolute top-0 bottom-0 ${bgColor} border-r border-slate-900 transition-colors opacity-80 hover:opacity-100 flex items-center justify-center overflow-hidden z-10`}
               style={{
                 left: `${startPct}%`,
                 width: `${widthPct}%`
@@ -83,7 +85,9 @@ export const FinalCutTimeline: React.FC<Props> = ({ timeline, currentTime, onSee
                   className="absolute top-1/2 text-[12px] font-black drop-shadow-md z-20 pointer-events-none transition-transform"
                   style={{ left: `${pct}%`, transform: 'translate(-50%, -50%)', color: '#ffffff' }}
                 >
-                  ★
+                  <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                    <path d="M0 0H10V10L5 14L0 10V0Z" />
+                  </svg>
                 </div>
               ))}
               {widthPct > 5 && bmMarkers.length === 0 && (
@@ -94,6 +98,36 @@ export const FinalCutTimeline: React.FC<Props> = ({ timeline, currentTime, onSee
             </div>
           );
         })}
+
+        {/* Audio Waveform Overlay */}
+        {audioWaveform.length > 0 && audioDuration > 0 && (() => {
+          const pointsPerSecond = audioWaveform.length / audioDuration;
+          const pointsToShow = Math.ceil(totalDuration * pointsPerSecond);
+          const visibleWaveform = audioWaveform.slice(0, pointsToShow);
+          
+          if (visibleWaveform.length === 0) return null;
+          
+          // Generate SVG Path for Premiere-like dense waveform
+          const width = 1000;
+          const height = 100;
+          const step = width / visibleWaveform.length;
+          
+          let pathD = `M 0,${height}`;
+          visibleWaveform.forEach((val, idx) => {
+            const x = (idx * step).toFixed(2);
+            const y = (height - (val * height)).toFixed(2);
+            pathD += ` L ${x},${y}`;
+          });
+          pathD += ` L ${width},${height} Z`;
+          
+          return (
+            <div className="absolute inset-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
+              <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full fill-emerald-400">
+                <path d={pathD} />
+              </svg>
+            </div>
+          );
+        })()}
 
         {/* Playhead */}
         <div 

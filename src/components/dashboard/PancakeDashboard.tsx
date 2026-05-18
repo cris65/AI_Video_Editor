@@ -20,7 +20,7 @@ export interface UserConstraint {
 }
 
 export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
-  const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, loading, error, refetchFinalCut } = usePancakeData(sequenceName);
+  const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveform, loading, error, refetchFinalCut } = usePancakeData(sequenceName);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   
@@ -447,6 +447,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 currentTime={currentTimelineTime}
                 onSeek={seekToTimelineTime}
                 userConstraints={userConstraints}
+                audioWaveform={audioWaveform}
+                audioDuration={audioDuration}
               />
             ) : (
               <InteractiveTimeline 
@@ -455,6 +457,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 duration={videoDuration} 
                 userConstraints={userConstraints}
                 clipOverrides={clipOverrides}
+                audioWaveform={audioWaveform}
+                audioDuration={audioDuration}
               />
             )}
           </div>

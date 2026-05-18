@@ -54,6 +54,8 @@ export function usePancakeData(sequenceName: string) {
   const [finalCutTimeline, setFinalCutTimeline] = useState<FinalCutClip[]>([]);
   const [gemmaRecipe, setGemmaRecipe] = useState<any[] | null>(null);
   const [audioBpm, setAudioBpm] = useState<number | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [audioWaveform, setAudioWaveform] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,11 +108,17 @@ export function usePancakeData(sequenceName: string) {
         
         // 4. Carica il BPM dal file _audio_beats.json
         try {
-          const audioRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_audio_beats.json`);
+          const audioRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_audio_beats.json?t=${Date.now()}`);
           if (audioRes.ok) {
             const audioJson = await audioRes.json();
             if (audioJson.tempo) {
               setAudioBpm(Math.round(audioJson.tempo));
+            }
+            if (audioJson.audio_duration) {
+              setAudioDuration(audioJson.audio_duration);
+            }
+            if (audioJson.waveform) {
+              setAudioWaveform(audioJson.waveform);
             }
           }
         } catch (e) {
@@ -152,5 +160,5 @@ export function usePancakeData(sequenceName: string) {
     }
   };
 
-  return { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, loading, error, refetchFinalCut: fetchFinalCut };
+  return { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveform, loading, error, refetchFinalCut: fetchFinalCut };
 }

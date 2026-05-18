@@ -7,9 +7,11 @@ interface InteractiveTimelineProps {
   duration: number;
   userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>>;
   clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
+  audioWaveform?: number[];
+  audioDuration?: number;
 }
 
-export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {} }: InteractiveTimelineProps) {
+export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0 }: InteractiveTimelineProps) {
   const playheadRef = useRef<HTMLDivElement>(null);
   const timeTextRef = useRef<HTMLSpanElement>(null);
 
@@ -102,7 +104,11 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                 >
                   {constraint.type === 'IN' && '['}
                   {constraint.type === 'OUT' && ']'}
-                  {constraint.type === 'BM' && '★'}
+                  {constraint.type === 'BM' && (
+                    <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                      <path d="M0 0H10V10L5 14L0 10V0Z" />
+                    </svg>
+                  )}
                 </div>
               ))}
             </div>
@@ -111,6 +117,36 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
 
         {/* Hover overlay for entire timeline */}
         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+        {/* Audio Waveform Overlay */}
+        {audioWaveform.length > 0 && audioDuration > 0 && (() => {
+          const pointsPerSecond = audioWaveform.length / audioDuration;
+          const pointsToShow = Math.ceil(duration * pointsPerSecond);
+          const visibleWaveform = audioWaveform.slice(0, pointsToShow);
+          
+          if (visibleWaveform.length === 0) return null;
+          
+          // Generate SVG Path for Premiere-like dense waveform
+          const width = 1000;
+          const height = 100;
+          const step = width / visibleWaveform.length;
+          
+          let pathD = `M 0,${height}`;
+          visibleWaveform.forEach((val, idx) => {
+            const x = (idx * step).toFixed(2);
+            const y = (height - (val * height)).toFixed(2);
+            pathD += ` L ${x},${y}`;
+          });
+          pathD += ` L ${width},${height} Z`;
+          
+          return (
+            <div className="absolute inset-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
+              <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full fill-emerald-400">
+                <path d={pathD} />
+              </svg>
+            </div>
+          );
+        })()}
 
         {/* Playhead controlled by requestAnimationFrame */}
         <div 

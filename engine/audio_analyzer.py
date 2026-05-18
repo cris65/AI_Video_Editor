@@ -34,9 +34,31 @@ def extract_beats(wav_path, output_dir, sequence_name):
             
         print(f"🥁 Trovati {len(beats_list)} beat (Tempo stimato: {tempo_val:.2f} BPM)")
         
+        # Calcolo dell'energia (waveform RMS)
+        print("🥁 Audio Analyzer: Estrazione Waveform...")
+        audio_duration = librosa.get_duration(y=y, sr=sr)
+        rms = librosa.feature.rms(y=y)[0]
+        
+        # Normalizzazione tra 0.0 e 1.0
+        max_rms = np.max(rms)
+        if max_rms > 0:
+            rms_norm = rms / max_rms
+        else:
+            rms_norm = rms
+            
+        # Riduzione a max 2000 punti per il frontend (alta risoluzione tipo Premiere)
+        target_points = 2000
+        if len(rms_norm) > target_points:
+            chunks = np.array_split(rms_norm, target_points)
+            waveform = [float(np.max(chunk)) for chunk in chunks]
+        else:
+            waveform = [float(val) for val in rms_norm]
+        
         with open(beats_json_path, 'w') as f:
             json.dump({
                 "tempo": tempo_val,
+                "audio_duration": float(audio_duration),
+                "waveform": waveform,
                 "beats": beats_list
             }, f, indent=2)
             
@@ -46,9 +68,19 @@ def extract_beats(wav_path, output_dir, sequence_name):
     except ImportError:
         print("❌ ERRORE: librosa non installato. (Fallback su beat simulati per MOCK_MODE)")
         beats_list = [float(i * 0.5) for i in range(120)] # 120 bpm = 0.5s inter-beat
+        import math
+        import random
+        # Genera una finta waveform molto frastagliata (tipo Premiere) a 2000 punti
+        mock_waveform = []
+        for i in range(2000):
+            base = abs(math.sin(i / 50.0)) * 0.5
+            spike = random.random() * 0.5 if random.random() > 0.8 else random.random() * 0.1
+            mock_waveform.append(float(min(1.0, base + spike + 0.05)))
         with open(beats_json_path, 'w') as f:
             json.dump({
                 "tempo": 120.0,
+                "audio_duration": 60.0,
+                "waveform": mock_waveform,
                 "beats": beats_list
             }, f, indent=2)
         return beats_json_path
