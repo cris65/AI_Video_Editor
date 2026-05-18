@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
 
 export interface DirectorConfig {
+  ai_model?: 'gemma-4-4b' | 'gemma-4-31b';
   target_duration: number;
   style_prompt: string;
   export_resolution?: string;
+  analysis_fps?: number;
+  target_product?: string;
+  expected_subjects?: number;
+  secondary_elements?: string;
+  ignore_list?: string;
+  safe_zone_margin?: number;
 }
 
 export interface FinalCutClip {

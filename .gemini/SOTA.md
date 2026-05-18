@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.22 - 2026-05-18
+**Version:** v0.1.23 - 2026-05-19
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -21,6 +21,8 @@
 7. **Frontend HITL (React/Vite)**: Interfaccia utente Human-In-The-Loop. Architettura Split-View NLE-style con Video Player sincronizzato e Timeline Interattiva (Stringout & Director's Cut). Integra un'ingegneria Anti-Lag spinta (60fps): il data-binding temporale usa `requestAnimationFrame` scavalcando lo state React globale, e implementa navigazione tastiera e Vertical Playlist con `React.memo`. Include un sistema Multi-Anchor (vincoli multipli per clip), un sistema di Override Non-Distruttivo (KEEP/TRASH/BROLL) con filtri avanzati. La UI è sincronizzata real-time: cliccando un marker o una clip nell'inspector verticale, la playhead orizzontale esegue il seek istantaneamente. Include playhead "Premiere style" in SVG e settaggi risoluzione custom per l'export. I dati sono salvati su sidecar JSON (`_hitl_data.json`) via endpoint Node locale.
    - **Timeline Orizzontale Interattiva (NLE DnD & Zoom Engine):** La `FinalCutTimeline` è un workspace NLE-style interattivo. I blocchi clip sono flex-item proporzionali alla durata (no `position: absolute`). Il drag orizzontale usa `@dnd-kit/core` + `horizontalListSortingStrategy` e un custom `snapToCursorModifier` per assicurare che il drag-overlay agganci perfettamente il cursore compensando il clamping della larghezza massima (max 350px) durante lo zoom spinto.
    - **Zoom Engine e Clip Ghosting:** Integrazione di uno Zoom Engine `(1x - 50x)` controllato via slider UI o `Ctrl+Scroll`. Le clip riposizionate manualmente assumono uno stato "Dirty" o "Ghosting" in tempo reale (trasparenza globale con un elegante alone interno scuro e bordo bianco) finché il pulsante "SAVE ORDER" persiste l'ordine su `_hitl_data.json` sotto la chiave `clip_order_override`. Il salvataggio è ora puramente "Optimistico": lava lo stato dirty localmente e non scatena un re-fetch dell'Engine raw, preservando la personalizzazione anche in caso di ricaricamento della pagina (grazie a un intercept di mount su `PancakeDashboard`). Waveform overlay e playhead RAF-driven sono inviolabili e renderizzano Z-indexed sopra le clip in drag.
+   - **Director Settings Panel & Advanced Modal:** L'interfaccia si è sdoppiata in una sidebar rapida (con modello AI, risoluzione, e Analysis FPS agnostico) e un "Creative Settings" pop-up in full-screen (Portal) per la selezione esplicita del `Target Product`, dei `Soggetti Attesi` e il tracciamento visivo della `Focus Area`. 
+   - **Dynamic Hardware Profiler:** L'interfaccia integra un Widget di calcolo in real-time su ETA, Frames analizzati e Chunks. Usa una query asincrona al server locale Python (`/api/system/profiler`) per calcolare l'inferenza matematica specifica all'hardware dell'utente, offrendo un fallback morbido "Mock Data" nel caso il backend sia offline.
 
 ## Automazione (Open Agent Manager)
 - I flussi di rilascio (`/wolf_flow`) validano e wrappano commit complessi sul repo `origin develop`.

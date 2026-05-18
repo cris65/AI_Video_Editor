@@ -83,7 +83,7 @@ From this exact moment, your operational protocol regarding any Database, Sync, 
 ## 6. EXECUTION, OUTPUT & ATOMIC FILE PROTOCOL
 
 - **🛡️ THE ATOMIC FILE PROTOCOL (STRICT):** 1. **Target:** Modify ONLY ONE file at a time. 2. **Validate:** Immediately run linter and type checker. 3. **Resolve:** Fix errors in that specific file immediately. 4. **Advance:** You are STRICTLY FORBIDDEN from opening or modifying the next file until the current file compiles perfectly.
-- **Complete Output:** Provide the COMPLETE code without omissions.
+- **Complete Output & Chat Hygiene:** Provide the COMPLETE code using the internal system tools (Atomic File Protocol). You are STRICTLY FORBIDDEN from printing raw code blocks in the chat response unless explicitly requested by the Tech Lead. This saves tokens and keeps the chat clean.
 - **700 Lines Limit:** If a file approaches 700 lines, you MUST proactively propose a refactoring plan.
 - **ZERO-TRACE DEBUGGING:** You are strictly forbidden from leaving behind temporary scripts (`.js`, `.py`, `.sql`) or test files. Every debug action must conclude with a cleanup (`rm`) in the same execution block before moving on.
 - **Workspace Hygiene & Output Paths:** Whenever generating a scouting report, schema analysis, or architectural plan, you MUST save the `.md` file directly into `.gemini/plans/`. NEVER write these files to the root directory.

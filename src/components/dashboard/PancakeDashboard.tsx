@@ -5,6 +5,7 @@ import { ClipCard } from './ClipCard';
 import { VideoPlayerSync } from './VideoPlayerSync';
 import { InteractiveTimeline } from './InteractiveTimeline';
 import { FinalCutTimeline } from './FinalCutTimeline';
+import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X } from 'lucide-react';
 
@@ -605,101 +606,21 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 </button>
                 
                 {isDirectorSettingsOpen && (
-                  <div className="p-4 pt-0 space-y-3 border-t border-slate-800 mt-1">
-                    <div>
-                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
-                       <input type="number" 
-                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                              value={directorConfig.target_duration}
-                              onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
-                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                       />
-                    </div>
-                    <div>
-                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
-                       <select
-                          className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
-                          value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const newRes = val === "custom" ? "1000x1000" : val;
-                            const newConfig = { ...directorConfig, export_resolution: newRes };
-                            setDirectorConfig(newConfig);
-                            triggerSave(userConstraints, clipOverrides, newConfig);
-                          }}
-                       >
-                         <option value="3840x2160">4K UHD (3840x2160)</option>
-                         <option value="1920x1080">Full HD (1920x1080)</option>
-                         <option value="1080x1920">Vertical (1080x1920)</option>
-                         <option value="custom">Custom...</option>
-                       </select>
-                       
-                       {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
-                         <div className="flex gap-2 mb-3">
-                           <input 
-                             type="number" 
-                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                             placeholder="W"
-                             value={directorConfig.export_resolution?.split('x')[0] || ""}
-                             onChange={(e) => {
-                                const h = directorConfig.export_resolution?.split('x')[1] || "1080";
-                                setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
-                             }}
-                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                           />
-                           <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
-                           <input 
-                             type="number" 
-                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                             placeholder="H"
-                             value={directorConfig.export_resolution?.split('x')[1] || ""}
-                             onChange={(e) => {
-                                const w = directorConfig.export_resolution?.split('x')[0] || "1920";
-                                setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
-                             }}
-                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                           />
-                         </div>
-                       )}
-                    </div>
-                    <div>
-                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
-                       <textarea 
-                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
-                              placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
-                              value={directorConfig.style_prompt}
-                              onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
-                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
-                       />
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-slate-800">
-                      <button
-                        onClick={handleRegenerateCut}
-                        disabled={isRegenerating || saveStatus === 'saving'}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all ${
-                          isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
-                          : finalCutTimeline.length === 0 
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
-                            : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30'
-                        }`}
-                        title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
-                      >
-                        {isRegenerating ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : finalCutTimeline.length === 0 ? (
-                          <Wand2 size={14} className="animate-pulse" />
-                        ) : (
-                          <RefreshCw size={14} />
-                        )}
-                        {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Initial Cut' : 'Regenerate Cut')}
-                      </button>
-                    </div>
-                  </div>
+                  <DirectorSettingsPanel
+                    config={directorConfig}
+                    onSave={(newConfig) => {
+                      setDirectorConfig(newConfig);
+                      triggerSave(userConstraints, clipOverrides, newConfig);
+                    }}
+                    onRegenerate={handleRegenerateCut}
+                    isRegenerating={isRegenerating}
+                    saveStatus={saveStatus}
+                    sequenceFps={fps}
+                  />
                 )}
               </div>
             </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             
             {isPreviewMode ? (
               // In Preview Mode, mostriamo le clip nell'ordine CORRENTE (orderedFinalCut)
