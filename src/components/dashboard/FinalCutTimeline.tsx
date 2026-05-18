@@ -356,7 +356,7 @@ export const FinalCutTimeline: React.FC<Props> = ({
             {/* Layer 3: FLEX CLIP TRACK — replaces absolute-positioned clips */}
             <SortableContext items={items} strategy={horizontalListSortingStrategy}>
               <div className="flex flex-row h-full w-full">
-              {timeline.map((clip, idx) => {
+              {timeline.map((clip) => {
                 const widthPct =
                   totalDuration > 0
                     ? ((clip.timeline_out - clip.timeline_in) / totalDuration) * 100

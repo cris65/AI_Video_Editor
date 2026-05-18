@@ -24,6 +24,11 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 - [x] Rilevamento della Safe Zone tramite YOLO/OpenCV.
 - [x] Estrazione del `people_count` da YOLO e iniezione nel dizionario della clip.
 
+**FASE A2: Analisi Audio (BPM & Transienti)**
+
+- [x] Implementazione script Python (`audio_analyzer.py` con `librosa`) per estrarre il tempo musicale (BPM) e mappare i transienti (picchi) della traccia audio.
+- [x] Iniezione dei timecode dei beat e della waveform nel JSON base per consentire il futuro "Cut on Beat".
+
 **FASE B: Analisi Semantica (MLX Vision)**
 
 - [x] Sviluppo `mlx_client.py` svincolato da ComfyUI.
@@ -64,3 +69,5 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 - [ ] Refactoring del Frontend React in Adobe CEP Extension (Manifest XML, ExtendScript).
 - [ ] Automazione I/O: Sincronizzazione automatica della timeline attiva tramite script JSX.
 - [ ] Packaging MLX: Creazione di un installer "One-Click" (macOS .pkg o PyInstaller) per rendere il server MLX locale invisibile e friction-less per l'utente finale non tecnico.
+- [ ] Motore Audio-Generativo Locale (MusicGen / Stable Audio): Integrazione di un modello text-to-audio offline.
+- [ ] Creazione pannello UI dedicato nella Dashboard per generare colonne sonore originali da prompt di testo, garantendo totale autonomia, privacy e sync deterministico senza chiamate ad API esterne.

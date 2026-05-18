@@ -11,7 +11,7 @@ export function useSequencePlayer(
   const [activeClipIndex, setActiveClipIndex] = useState(0);
   const rafRef = useRef<number>();
   const isSeeking = useRef(false);
-  const userSeekTarget = useRef<number | null>(null);
+
 
   // Reset sequence when timeline is regenerated
   useEffect(() => {
