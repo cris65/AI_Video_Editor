@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.23 - 2026-05-19
+**Version:** v0.1.25 - 2026-05-19
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -22,7 +22,8 @@
    - **Timeline Orizzontale Interattiva (NLE DnD & Zoom Engine):** La `FinalCutTimeline` è un workspace NLE-style interattivo. I blocchi clip sono flex-item proporzionali alla durata (no `position: absolute`). Il drag orizzontale usa `@dnd-kit/core` + `horizontalListSortingStrategy` e un custom `snapToCursorModifier` per assicurare che il drag-overlay agganci perfettamente il cursore compensando il clamping della larghezza massima (max 350px) durante lo zoom spinto.
    - **Zoom Engine e Clip Ghosting:** Integrazione di uno Zoom Engine `(1x - 50x)` controllato via slider UI o `Ctrl+Scroll`. Le clip riposizionate manualmente assumono uno stato "Dirty" o "Ghosting" in tempo reale (trasparenza globale con un elegante alone interno scuro e bordo bianco) finché il pulsante "SAVE ORDER" persiste l'ordine su `_hitl_data.json` sotto la chiave `clip_order_override`. Il salvataggio è ora puramente "Optimistico": lava lo stato dirty localmente e non scatena un re-fetch dell'Engine raw, preservando la personalizzazione anche in caso di ricaricamento della pagina (grazie a un intercept di mount su `PancakeDashboard`). Waveform overlay e playhead RAF-driven sono inviolabili e renderizzano Z-indexed sopra le clip in drag.
    - **Director Settings Panel & Advanced Modal:** L'interfaccia si è sdoppiata in una sidebar rapida (con modello AI, risoluzione, e Analysis FPS agnostico) e un "Creative Settings" pop-up in full-screen (Portal) per la selezione esplicita del `Target Product`, dei `Soggetti Attesi` e il tracciamento visivo della `Focus Area`. 
-   - **Dynamic Hardware Profiler:** L'interfaccia integra un Widget di calcolo in real-time su ETA, Frames analizzati e Chunks. Usa una query asincrona al server locale Python (`/api/system/profiler`) per calcolare l'inferenza matematica specifica all'hardware dell'utente, offrendo un fallback morbido "Mock Data" nel caso il backend sia offline.
+   - **Dynamic Hardware Profiler:** L'interfaccia integra un Widget di calcolo in real-time su ETA, Frames analizzati e Chunks. Usa una query asincrona al server locale Python (`/api/system/profiler`) che interroga il kernel macOS (`sysctl`) e `psutil` per rilevare l'esatto modello di chip (es. Apple M4 Max) e la Unified RAM installata, offrendo un fallback morbido "Mock Data" nel caso il backend sia offline.
 
 ## Automazione (Open Agent Manager)
+- **Trinity Ecosystem Startup:** Tramite il comando `npm run wolf:dev` (che usa `concurrently`), il sistema avvia in parallelo l'interfaccia React Vite (5173) e il backend FastAPI/Python (8000) attivando dinamicamente il Virtual Environment locale.
 - I flussi di rilascio (`/wolf_flow`) validano e wrappano commit complessi sul repo `origin develop`.

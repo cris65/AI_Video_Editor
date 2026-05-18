@@ -23,6 +23,7 @@ L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard Op
 - Iniettando il Context Prompt specifico sulla Continuità Cronologica.
 - Salvando il risultato validato nel dict JSON tramite una logica tollerante e autonoma (retry x3, regex cleaning e salvataggio JSON progressivo).
 - Bypass morfologico (Skip Morbido) per l'ingest automatico se il server non è avviato.
+- **Integrazione Nativa Apple Silicon**: L'ambiente Python (`engine/requirements.txt`) è ora equipaggiato nativamente con i framework ufficiali `mlx` e `mlx-lm` per consentire l'inferenza LLM diretta sfruttando la Unified Memory, senza dipendere da server esterni.
 
 ### 4. Automazione Drop-Zone Flessibile
 - **Ingest Agnostico:** Supporto esteso a `.mp4`, `.mov`, `.mxf`, `.avi`, `.mkv`.
@@ -39,4 +40,4 @@ L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard Op
 - **Keyboard Shortcuts Professionali**: Integrazione standard per il montaggio. Spazio per Play/Pausa, frecce orizzontali per lo scrubbing (10 frames base, +Shift per 1 frame, +Alt per 30 frames), frecce verticali per "saltare" istantaneamente ai tagli successivi/precedenti calcolati dall'Engine. Menu informativo (Info Popup) "on-click" per tutte le timeline.
 - **Anti-Lag Engine (60fps)**: Data-binding del tempo completamente sganciato dal React State e demandato a un `requestAnimationFrame` diretto sul DOM. I re-render React sono bloccati tramite `React.memo` tranne quando il video sorpassa un effettivo "taglio" dell'EDL virtuale.
 - **Director Settings Panel & Advanced Modal**: L'utente può accedere a un panel avanzato `🎨 AI Director Creative Settings` (tramite createPortal per superare limiti di z-index) dove impostare il *Target Product*, *Expected Subjects*, *Focus Area* e parametri NLP, salvati all'interno della `DirectorConfig`.
-- **API-Ready Dynamic Hardware Profiler**: Un widget integrato legge l'hardware dal backend (`/api/system/profiler`) calcolando in real-time l'ETA e i lotti di inferenza (Chunks) basandosi sull'Analysis FPS agnostico impostato e sui pesi del modello.
+- **Dynamic Hardware Profiler & Trinity Startup**: L'intero ecosistema (React + Python) si avvia in parallelo con un singolo comando (`npm run wolf:dev`). Il widget hardware integrato non usa più dati mockati, ma legge il profilo dal backend (`/api/system/profiler`) che a sua volta estrae l'esatto modello del chip e la Unified RAM interrogando nativamente il kernel macOS (`sysctl`). L'ETA e i lotti di inferenza (Chunks) sono calcolati matematicamente in real-time.
