@@ -86,7 +86,7 @@ const engineAssetsPlugin = () => ({
         }
         
         const pythonExecutable = path.join(process.cwd(), 'engine', 'venv', 'bin', 'python');
-        const script = `import sys; sys.path.append('engine'); import director; seq='${sequence}'; base='engine/output/'+seq+'/LLM_Export_Package/'; director.generate_final_cut(base+seq+'_stringout.json', base+seq+'_hitl_data.json', base+seq+'_audio_beats.json', base, seq)`;
+        const script = `import sys; sys.path.append('engine'); import update_cut; update_cut.update_cut('${sequence}')`;
         
         exec(`${pythonExecutable} -c "${script}"`, { cwd: process.cwd() }, (error: any, stdout: any, stderr: any) => {
           if (error) {

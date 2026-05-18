@@ -49,12 +49,12 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 - [x] Navigazione avanzata tramite Keyboard Shortcuts (NLE Style) e Vertical Playlist auto-scrollante.
 - [x] Override e forzatura manuale dei valori da parte dell'utente (Salvataggio in JSON locale).
 - [ ] Drag & Drop (dnd-kit) nella timeline Director's Cut per il riordino manuale delle clip e dei BM.
-- [ ] Integrazione Supabase per il salvataggio degli stati di avanzamento delle
-      timeline.
+- [ ] Global START / END: Supporto per fissare manualmente la prima clip (Establishing) e l'ultima clip (Logo/Finale) scavalcando l'AI.
+- [ ] Integrazione Supabase per il salvataggio degli stati di avanzamento delle timeline e User Export Settings (es. formati custom di default).
 
 ## 🔴 FASE 3: Il "Regista" & Orchestrazione
 
-- [ ] Supporto ai "Pinned Anchors": Gemma 4 rispetta il riordino manuale forzato (Drag & Drop) proveniente dall'HITL.
+- [ ] Supporto ai "Pinned Anchors": Gemma 4 rispetta il riordino manuale (Forced Order) e i Global START/END provenienti dall'HITL.
 - [ ] Rilevamento di anomalie video avanzate (micro-mosso, drop frame).
 - [ ] Esportazione XML multi-track per NLE alternativi (Premiere Pro / DaVinci / FCPX).
 - [ ] Packaging e automazione esecuzione batch in background.

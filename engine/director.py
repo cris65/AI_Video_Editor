@@ -246,7 +246,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                 "timeline_in": beats[start_idx],
                 "timeline_out": beats[end_idx],
                 "role": "PILLAR" if clip.get('_has_bm') else "FILLER",
-                "tag": clip['_final_tag']
+                "tag": clip['_final_tag'],
+                "_bm_time": clip.get('_bm_time')
             })
             cursor_idx = end_idx
             
@@ -371,7 +372,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                     "timeline_in": beats[start_idx],
                     "timeline_out": beats[end_idx],
                     "role": "PILLAR",
-                    "tag": pillar['_final_tag']
+                    "tag": pillar['_final_tag'],
+                    "_bm_time": pillar.get('_bm_time')
                 })
                 
         gaps = []
@@ -444,7 +446,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     
     export_data = []
     for item in final_timeline:
-        export_data.append({
+        export_item = {
             "source_clip_start": round(item['clip_ref']['start'], 3),
             "source_clip_end": round(item['clip_ref']['end'], 3),
             "source_in": round(item['source_in'], 3),
@@ -453,7 +455,11 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
             "timeline_out": round(item['timeline_out'], 3),
             "role": item['role'],
             "tag": item['tag']
-        })
+        }
+        if '_bm_time' in item and item['_bm_time'] is not None:
+            export_item['_bm_time'] = round(item['_bm_time'], 3)
+            
+        export_data.append(export_item)
         
     with open(output_path, 'w') as f:
         json.dump({"final_edit_timeline": export_data}, f, indent=2)

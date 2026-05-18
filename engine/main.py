@@ -7,6 +7,7 @@ import shutil
 import edl_parser
 import pancake_editor
 import edl_exporter
+import xml_exporter
 import mlx_client
 import bgm_generator
 import audio_analyzer
@@ -172,9 +173,20 @@ def run_pipeline():
         print(f"❌ ERRORE in Fase D (Director): {e}")
 
     # ============================================================
-    # 6. FASE E: EXPORT EDL
+    # 6. FASE E: EXPORT EDL & XML
     # ============================================================
-    print("\n--- FASE E: Generazione Timeline EDL ---")
+    print("\n--- FASE E: Generazione Timeline EDL & XML ---")
+    
+    # Estrazione FPS dinamico da Stringout
+    fps = 25.0
+    try:
+        import json
+        with open(json_main_path, 'r') as f:
+            s_data = json.load(f)
+            fps = s_data.get("metadata", {}).get("fps", 25.0)
+    except Exception:
+        pass
+        
     try:
         # Crea la cartella se non esiste
         seq_output_dir = os.path.join(DIR_OUTPUT, sequence_name)
@@ -187,13 +199,33 @@ def run_pipeline():
             sequence_name=f"{sequence_name}_Stringout",
             clip_map=clip_map,
             output_edl_path=FILE_EDL_OUT,
-            fps=25
+            fps=fps
         )
+        
+        # Generazione XML del Director's Cut
+        if final_edit_json and os.path.exists(final_edit_json):
+            seq_llm_export_dir = os.path.join(DIR_OUTPUT, sequence_name, "LLM_Export_Package")
+            FILE_XML_OUT = os.path.join(seq_llm_export_dir, f"{sequence_name}_FinalCut.xml")
+            
+            # Recupera il bgm_wav_path se esiste (dalla fase C)
+            bgm_wav_path = os.path.join(seq_llm_export_dir, f"{sequence_name}_bgm.wav")
+            
+            xml_exporter.export_to_xml(
+                json_path=final_edit_json,
+                clip_map=clip_map,
+                output_xml_path=FILE_XML_OUT,
+                sequence_name=f"{sequence_name}_FinalCut",
+                audio_bgm_path=bgm_wav_path if os.path.exists(bgm_wav_path) else None,
+                fps=fps
+            )
+        else:
+            print("⚠️ Nessun Final Cut trovato. Salto l'esportazione XML.")
+            
     except Exception as e:
-        print(f"❌ ERRORE CRITICO in Fase B: {e}")
+        print(f"❌ ERRORE CRITICO in Fase E: {e}")
         sys.exit(1)
 
-    print(f"\n✅ PIPELINE COMPLETATA. Il file EDL CMX3600 ({os.path.basename(FILE_EDL_OUT)}) è pronto per l'importazione in Adobe Premiere.")
+    print(f"\n✅ PIPELINE COMPLETATA. Il file EDL ({os.path.basename(FILE_EDL_OUT)}) e l'XML ({os.path.basename(FILE_XML_OUT) if 'FILE_XML_OUT' in locals() else 'N/A'}) sono pronti per l'importazione in Premiere.")
     cleanup_inputs(FILE_EDL_IN, FILE_PROXY_IN, sequence_name)
 
 if __name__ == "__main__":

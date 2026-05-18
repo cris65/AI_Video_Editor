@@ -128,7 +128,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         return next;
       });
     }
-  }, [combinedTimeline, fps, clipOverrides]);
+  }, [combinedTimeline, fps, clipOverrides, directorConfig]);
 
   const handleRemoveSpecificConstraint = useCallback((clipKey: string, time: number) => {
     setUserConstraints(prev => {
@@ -168,11 +168,11 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     }
   }, [combinedTimeline, userConstraints, directorConfig]);
 
-  const triggerSave = async (
+  async function triggerSave(
     constraintsToSave: Record<string, UserConstraint[]>, 
     overridesToSave: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>,
     configToSave: DirectorConfig
-  ) => {
+  ) {
     setSaveStatus('saving');
     try {
       const payload = { hitl_constraints: constraintsToSave, clip_overrides: overridesToSave, director_config: configToSave };
@@ -210,6 +210,15 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     finalCutTimeline, 
     isPreviewMode
   );
+
+  useEffect(() => {
+    if (isPreviewMode && activeClipIndex !== null) {
+      const el = document.getElementById(`fc-card-${activeClipIndex}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [isPreviewMode, activeClipIndex]);
 
   useVideoShortcuts(
     videoRef, 
@@ -442,24 +451,28 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           </div>
           <div className="shrink-0 mt-4">
             {isPreviewMode ? (
-              <FinalCutTimeline 
-                timeline={finalCutTimeline}
-                currentTime={currentTimelineTime}
-                onSeek={seekToTimelineTime}
-                userConstraints={userConstraints}
-                audioWaveform={audioWaveform}
-                audioDuration={audioDuration}
-              />
+              <>
+                <FinalCutTimeline 
+                  timeline={finalCutTimeline}
+                  currentTime={currentTimelineTime}
+                  onSeek={seekToTimelineTime}
+                  userConstraints={userConstraints}
+                  audioWaveform={audioWaveform}
+                  audioDuration={audioDuration}
+                />
+              </>
             ) : (
-              <InteractiveTimeline 
-                timeline={filteredTimeline} 
-                videoRef={videoRef} 
-                duration={videoDuration} 
-                userConstraints={userConstraints}
-                clipOverrides={clipOverrides}
-                audioWaveform={audioWaveform}
-                audioDuration={audioDuration}
-              />
+              <>
+                <InteractiveTimeline 
+                  timeline={filteredTimeline} 
+                  videoRef={videoRef} 
+                  duration={videoDuration} 
+                  userConstraints={userConstraints}
+                  clipOverrides={clipOverrides}
+                  audioWaveform={audioWaveform}
+                  audioDuration={audioDuration}
+                />
+              </>
             )}
           </div>
         </div>
@@ -473,7 +486,6 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             </h2>
           </div>
           
-          {!isPreviewMode && (
             <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
               <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-sm">
                 <h3 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
@@ -498,6 +510,53 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                      />
                   </div>
                   <div>
+                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
+                     <select
+                        className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
+                        value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const newRes = val === "custom" ? "1000x1000" : val;
+                          const newConfig = { ...directorConfig, export_resolution: newRes };
+                          setDirectorConfig(newConfig);
+                          triggerSave(userConstraints, clipOverrides, newConfig);
+                        }}
+                     >
+                       <option value="3840x2160">4K UHD (3840x2160)</option>
+                       <option value="1920x1080">Full HD (1920x1080)</option>
+                       <option value="1080x1920">Vertical (1080x1920)</option>
+                       <option value="custom">Custom...</option>
+                     </select>
+                     
+                     {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
+                       <div className="flex gap-2 mb-3">
+                         <input 
+                           type="number" 
+                           className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+                           placeholder="W"
+                           value={directorConfig.export_resolution?.split('x')[0] || ""}
+                           onChange={(e) => {
+                              const h = directorConfig.export_resolution?.split('x')[1] || "1080";
+                              setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
+                           }}
+                           onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                         />
+                         <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
+                         <input 
+                           type="number" 
+                           className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+                           placeholder="H"
+                           value={directorConfig.export_resolution?.split('x')[1] || ""}
+                           onChange={(e) => {
+                              const w = directorConfig.export_resolution?.split('x')[0] || "1920";
+                              setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
+                           }}
+                           onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                         />
+                       </div>
+                     )}
+                  </div>
+                  <div>
                      <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
                      <textarea 
                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
@@ -510,8 +569,6 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 </div>
               </div>
             </div>
-          )}
-          
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             
             {isPreviewMode ? (
@@ -531,14 +588,14 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 return (
                   <div 
                     key={`fc-card-${idx}`} 
+                    id={`fc-card-${idx}`}
                     onClick={() => {
-                      setIsPreviewMode(false);
                       if (videoRef.current) {
-                        videoRef.current.currentTime = clip.source_in;
+                        seekToTimelineTime(clip.timeline_in);
                       }
                     }}
                     className={`p-3 rounded-lg border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${activeClipIndex === idx ? 'bg-slate-800 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-slate-900/50 border-slate-800'} transition-all`}
-                    title="Clicca per tornare allo Stringout e modificare questa clip"
+                    title="Clicca per spostare la playhead su questa clip nel Director's Cut"
                   >
                      <div className="flex justify-between items-center mb-2 pointer-events-none">
                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
@@ -553,14 +610,21 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                      {/* Constraints List */}
                      {constraints && constraints.length > 0 && (
                        <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-800">
-                         {constraints.map((c, cIdx) => (
-                           <div 
-                             key={cIdx} 
-                             className="flex items-center justify-between bg-slate-950/50 px-2 py-1 rounded border border-slate-800/50"
-                             onClick={(e) => e.stopPropagation()}
-                           >
-                             <div className="flex items-center gap-2">
-                               <div className="w-4 flex justify-center">
+                         {constraints.map((c, cIdx) => {
+                           const globalTime = clip.timeline_in + (c.time - clip.source_in);
+                           const isMarkerActive = isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
+                           
+                           return (
+                              <div 
+                                key={cIdx} 
+                                className={`flex items-center justify-between px-2 py-1 rounded border transition-all cursor-pointer hover:scale-[1.02] ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  seekToTimelineTime(globalTime);
+                                }}
+                              >
+                               <div className="flex items-center gap-2">
+                                 <div className="w-4 flex justify-center">
                                  {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
                                  {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
                                  {c.type === 'BM' && (
@@ -582,7 +646,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                                <X size={12} />
                              </button>
                            </div>
-                         ))}
+                           );
+                         })}
                        </div>
                      )}
                   </div>

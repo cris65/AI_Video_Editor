@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export interface DirectorConfig {
   target_duration: number;
   style_prompt: string;
+  export_resolution?: string;
 }
 
 export interface FinalCutClip {
