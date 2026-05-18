@@ -61,6 +61,11 @@ export const FinalCutTimeline: React.FC<Props> = ({
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
   );
 
+  const handleSaveClick = () => {
+    setManuallyMovedIds(new Set());
+    if (onSaveOrder) onSaveOrder();
+  };
+
   const totalDuration = useMemo(() => {
     if (!timeline.length) return 0;
     return timeline[timeline.length - 1].timeline_out;
@@ -323,7 +328,7 @@ export const FinalCutTimeline: React.FC<Props> = ({
           </div>
           <span className="text-[10px] text-slate-400">{totalDuration.toFixed(1)}s</span>
           <button
-            onClick={onSaveOrder}
+            onClick={handleSaveClick}
             className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
             title="Salva l'ordine corrente nel file HITL (clip_order_override)"
           >

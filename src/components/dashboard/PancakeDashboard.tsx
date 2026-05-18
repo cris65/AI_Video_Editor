@@ -79,8 +79,12 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
   // Sync orderedFinalCut from source whenever finalCutTimeline is refreshed (e.g. after Update Cut)
   useEffect(() => {
-    setOrderedFinalCut(finalCutTimeline);
-  }, [finalCutTimeline]);
+    if (hitlData && hitlData.clip_order_override && hitlData.clip_order_override.length === finalCutTimeline.length) {
+      setOrderedFinalCut(hitlData.clip_order_override);
+    } else {
+      setOrderedFinalCut(finalCutTimeline);
+    }
+  }, [finalCutTimeline, hitlData]);
 
   useEffect(() => {
     if (audioBpm && !hasAutoSuggested.current) {
@@ -255,7 +259,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
       .then(res => {
         if (!res.ok) throw new Error('Save failed');
         setSaveStatus('saved');
-        refetchFinalCut();
+        // Do NOT call refetchFinalCut() here, otherwise the Python's raw timeline will overwrite our sorted local state.
         setTimeout(() => setSaveStatus('idle'), 2000);
       })
       .catch(err => {
