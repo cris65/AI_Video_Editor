@@ -48,7 +48,7 @@ La pipeline è divisa in tre sotto-fasi rigorosamente sequenziali.
 - [x] Sincronizzazione Anti-Lag a 60fps con requestAnimationFrame e disaccoppiamento dello stato temporale.
 - [x] Navigazione avanzata tramite Keyboard Shortcuts (NLE Style) e Vertical Playlist auto-scrollante.
 - [x] Override e forzatura manuale dei valori da parte dell'utente (Salvataggio in JSON locale).
-- [ ] Drag & Drop (dnd-kit) nella timeline Director's Cut per il riordino manuale delle clip e dei BM.
+- [x] Drag & Drop (dnd-kit) sulla timeline orizzontale Director's Cut per il riordino manuale delle clip (NLE-style, flex-row, `horizontalListSortingStrategy`). Persistenza dell'ordine su `_hitl_data.json` via `clip_order_override`.
 - [ ] Global START / END: Supporto per fissare manualmente la prima clip (Establishing) e l'ultima clip (Logo/Finale) scavalcando l'AI.
 - [ ] Integrazione Supabase per il salvataggio degli stati di avanzamento delle timeline e User Export Settings (es. formati custom di default).
 

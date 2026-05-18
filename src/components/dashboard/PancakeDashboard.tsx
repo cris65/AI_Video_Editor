@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePancakeData, DirectorConfig } from '../../hooks/usePancakeData';
+import { usePancakeData, DirectorConfig, FinalCutClip } from '../../hooks/usePancakeData';
 import { useVideoShortcuts } from '../../hooks/useVideoShortcuts';
 import { ClipCard } from './ClipCard';
 import { VideoPlayerSync } from './VideoPlayerSync';
@@ -7,6 +7,22 @@ import { InteractiveTimeline } from './InteractiveTimeline';
 import { FinalCutTimeline } from './FinalCutTimeline';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X } from 'lucide-react';
+
+// Pure function: recalculates timeline_in/timeline_out after manual reorder.
+// Durations are invariant (source_out - source_in). Returns a new immutable array.
+function recalcTimeline(clips: FinalCutClip[]): FinalCutClip[] {
+  let cursor = 0;
+  return clips.map(clip => {
+    const duration = clip.source_out - clip.source_in;
+    const recalculated: FinalCutClip = {
+      ...clip,
+      timeline_in: cursor,
+      timeline_out: cursor + duration,
+    };
+    cursor += duration;
+    return recalculated;
+  });
+}
 
 interface PancakeDashboardProps {
   sequenceName: string;
@@ -33,6 +49,9 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [filterMode, setFilterMode] = useState<'ALL' | 'VALID' | 'BROLL' | 'TRASH'>('ALL');
   const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
+  // Local mutable order — derived from immutable finalCutTimeline source.
+  // Re-synced whenever the Director re-generates the cut.
+  const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
   const hasAutoSuggested = useRef(false);
 
   useEffect(() => {
@@ -55,6 +74,11 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
       setDirectorConfig(hitlData.director_config);
     }
   }, [hitlData]);
+
+  // Sync orderedFinalCut from source whenever finalCutTimeline is refreshed (e.g. after Update Cut)
+  useEffect(() => {
+    setOrderedFinalCut(finalCutTimeline);
+  }, [finalCutTimeline]);
 
   useEffect(() => {
     if (audioBpm && !hasAutoSuggested.current) {
@@ -204,10 +228,41 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     }
   };
 
+  // Receives the arrayMove'd array from FinalCutTimeline and recalculates timeline positions.
+  const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[]) => {
+    setOrderedFinalCut(recalcTimeline(newTimeline));
+  }, []);
+
+  // Persists the current clip order into _hitl_data.json under clip_order_override.
+  const handleSaveOrder = useCallback(() => {
+    const payload = {
+      hitl_constraints: userConstraints,
+      clip_overrides: clipOverrides,
+      director_config: directorConfig,
+      clip_order_override: orderedFinalCut,
+    };
+    setSaveStatus('saving');
+    fetch(`/api/save-hitl?sequence=${sequenceName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload, null, 2),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Save failed');
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      })
+      .catch(err => {
+        console.error('Failed to save order:', err);
+        setSaveStatus('idle');
+      });
+  }, [userConstraints, clipOverrides, directorConfig, orderedFinalCut, sequenceName]);
+
+  // useSequencePlayer now consumes orderedFinalCut so playback respects manual reorder.
   const { currentTimelineTime, activeClipIndex, seekToTimelineTime } = useSequencePlayer(
-    videoRef, 
-    audioRef, 
-    finalCutTimeline, 
+    videoRef,
+    audioRef,
+    orderedFinalCut,
     isPreviewMode
   );
 
@@ -452,10 +507,12 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           <div className="shrink-0 mt-4">
             {isPreviewMode ? (
               <>
-                <FinalCutTimeline 
-                  timeline={finalCutTimeline}
+                <FinalCutTimeline
+                  timeline={orderedFinalCut}
                   currentTime={currentTimelineTime}
                   onSeek={seekToTimelineTime}
+                  onReorder={handleFinalCutReorder}
+                  onSaveOrder={handleSaveOrder}
                   userConstraints={userConstraints}
                   audioWaveform={audioWaveform}
                   audioDuration={audioDuration}
