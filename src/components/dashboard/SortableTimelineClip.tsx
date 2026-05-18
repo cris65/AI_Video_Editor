@@ -2,13 +2,13 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { FinalCutClip } from '../../hooks/usePancakeData';
-import type { UserConstraint } from './PancakeDashboard';
 
 interface SortableTimelineClipProps {
   id: string;
   clip: FinalCutClip;
   widthPct: number;
   seqLabel: string;
+  isMoved?: boolean;
 }
 
 export const SortableTimelineClip: React.FC<SortableTimelineClipProps> = ({
@@ -16,6 +16,7 @@ export const SortableTimelineClip: React.FC<SortableTimelineClipProps> = ({
   clip,
   widthPct,
   seqLabel,
+  isMoved = false,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -41,7 +42,11 @@ export const SortableTimelineClip: React.FC<SortableTimelineClipProps> = ({
       style={style}
       {...attributes}
       {...listeners}
-      className={`${bgColor} border-r border-slate-900 flex items-center justify-center cursor-grab active:cursor-grabbing`}
+      className={`${bgColor} flex items-center justify-center cursor-grab active:cursor-grabbing relative transition-all duration-300 ${
+        isMoved 
+          ? 'z-10 opacity-60 before:absolute before:inset-0 before:bg-black/60 before:shadow-[inset_0_0_8px_rgba(255,255,255,0.8)] before:pointer-events-none border-transparent' 
+          : 'border-r border-slate-900 z-10'
+      }`}
       title={`[${clip.role}] ${clip.tag}`}
     >
       {widthPct > 4 && (

@@ -255,13 +255,14 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
       .then(res => {
         if (!res.ok) throw new Error('Save failed');
         setSaveStatus('saved');
+        refetchFinalCut();
         setTimeout(() => setSaveStatus('idle'), 2000);
       })
       .catch(err => {
         console.error('Failed to save order:', err);
         setSaveStatus('idle');
       });
-  }, [userConstraints, clipOverrides, directorConfig, orderedFinalCut, sequenceName]);
+  }, [userConstraints, clipOverrides, directorConfig, orderedFinalCut, sequenceName, refetchFinalCut]);
 
   // useSequencePlayer now consumes orderedFinalCut so playback respects manual reorder.
   const { currentTimelineTime, activeClipIndex, seekToTimelineTime } = useSequencePlayer(

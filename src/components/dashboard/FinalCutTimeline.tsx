@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -9,6 +9,7 @@ import {
   useSensors,
   MouseSensor,
   TouchSensor,
+  Modifier,
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import type { FinalCutClip } from '../../hooks/usePancakeData';
@@ -43,6 +44,16 @@ export const FinalCutTimeline: React.FC<Props> = ({
 }) => {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [zoomFactor, setZoomFactor] = useState<number>(1);
+
+  // Track IDs of clips explicitly dragged by the user
+  const [manuallyMovedIds, setManuallyMovedIds] = useState<Set<string>>(new Set());
+
+  // Clear tracking when the original timeline updates (e.g. after SAVE ORDER)
+  useEffect(() => {
+    setManuallyMovedIds(new Set());
+  }, [originalTimeline]);
 
   // LAW 10: MouseSensor + TouchSensor only. No PointerSensor.
   const sensors = useSensors(
@@ -91,6 +102,46 @@ export const FinalCutTimeline: React.FC<Props> = ({
     return closestId;
   }, [timeline, userConstraints, currentTime]);
 
+  // Zoom via Ctrl+Scroll
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        setZoomFactor((prev) => {
+          let next = prev - e.deltaY * 0.01;
+          return Math.max(1, Math.min(50, next));
+        });
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Playhead Tracking Auto-Scroll
+  useEffect(() => {
+    if (activeDragId !== null) return;
+    const container = scrollContainerRef.current;
+    if (!container || totalDuration === 0) return;
+    
+    const playheadPct = currentTime / totalDuration;
+    const playheadPx = playheadPct * container.scrollWidth;
+    
+    const viewportWidth = container.clientWidth;
+    const scrollLeft = container.scrollLeft;
+    
+    // Dead zone: 30% to 70% of the visible viewport
+    const leftBound = scrollLeft + viewportWidth * 0.3;
+    const rightBound = scrollLeft + viewportWidth * 0.7;
+    
+    if (playheadPx > rightBound) {
+      container.scrollLeft = playheadPx - viewportWidth * 0.7;
+    } else if (playheadPx < leftBound) {
+      container.scrollLeft = playheadPx - viewportWidth * 0.3;
+    }
+  }, [currentTime, totalDuration, activeDragId]);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
   }, []);
@@ -114,6 +165,13 @@ export const FinalCutTimeline: React.FC<Props> = ({
       const offset = (currentTime >= oldClip.timeline_in && currentTime <= oldClip.timeline_out)
         ? (currentTime - oldClip.timeline_in)
         : 0.01;
+
+      // Traccia la clip esplicitamente mossa
+      setManuallyMovedIds(prev => {
+        const next = new Set(prev);
+        next.add(String(active.id));
+        return next;
+      });
 
       const newTimeline = arrayMove(timeline, oldIndex, newIndex);
 
@@ -157,8 +215,41 @@ export const FinalCutTimeline: React.FC<Props> = ({
   const activeDragWidthPx = useMemo(() => {
     if (!activeDragClip || totalDuration === 0 || !trackRef.current) return 0;
     const widthPct = (activeDragClip.timeline_out - activeDragClip.timeline_in) / totalDuration;
-    return trackRef.current.clientWidth * widthPct;
+    const rawWidth = trackRef.current.clientWidth * widthPct;
+    return Math.min(rawWidth, 350); // MAX-WIDTH clamp per UX su timeline super-zoomate
   }, [activeDragClip, totalDuration]);
+
+  // Centra il DragOverlay esattamente sotto il puntatore del mouse calcolando la posizione reale
+  const snapToCursorModifier: Modifier = useCallback(
+    ({ transform, activeNodeRect, activatorEvent }) => {
+      if (!activeNodeRect || !activatorEvent) {
+        return transform;
+      }
+
+      let initialX = 0;
+      let initialY = 0;
+
+      if ('touches' in activatorEvent && (activatorEvent as TouchEvent).touches.length > 0) {
+        initialX = (activatorEvent as TouchEvent).touches[0].clientX;
+        initialY = (activatorEvent as TouchEvent).touches[0].clientY;
+      } else if ('clientX' in activatorEvent && 'clientY' in activatorEvent) {
+        initialX = (activatorEvent as MouseEvent).clientX;
+        initialY = (activatorEvent as MouseEvent).clientY;
+      } else {
+        return transform;
+      }
+
+      const currentX = initialX + transform.x;
+      const currentY = initialY + transform.y;
+
+      return {
+        ...transform,
+        x: currentX - activeNodeRect.left - (activeDragWidthPx / 2),
+        y: currentY - activeNodeRect.top - 24, // 24px = metà altezza (h-12 = 48px)
+      };
+    },
+    [activeDragWidthPx]
+  );
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -216,7 +307,21 @@ export const FinalCutTimeline: React.FC<Props> = ({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span>{totalDuration.toFixed(1)}s</span>
+          <div className="flex items-center gap-2 mr-2">
+            <span className="text-[9px] uppercase tracking-widest text-slate-500">Zoom</span>
+            <input
+              type="range"
+              min="1"
+              max="50"
+              step="0.1"
+              value={zoomFactor}
+              onChange={(e) => setZoomFactor(parseFloat(e.target.value))}
+              className="w-20 accent-emerald-500 cursor-ew-resize"
+              title="Ctrl + Scroll"
+            />
+            <span className="text-[10px] text-slate-400 w-6">{Math.round(zoomFactor)}x</span>
+          </div>
+          <span className="text-[10px] text-slate-400">{totalDuration.toFixed(1)}s</span>
           <button
             onClick={onSaveOrder}
             className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
@@ -234,17 +339,24 @@ export const FinalCutTimeline: React.FC<Props> = ({
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        autoScroll={true}
       >
-        {/* Outer wrapper: relative for playhead + waveform overlays */}
+        {/* Layer 1: Scroll Container */}
         <div
-          ref={trackRef}
-          className="relative h-12 w-full bg-slate-800 rounded-md overflow-hidden shadow-inner cursor-pointer"
-          onClick={handleTimelineClick}
+          ref={scrollContainerRef}
+          className="w-full overflow-x-auto overflow-y-hidden rounded-md shadow-inner bg-slate-800 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
         >
-          {/* FLEX CLIP TRACK — replaces absolute-positioned clips */}
-          <SortableContext items={items} strategy={horizontalListSortingStrategy}>
-            <div className="flex flex-row h-full w-full">
-              {timeline.map((clip) => {
+          {/* Layer 2: Zoom Container */}
+          <div
+            ref={trackRef}
+            className="relative h-12 bg-slate-800 cursor-pointer"
+            style={{ width: `${zoomFactor * 100}%`, minWidth: '100%' }}
+            onClick={handleTimelineClick}
+          >
+            {/* Layer 3: FLEX CLIP TRACK — replaces absolute-positioned clips */}
+            <SortableContext items={items} strategy={horizontalListSortingStrategy}>
+              <div className="flex flex-row h-full w-full">
+              {timeline.map((clip, idx) => {
                 const widthPct =
                   totalDuration > 0
                     ? ((clip.timeline_out - clip.timeline_in) / totalDuration) * 100
@@ -261,14 +373,18 @@ export const FinalCutTimeline: React.FC<Props> = ({
                   else fCount++;
                 }
                 const seqLabel = clip.role === 'PILLAR' ? `P${pCount}` : `F${fCount}`;
+                
+                const clipId = `${clip.source_clip_start}_${clip.source_in}`;
+                const isMoved = manuallyMovedIds.has(clipId);
 
                 return (
                   <SortableTimelineClip
-                    key={`${clip.source_clip_start}_${clip.source_in}`}
-                    id={`${clip.source_clip_start}_${clip.source_in}`}
+                    key={clipId}
+                    id={clipId}
                     clip={clip}
                     widthPct={widthPct}
                     seqLabel={seqLabel}
+                    isMoved={isMoved}
                   />
                 );
               })}
@@ -397,10 +513,11 @@ export const FinalCutTimeline: React.FC<Props> = ({
             </svg>
             <div className="w-[2px] h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)]" />
           </div>
+          </div>
         </div>
 
         {/* DragOverlay — Anti-Rubber-Band (dropAnimation null), renders in portal */}
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null} modifiers={[snapToCursorModifier]}>
           {activeDragClip ? (
             <StaticClipPreview clip={activeDragClip} widthPx={activeDragWidthPx} />
           ) : null}
