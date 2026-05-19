@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.31 - 2026-05-20
+**Version:** v0.1.32 - 2026-05-20
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
