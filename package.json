@@ -1,11 +1,14 @@
 {
   "name": "ai-video-editor",
   "private": true,
-  "version": "0.1.25",
+  "version": "0.1.26",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "wolf:dev": "concurrently \"npm run dev\" \"cd engine && source venv/bin/activate && uvicorn api_server:app --reload --port 8000\"",
+    "dev:ui": "vite",
+    "dev:api": "cd engine && source venv/bin/activate && uvicorn api_server:app --reload --port 8000",
+    "dev:llm": "cd engine && source venv/bin/activate && python -m mlx_lm.server --model mlx-community/gemma-4-e4b-it-4bit --port 8080",
+    "wolf:dev": "concurrently -c \"blue,green,magenta\" -n \"UI,API,LLM\" \"npm run dev:ui\" \"npm run dev:api\" \"npm run dev:llm\"",
     "sb:serve": "supabase functions serve --no-verify-jwt",
     "dev:all": "concurrently -c \"cyan,magenta\" -n \"VITE,SUPABASE\" \"npm run dev\" \"npm run sb:serve\"",
     "build": "tsc -b && vite build",

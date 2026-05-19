@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.25 - 2026-05-19
+**Version:** v0.1.26 - 2026-05-19
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -25,5 +25,5 @@
    - **Dynamic Hardware Profiler:** L'interfaccia integra un Widget di calcolo in real-time su ETA, Frames analizzati e Chunks. Usa una query asincrona al server locale Python (`/api/system/profiler`) che interroga il kernel macOS (`sysctl`) e `psutil` per rilevare l'esatto modello di chip (es. Apple M4 Max) e la Unified RAM installata, offrendo un fallback morbido "Mock Data" nel caso il backend sia offline.
 
 ## Automazione (Open Agent Manager)
-- **Trinity Ecosystem Startup:** Tramite il comando `npm run wolf:dev` (che usa `concurrently`), il sistema avvia in parallelo l'interfaccia React Vite (5173) e il backend FastAPI/Python (8000) attivando dinamicamente il Virtual Environment locale.
+- **Trinity Ecosystem Startup:** Tramite il comando `npm run wolf:dev` (che usa `concurrently`), il sistema orchestra tre sottoprocessi dedicati: `dev:ui` (React Vite su 5173), `dev:api` (FastAPI su 8000), e `dev:llm` (MLX Server su 8080 con gemma-4), attivando per gli ultimi due il Virtual Environment locale in modo isolato.
 - I flussi di rilascio (`/wolf_flow`) validano e wrappano commit complessi sul repo `origin develop`.
