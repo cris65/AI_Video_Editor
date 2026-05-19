@@ -1,6 +1,15 @@
 {
   "python.defaultInterpreterPath": "/Users/macbookm4cdv/Development/AI_Video_Editor/engine/venv/bin/python",
+  "python.interpreterPath": "/Users/macbookm4cdv/Development/AI_Video_Editor/engine/venv/bin/python",
   "python.languageServer": "Pylance",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/engine/venv/lib/python3.13/site-packages",
+    "${workspaceFolder}/engine"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/engine/venv/lib/python3.13/site-packages",
+    "${workspaceFolder}/engine"
+  ],
   "pyrefly.enable": false,
   "css.lint.unknownAtRules": "ignore",
   "scss.lint.unknownAtRules": "ignore"
