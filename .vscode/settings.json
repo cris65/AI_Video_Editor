@@ -1,7 +1,7 @@
 {
   "python.defaultInterpreterPath": "/Users/macbookm4cdv/Development/AI_Video_Editor/engine/venv/bin/python",
   "python.interpreterPath": "/Users/macbookm4cdv/Development/AI_Video_Editor/engine/venv/bin/python",
-  "python.languageServer": "Pylance",
+  "python.languageServer": "Jedi",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/engine/venv/lib/python3.13/site-packages",
     "${workspaceFolder}/engine"
@@ -10,7 +10,9 @@
     "${workspaceFolder}/engine/venv/lib/python3.13/site-packages",
     "${workspaceFolder}/engine"
   ],
-  "pyrefly.enable": false,
+  "python.pyrefly.disableTypeErrors": true,
+  "python.pyrefly.disableLanguageServices": true,
+  "python.pyrefly.typeCheckingMode": "off",
   "css.lint.unknownAtRules": "ignore",
   "scss.lint.unknownAtRules": "ignore"
 }
