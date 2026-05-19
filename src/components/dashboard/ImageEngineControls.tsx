@@ -29,7 +29,6 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
   const [engineStatus, setEngineStatus] = useState<'idle' | 'running' | 'error' | 'success'>('idle');
   const [isScanning, setIsScanning] = useState(true);
   const [vlmModel, setVlmModel] = useState('mlx-community/gemma-4-e4b-it-4bit');
-  const [llmModel, setLlmModel] = useState('mlx-community/gemma-4-9b-it-4bit');
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
 
   useEffect(() => {
@@ -97,7 +96,7 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
         sequence_file_path: selectedClip.edl_path,
         sampling_density_percent: density,
         vlm_model_id: vlmModel,
-        llm_model_id: llmModel
+        llm_model_id: 'mlx-community/gemma-4-9b-it-4bit'
       };
       const res = await fetch('http://localhost:8000/api/phase-a/run', {
         method: 'POST',
@@ -117,8 +116,11 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
   const totalFrames = selectedClip ? selectedClip.total_frames : 0;
   const extractedFrames = selectedClip ? Math.max(1, Math.floor(totalFrames * density)) : 0;
   
-  const vlmMultiplier = vlmModel === 'mlx-community/gemma-4-31b-it-4bit' ? 0.5 : 0.1;
-  const estimatedSeconds = extractedFrames * vlmMultiplier;
+  const mlxMultiplier = vlmModel === 'mlx-community/gemma-4-31b-it-4bit' ? 12 : 6;
+  const estimatedClips = totalFrames / 100;
+  const tempoOpenCV = extractedFrames * 0.05;
+  const tempoMLX = estimatedClips * mlxMultiplier;
+  const estimatedSeconds = tempoOpenCV + tempoMLX;
   let estimatedTimeString = '';
   if (estimatedSeconds < 60) {
     estimatedTimeString = `${estimatedSeconds.toFixed(1)}s`;
@@ -260,22 +262,7 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
               </div>
             </div>
 
-            {/* AI Director Model Selector */}
-            <div className="mt-4">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">AI Director Model (Fase D)</label>
-              <div className="relative">
-                <select 
-                  className="w-full bg-[#1A1D24] border border-gray-700 rounded-lg pl-3 pr-8 py-2.5 text-xs text-gray-200 font-medium focus:outline-none focus:border-purple-500 transition-colors appearance-none"
-                  value={llmModel}
-                  onChange={(e) => setLlmModel(e.target.value)}
-                  disabled={isScanning || engineStatus === 'running'}
-                >
-                  <option value="mlx-community/Llama-3.3-70B-Instruct-4bit">meta-llama/Llama-3-70B (Pro Director)</option>
-                  <option value="mlx-community/gemma-4-9b-it-4bit">google/gemma-4-9b-it (Fast Director)</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
+
           </div>
 
           {/* Dynamic Profiler Live Box */}
@@ -296,17 +283,14 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                 <span className="text-xs text-slate-500 font-mono">Vision AI:</span>
                 <span className="text-xs text-white font-mono text-right">{vlmModel === 'mlx-community/gemma-4-31b-it-4bit' ? 'Gemma 4 (31B)' : 'Gemma 4 (E4B)'}</span>
               </div>
+
               <div className="flex justify-between items-baseline border-b border-gray-800/50 pb-2">
-                <span className="text-xs text-slate-500 font-mono">Director AI:</span>
-                <span className="text-xs text-purple-400 font-mono text-right">{llmModel === 'mlx-community/Llama-3.3-70B-Instruct-4bit' ? 'Llama 3 (70B)' : 'Gemma 4 (9B)'}</span>
-              </div>
-              <div className="flex justify-between items-baseline border-b border-gray-800/50 pb-2">
-                <span className="text-xs text-slate-500 font-mono">Estimated Performance:</span>
-                <span className="text-xs text-orange-400 font-bold font-mono text-right">{vlmMultiplier}s / frame</span>
+                <span className="text-xs text-slate-500 font-mono">Est. Unit Speeds:</span>
+                <span className="text-xs text-orange-400 font-bold font-mono text-right">0.05s/f (CV) + {vlmModel === 'mlx-community/gemma-4-31b-it-4bit' ? 12 : 6}.0s/c (VLM)</span>
               </div>
               <div className="flex justify-between items-baseline pt-1">
                 <span className="text-xs text-slate-500 font-mono">Total Computation:</span>
-                <span className="text-xs text-slate-300 font-mono text-right">{extractedFrames} frames × {vlmMultiplier}s</span>
+                <span className="text-xs text-slate-300 font-mono text-right">Phase A (OpenCV) + Phase B (VLM)</span>
               </div>
             </div>
           </div>
@@ -331,7 +315,7 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                   <span className="text-blue-400 font-bold text-xs">{extractedFrames.toLocaleString()}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="uppercase text-orange-500/70 mb-1">VLM Est.</span>
+                  <span className="uppercase text-orange-500/70 mb-1">Est. Duration</span>
                   <span className="text-orange-400 font-bold text-xs">{estimatedTimeString}</span>
                 </div>
               </div>

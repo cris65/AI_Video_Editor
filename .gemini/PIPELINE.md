@@ -1,6 +1,6 @@
 # 🎬 AI Video Editor — Pipeline Operativa & Flusso di Produzione
 
-**Version:** v0.1.26 - 2026-05-19
+**Version:** v0.1.30 - 2026-05-20
 **Scope:** Guida operativa per l'avvio dell'ambiente di sviluppo e l'esecuzione della pipeline di analisi video completa.
 
 ---

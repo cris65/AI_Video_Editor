@@ -1,6 +1,6 @@
 # 🗺️ STRUCTURE (Architettura delle Directory)
 
-**Version:** v0.1.26 - 2026-05-19
+**Version:** v0.1.30 - 2026-05-20
 
 > [!NOTE]
 > Questo documento mappa la topologia ufficiale del repository per l'AI Video
