@@ -46,7 +46,7 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
     return 'bg-red-500';
   };
 
-  const score = clip.visual_quality_score || 0;
+  const score = clip.cinematography?.visual_quality_score ?? 0;
   const fileName = clip.storyboard_path ? clip.storyboard_path.split('/').pop() : '';
   const imageUrl = `/engine/output/${sequenceName}/storyboards/${fileName}`;
   const clipName = fileName ? fileName.split('_')[0] : 'Unknown';
@@ -148,7 +148,7 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
             {!isRejected && (
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-slate-950/80 text-slate-300 backdrop-blur-md border border-slate-800/50">
                 <Users size={12} />
-                {clip.people_count || 0}
+                {clip.yolo_omniscient_data?.total_objects ?? 0}
               </span>
             )}
           </div>
@@ -157,7 +157,7 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
         {/* Bottom Bar: Palette & Score */}
         <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-slate-950/90 to-transparent flex justify-between items-end z-20">
           <div className="flex gap-1">
-            {clip.cinematic_palette?.map((color, idx) => (
+            {clip.technical_quality?.cinematic_palette?.map((color, idx) => (
               <div key={idx} className="w-3 h-3 rounded-full border border-slate-800 shadow-sm" style={{ backgroundColor: color }} title={color} />
             ))}
           </div>
@@ -250,19 +250,19 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
 
         {expanded && (
           <div className="mt-2 space-y-3 text-xs text-slate-400 bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
-            {clip.technical_flaws && clip.technical_flaws !== 'Nessuno' && clip.technical_flaws !== 'None' && clip.technical_flaws !== 'ANALYSIS_FAILED' && (
+            {clip.cinematography?.technical_flaws && clip.cinematography.technical_flaws !== 'Nessuno' && clip.cinematography.technical_flaws !== 'None' && clip.cinematography.technical_flaws !== 'ANALYSIS_FAILED' && (
               <div className={isRejected ? "p-2 bg-red-500/10 border border-red-500/30 rounded-md" : ""}>
                 <strong className="text-red-400 block mb-1 flex items-center gap-1"><Activity size={12} /> {isRejected ? "Motivo Scarto (Flaws)" : "Technical Flaws"}</strong>
-                <p className="text-red-300/90 leading-relaxed font-medium">{clip.technical_flaws}</p>
+                <p className="text-red-300/90 leading-relaxed font-medium">{clip.cinematography.technical_flaws}</p>
               </div>
             )}
             <div className={isRejected ? 'opacity-70' : ''}>
               <strong className="text-slate-300 block mb-1">Scene & Lighting</strong>
-              <p className="leading-relaxed">{clip.scene_and_lighting || 'N/A'}</p>
+              <p className="leading-relaxed">{clip.cinematography?.scene_description || 'N/A'}</p>
             </div>
             <div className={isRejected ? 'opacity-70' : ''}>
               <strong className="text-slate-300 block mb-1">Action Continuity</strong>
-              <p className="leading-relaxed">{clip.action_continuity || 'N/A'}</p>
+              <p className="leading-relaxed">{clip.continuity?.action_description || 'N/A'}</p>
             </div>
           </div>
         )}

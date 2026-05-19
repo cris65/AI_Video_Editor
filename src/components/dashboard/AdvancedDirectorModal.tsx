@@ -86,7 +86,7 @@ export function AdvancedDirectorModal({ config, sourceResolution, onClose }: Adv
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-2">Soggetti Attesi (Global Count)</label>
+                      <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-2">Expected Subjects (Global Count)</label>
                       <input 
                         type="number" 
                         min="0"
@@ -146,11 +146,11 @@ export function AdvancedDirectorModal({ config, sourceResolution, onClose }: Adv
               <div className="pt-2 pb-2">
                 <div className="flex justify-between items-end mb-4">
                   <label className="block text-sm text-white font-bold tracking-wider">
-                    Configuratore Focus Area (Deep Analysis)
+                    Focus Area Configurator (Deep Analysis)
                   </label>
                   <div className="flex gap-6 text-[10px] text-slate-400 font-mono tracking-wider">
                     <div className="flex flex-col items-end">
-                      <span className="uppercase text-slate-500 mb-1">Margine SX</span>
+                      <span className="uppercase text-slate-500 mb-1">Left Margin</span>
                       <span className="text-white font-bold text-xs">{safeZoneMargin.toFixed(1)}%</span>
                     </div>
                     <div className="flex flex-col items-center">
@@ -158,19 +158,12 @@ export function AdvancedDirectorModal({ config, sourceResolution, onClose }: Adv
                       <span className="text-white font-bold text-xs">{boxWidthPct}%</span>
                     </div>
                     <div className="flex flex-col items-start">
-                      <span className="uppercase text-slate-500 mb-1">Margine DX</span>
+                      <span className="uppercase text-slate-500 mb-1">Right Margin</span>
                       <span className="text-white font-bold text-xs">{rightMargin.toFixed(1)}%</span>
                     </div>
                   </div>
                 </div>
                 
-                <p className="text-[10px] text-slate-400 mb-4 leading-tight">
-                  Payload Backend (YOLO/CV): {"{ "}
-                  "tracking_config": {"{ "}
-                  "left_margin": {safeZoneMargin.toFixed(0)}, "right_margin": {rightMargin.toFixed(0)}, "safe_zone_width": {boxWidthPct}, "unit": "percentage"
-                  {" } }"}
-                </p>
-
                 {/* Monitor Wrapper */}
                 <div className="bg-slate-900 rounded-xl p-4 lg:p-6 border border-slate-800">
                   <div 
@@ -207,7 +200,7 @@ export function AdvancedDirectorModal({ config, sourceResolution, onClose }: Adv
                 {/* Slider Controls */}
                 <div className="mt-8">
                   <div className="flex items-center gap-4 mb-6">
-                    <span className="text-xs text-slate-300 font-bold tracking-wider uppercase whitespace-nowrap">Posizione Libera (%)</span>
+                    <span className="text-xs text-slate-300 font-bold tracking-wider uppercase whitespace-nowrap">Free Position (%)</span>
                     <input 
                       type="range" 
                       min="0" 

@@ -1,5 +1,12 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
+**Version:** v0.1.26 - 2026-05-19
+
+> [!NOTE]
+> Questo documento descrive le **Feature** — ovvero il valore funzionale esposto all'utente finale,
+> sia come capacità dell'engine che come interfaccia UI. Non descrive come i dati sono strutturati
+> (→ `STRUCTURE.md`) né il flusso temporale di esecuzione (→ `PIPELINE.md`).
+
 ## Core Capabilities (Stringout AI Engine)
 
 ### 1. Taglio a Singolo Binario (Stringout Workflow)
@@ -14,21 +21,34 @@ Il sistema estrapola un'unica timeline ottimizzata per massimizzare la velocità
 - **Action Peak (Best Moment):** Tracciamento in tempo reale del picco di nitidezza. L'engine memorizza la chiave temporanea `_max_lap` e certifica all'interno della metadata clip il `best_moment`, ovvero il millisecondo esatto del fotogramma perfetto per gli LLM successivi.
 - **Boundary Crossing Split:** Tagli proxy che scavallano il bordo della clip originale vengono spezzati dinamicamente durante l'export EDL per prevenire errori "Media Offline" o pattern zebrati su Adobe Premiere.
 - **DNA Cromatico (Cinematic Palette):** Tramite K-Means Clustering su OpenCV, l'algoritmo estrae al volo i 5 colori HEX dominanti di ogni clip. Il campionamento fonde 3 matrici (IN, OUT, e BEST) per una color-continuity perfetta senza pesare sulle performance CPU e RAM (Zero-Seeking).
-- **Optical Flow (Motion Scoring):** Calcolo vettoriale `Farneback` ultraleggero a 160x90 per ogni blocco. Restituisce `intensity` e `camera_direction` (PAN, TILT, STATIC) nello `stringout.json`.
+- **Optical Flow (Motion Scoring):** Calcolo vettoriale `Farneback` ultraleggero a 160x90 per ogni blocco. Restituisce `motion_intensity` (float) e `camera_direction` (PAN_LEFT, PAN_RIGHT, TILT_UP, TILT_DOWN, STATIC) nel macro-oggetto annidato `technical_quality` dello `stringout.json`.
 - **Semantic Storyboard & Smart Naming:** Estrazione al volo di tre frame (IN, BEST, OUT) a 480x270, uniti orizzontalmente. I frame estratti non sono più anonimi, ma intercettano dalla mappa EDL il VERO nome nativo (`C4369`) e il Timecode sicuro calcolato dal motore, generando `{clip_name}_{tc_safe}.jpg`.
 
 ### 3. FASE B - Vision LLM Inference (MLX Server)
 L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard OpenAI-compatible (`http://127.0.0.1:8080/v1/chat/completions`), il sistema analizza la timeline di Stringout:
-- Convertendo al volo lo Semantic Storyboard in `base64`.
-- Iniettando il Context Prompt specifico sulla Continuità Cronologica.
-- Salvando il risultato validato nel dict JSON tramite una logica tollerante e autonoma (retry x3, regex cleaning e salvataggio JSON progressivo).
-- Bypass morfologico (Skip Morbido) per l'ingest automatico se il server non è avviato.
-- **Integrazione Nativa Apple Silicon**: L'ambiente Python (`engine/requirements.txt`) è ora equipaggiato nativamente con i framework ufficiali `mlx` e `mlx-lm` per consentire l'inferenza LLM diretta sfruttando la Unified Memory, senza dipendere da server esterni.
+- Convertendo al volo lo Semantic Storyboard in `base64` e inviando il contesto tecnico YOLO (numero soggetti rilevati in scena).
+- Iniettando un Context Prompt specifico sulla Continuità Cronologica e sull'analisi commerciale.
+- Ricevendo da Gemma 4 un payload JSON strutturato in **4 macro-oggetti annidati** che arricchisce ogni clip:
+  - `cinematography` → `scene_description`, `lighting_type`, `visual_quality_score`, `technical_flaws`
+  - `continuity` → `action_description`, `emotion_arc`, `match_cut_potential`
+  - `commercial` → `product_visibility`, `brand_safe`, `reaction_type`
+  - `story` → `narrative_role`, `recommended_position`, `director_note`
+- Salvando il risultato validato nel dict JSON tramite una logica tollerante e autonoma (retry x3, regex cleaning, fallback strutturato esplicito per ogni sotto-chiave, salvataggio JSON progressivo atomico post-clip).
+- Bypass morfologico (Skip Morbido) per l'ingest automatico se il server MLX non è avviato.
+- **Integrazione Nativa Apple Silicon**: L'ambiente Python (`engine/requirements.txt`) è equipaggiato nativamente con i framework `mlx` e `mlx-lm` per l'inferenza LLM diretta sulla Unified Memory, senza dipendere da server esterni.
 
 ### 4. Automazione Drop-Zone Flessibile
 - **Ingest Agnostico:** Supporto esteso a `.mp4`, `.mov`, `.mxf`, `.avi`, `.mkv`.
 - **Auto-Cleanup:** Una volta emesso il file EDL (`_Stringout_Cut.edl`), i file originali nella drop zone vengono puliti e spostati direttamente nella cartella di output della rispettiva sequenza per evitare strascichi.
 - **Esportazione Diretta:** Eliminato il gate manuale [Y/N]; il motore macina proxy, calcola scarti e genera CMX3600 in autonomia totale a 50fps.
+
+### 5. FASE D - AI Director (Risoluzione Vincoli HITL)
+Il Director è il modulo che chiude il loop tra l'analisi AI e le decisioni umane:
+- **LLM Editing Recipe:** Gemma 4 riceve la lista dei clip usabili (con Score, Scene, Action Strategy) e produce una `editing_recipe` JSON che definisce l'ordine narrativo e i beat musicali assegnati a ogni clip.
+- **Beat-Sync Math:** La recipe LLM viene applicata su una griglia matematica di beat timestamps (`_audio_beats.json`). Ogni clip viene troncata/estesa in modo da essere perfettamente sincronizzata con il ritmo musicale.
+- **Pillar & Filler System:** Le clip con marker BM (Best Moment) impostati dall'utente diventano PILLAR ancorati sul beat più vicino. Le clip senza vincoli diventano FILLER, ordinati per `visual_quality_score` come criterio di spareggio.
+- **Safety Net Auto-Fill:** Se la recipe LLM è troppo corta rispetto alla target duration, il Director attiva autonomamente un fallback euristico a 4-beat per riempire i gap rimanenti.
+- **Export Dual-Track:** Produce `_final_edit.json` (timeline interna) + `_FinalCut.xml` (FCP7 XML pronto per Premiere/FCPX) + `_gemma_recipe.json` (reasoning del Director per debug e trasparenza).
 
 ## Frontend (React HITL Dashboard)
 

@@ -132,6 +132,31 @@ export function DirectorSettingsPanel({
           </select>
         </div>
 
+        {/* Deterministic Seed */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider">
+              Director Seed
+            </label>
+            <span className="text-[9px] font-mono text-slate-600">
+              {(localConfig.seed ?? -1) === -1 ? '🎲 RANDOM' : '🔒 LOCKED'}
+            </span>
+          </div>
+          <input
+            type="number"
+            id="director-seed-input"
+            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none font-mono"
+            value={localConfig.seed ?? -1}
+            onChange={(e) => handleChange('seed', Number(e.target.value))}
+            onBlur={handleBlurOrMouseUp}
+            placeholder="-1 (Random)"
+            min={-1}
+          />
+          <p className="text-[9px] text-slate-600 mt-1">
+            -1 = random every time · any positive integer = reproducible edit
+          </p>
+        </div>
+
         {/* Duration & Resolution */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -220,17 +245,17 @@ export function DirectorSettingsPanel({
                 className="text-[9px] text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1 cursor-pointer hover:text-amber-500 transition-colors"
                 onClick={() => setShowHardwareInfo(!showHardwareInfo)}
               >
-                Tempo Stimato
+                Estimated Time
                 <Info size={10} />
               </span>
               <span className="text-sm font-bold text-amber-500 font-mono leading-none">{formatTime(totalTimeSeconds)}</span>
             </div>
             <div className="px-2 flex flex-col items-center justify-center text-center">
-              <span className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Frame Analizzati</span>
+              <span className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Analyzed Frames</span>
               <span className="text-sm font-bold text-slate-300 font-mono leading-none">{totalFrames}</span>
             </div>
             <div className="px-2 flex flex-col items-center justify-center text-center">
-              <span className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Lotti (Chunks)</span>
+              <span className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Batches (Chunks)</span>
               <span className="text-sm font-bold text-emerald-500 font-mono leading-none">{requiredChunks}</span>
             </div>
           </div>
@@ -253,7 +278,7 @@ export function DirectorSettingsPanel({
               ) : (
                 <ul className="space-y-1.5 font-mono text-[9px] text-slate-300">
                   <li className="flex justify-between">
-                    <span className="text-slate-500">Hardware Rilevato:</span>
+                    <span className="text-slate-500">Detected Hardware:</span>
                     <span className={`font-bold ${hardware.isOfflineMock ? 'text-amber-500' : 'text-white'}`}>{hardware.name}</span>
                   </li>
                   <li className="flex justify-between">
@@ -261,11 +286,11 @@ export function DirectorSettingsPanel({
                     <span>{aiModel === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (4B)'}</span>
                   </li>
                   <li className="flex justify-between">
-                    <span className="text-slate-500">Prestazione Stimata:</span>
+                    <span className="text-slate-500">Estimated Performance:</span>
                     <span className="text-amber-400 font-bold">{inferenceTime}s / frame</span>
                   </li>
                   <li className="flex justify-between pt-1 border-t border-slate-800/50 mt-1">
-                    <span className="text-slate-500">Calcolo Totale:</span>
+                    <span className="text-slate-500">Total Computation:</span>
                     <span>{totalFrames} frames × {inferenceTime}s</span>
                   </li>
                 </ul>
@@ -300,7 +325,7 @@ export function DirectorSettingsPanel({
             ) : (
               <Wand2 size={14} />
             )}
-            {isRegenerating ? 'Elaborazione...' : 'Regenerate Cut'}
+            {isRegenerating ? 'Processing...' : 'Regenerate Cut'}
           </button>
         </div>
       </div>

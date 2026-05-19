@@ -35,14 +35,14 @@ def clean_json_response(raw_text):
             pass
     return None
 
-def call_director_llm(usable_clips, target_duration, total_beats, style_prompt):
+def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, seed: int = -1):
     print("🧠 Invocazione Gemma 4 (Director's Brain)...")
     clip_list_str = []
     for c in usable_clips:
         role = "MUST INCLUDE (PILLAR)" if c.get('_has_bm') else "OPTIONAL (FILLER)"
-        action = c.get('action_continuity', 'Azione')
-        scene = c.get('scene_and_lighting', 'Scena')
-        score = c.get('visual_quality_score', 5)
+        action = c.get('continuity', {}).get('action_description', 'Azione')
+        scene = c.get('cinematography', {}).get('scene_description', 'Scena')
+        score = c.get('cinematography', {}).get('visual_quality_score', 5)
         clip_list_str.append(f"- ID: {c['start']} | Role: {role} | Score: {score}/10 | Scene: {scene} | Action: {action}")
         
     clips_text = "\n".join(clip_list_str)
@@ -76,7 +76,8 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt):
             {"role": "user", "content": "Ecco i clip disponibili:\n" + clips_text + "\n\nGenera la JSON Editing Recipe."}
         ],
         "max_tokens": 4096,
-        "temperature": 0.3
+        "temperature": 0.3,
+        **({"seed": seed} if seed >= 0 else {}),
     }
     
     try:
@@ -95,7 +96,7 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt):
         
     return None
 
-def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequence_name):
+def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequence_name, seed: int = -1):
     print(f"🎬 AI Director: Inizio Risoluzione Vincoli per {sequence_name}")
     
     stringout = load_json(stringout_path)
@@ -153,7 +154,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                 
         usable_clips.append(clip)
 
-    recipe_dict = call_director_llm(usable_clips, target_duration, target_beats_count, style_prompt)
+    recipe_dict = call_director_llm(usable_clips, target_duration, target_beats_count, style_prompt, seed)
     
     if recipe_dict:
         os.makedirs(output_dir, exist_ok=True)
@@ -259,7 +260,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
             print(f"⚠️ Timeline LLM troppo corta ({cursor_idx}/{target_beats_count} beats). Attivazione Safety Net.")
             
             fillers = [c for c in usable_clips if c['start'] not in used_clip_starts and not c.get('_has_bm')]
-            fillers.sort(key=lambda c: c.get('visual_quality_score', 0) + (10 if c.get('score_mlx') else 0), reverse=True)
+            fillers.sort(key=lambda c: c.get('cinematography', {}).get('visual_quality_score', 0) + (10 if c.get('score_mlx') else 0), reverse=True)
             
             filler_index = 0
             PACING_BEATS = 4
@@ -316,7 +317,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         print("⚠️ FALLBACK EURISTICO ATTIVO: Utilizzo logica a 4-beat per il pacing.")
         pillars = [c for c in usable_clips if c['_has_bm']]
         fillers = [c for c in usable_clips if not c['_has_bm']]
-        fillers.sort(key=lambda c: c.get('visual_quality_score', 0) + (10 if c.get('score_mlx') else 0), reverse=True)
+        fillers.sort(key=lambda c: c.get('cinematography', {}).get('visual_quality_score', 0) + (10 if c.get('score_mlx') else 0), reverse=True)
         
         pillars.sort(key=lambda c: c['start'])
         occupied_beats = [False] * len(beats)

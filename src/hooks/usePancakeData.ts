@@ -11,6 +11,7 @@ export interface DirectorConfig {
   secondary_elements?: string;
   ignore_list?: string;
   safe_zone_margin?: number;
+  seed?: number;
 }
 
 export interface FinalCutClip {
@@ -29,18 +30,48 @@ export interface PancakeClip {
   end: number;
   tag: string;
   best_moment: number;
-  people_count: number;
   storyboard_path: string;
-  cinematic_palette: string[];
-  motion: {
-    intensity: number;
-    direction: string;
-  };
-  scene_and_lighting?: string;
-  action_continuity?: string;
-  visual_quality_score?: number;
-  technical_flaws?: string;
   is_usable?: boolean;
+
+  // Phase 1 — Physical & Spatial Analysis (always present after pancake_editor)
+  technical_quality: {
+    blur_score: number;
+    is_soft_focus: boolean;
+    motion_intensity: number;
+    camera_direction: string;
+    cinematic_palette: string[];
+  };
+  spatial_configuration: {
+    safe_zone_tag: string;
+    focus_area: string | null;
+  };
+  yolo_omniscient_data: {
+    total_objects: number;
+    detections: unknown[];
+  };
+
+  // Phase 2 — Semantic Analysis (optional: present only after MLX Vision pass)
+  cinematography?: {
+    scene_description: string;
+    lighting_type: string;
+    visual_quality_score: number;
+    technical_flaws: string;
+  };
+  continuity?: {
+    action_description: string;
+    emotion_arc: string;
+    match_cut_potential: boolean;
+  };
+  commercial?: {
+    product_visibility: string;
+    brand_safe: boolean;
+    reaction_type: string;
+  };
+  story?: {
+    narrative_role: string;
+    recommended_position: string;
+    director_note: string;
+  };
 }
 
 export interface PancakeMetadata {

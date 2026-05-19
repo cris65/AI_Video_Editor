@@ -7,7 +7,11 @@ import psutil
 import subprocess
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 import uvicorn
+import os
+import director as director_module
 
 app = FastAPI(title="AI Video Editor Engine API", version="0.1.0")
 
@@ -81,6 +85,64 @@ async def get_system_profiler():
         "inference_time_4b": base_inference_4b,
         "inference_time_31b": base_inference_31b
     }
+
+class UserConstraint(BaseModel):
+    type: Literal['IN', 'OUT', 'BM']
+    time: float
+
+class DirectorConfigPayload(BaseModel):
+    ai_model: Optional[Literal['gemma-4-4b', 'gemma-4-31b']] = 'gemma-4-4b'
+    target_duration: float = 60.0
+    style_prompt: str = ""
+    export_resolution: Optional[str] = "1920x1080"
+    analysis_fps: Optional[float] = 0.5
+    target_product: Optional[str] = None
+    expected_subjects: Optional[int] = None
+    secondary_elements: Optional[str] = None
+    ignore_list: Optional[str] = None
+    safe_zone_margin: Optional[float] = None
+    seed: int = Field(default=-1, description="-1 = random, any positive integer = deterministic")
+
+class OrchestratePayload(BaseModel):
+    sequence_name: str
+    hitl_constraints: dict[str, list[UserConstraint]] = {}
+    clip_overrides: dict[str, Literal['KEEP', 'TRASH', 'BROLL']] = {}
+    director_config: DirectorConfigPayload = DirectorConfigPayload()
+
+@app.post("/api/orchestrate")
+async def orchestrate_director_cut(payload: OrchestratePayload):
+    """
+    Triggers Phase D (AI Director) exclusively.
+    The heavy compute (Phases A/B) is already done. This only rearranges JSON.
+    Expected latency: < 1 second.
+    """
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DIR_OUTPUT = os.path.join(BASE_DIR, 'output')
+    seq_llm_dir = os.path.join(DIR_OUTPUT, payload.sequence_name, "LLM_Export_Package")
+
+    stringout_path = os.path.join(seq_llm_dir, f"{payload.sequence_name}_stringout.json")
+    hitl_path      = os.path.join(seq_llm_dir, f"{payload.sequence_name}_hitl_data.json")
+    beats_path     = os.path.join(seq_llm_dir, f"{payload.sequence_name}_audio_beats.json")
+
+    if not os.path.exists(stringout_path):
+        return {"ok": False, "error": f"Stringout not found: {stringout_path}"}
+
+    # Inject seed into director config for downstream LLM call
+    director_cfg_dict = payload.director_config.model_dump()
+    seed = director_cfg_dict.get("seed", -1)
+
+    try:
+        output_path = director_module.generate_final_cut(
+            stringout_path=stringout_path,
+            hitl_path=hitl_path,
+            beats_path=beats_path,
+            output_dir=seq_llm_dir,
+            sequence_name=payload.sequence_name,
+            seed=seed,
+        )
+        return {"ok": True, "output_path": output_path}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 if __name__ == "__main__":
     # Start the server on the strictly confirmed port 8000

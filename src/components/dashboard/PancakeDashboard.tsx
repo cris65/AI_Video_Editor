@@ -224,8 +224,20 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const handleRegenerateCut = async () => {
     setIsRegenerating(true);
     try {
-      const res = await fetch(`/api/regenerate-director-cut?sequence=${sequenceName}`, { method: 'POST' });
-      if (!res.ok) throw new Error('Regeneration failed');
+      const orchestratePayload = {
+        sequence_name: sequenceName,
+        hitl_constraints: userConstraints,
+        clip_overrides: clipOverrides,
+        director_config: directorConfig,
+      };
+      const res = await fetch('http://localhost:8000/api/orchestrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orchestratePayload),
+      });
+      if (!res.ok) throw new Error('Orchestration failed');
+      const result = await res.json();
+      if (!result.ok) throw new Error(result.error ?? 'Director error');
       await refetchFinalCut();
       setIsPreviewMode(true);
     } catch (err) {

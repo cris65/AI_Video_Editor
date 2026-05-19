@@ -16,11 +16,13 @@ def generate_bgm(stringout_json_path, output_dir, sequence_name):
                 data = json.load(f)
                 for clip in data.get("stringout_timeline", []):
                     if clip.get("is_usable") is not False:
-                        if clip.get("scene_and_lighting"):
-                            words = [w.strip() for w in clip["scene_and_lighting"].split(",") if len(w.strip()) > 3]
+                        scene_desc = clip.get("cinematography", {}).get("scene_description", "")
+                        if scene_desc:
+                            words = [w.strip() for w in scene_desc.split(",") if len(w.strip()) > 3]
                             keywords.update(words[:2])
-                        if clip.get("action_continuity"):
-                            words = [w.strip() for w in clip["action_continuity"].split(",") if len(w.strip()) > 3]
+                        action_desc = clip.get("continuity", {}).get("action_description", "")
+                        if action_desc:
+                            words = [w.strip() for w in action_desc.split(",") if len(w.strip()) > 3]
                             keywords.update(words[:2])
     except Exception as e:
         print(f"⚠️ Errore lettura stringout per keywords: {e}")

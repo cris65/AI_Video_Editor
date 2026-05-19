@@ -12,11 +12,17 @@ MAX_RETRIES = 3
 TIMEOUT_SECONDS = 60
 
 PROMPT_TEXT = (
-    "Sei un Senior Video Editor e Direttore della Fotografia. "
-    "Stai analizzando una singola inquadratura video continua, mostrata attraverso 3 fotogrammi temporali in un'unica immagine: Sinistra (START), Centro (BEST MOMENT), Destra (END). "
-    "REGOLA FONDAMENTALE SULLA CONTINUITÀ: Questa immagine rappresenta lo scorrere del tempo in una SINGOLA scena. I soggetti presenti a sinistra sono gli stessi che continuano la loro azione al centro e a destra. "
-    "Il tuo compito è analizzare come la scena e i soggetti si muovono ed evolvono cronologicamente. "
-    "Rispondi ESCLUSIVAMENTE con un blocco di codice JSON valido contenente le chiavi: 'scene_and_lighting', 'action_continuity', 'visual_quality_score', 'technical_flaws', 'is_usable'."
+    "You are a Senior Video Editor, Director of Photography, and Commercial Creative Director. "
+    "You are analyzing a single continuous video shot, displayed across 3 temporal frames in one image: Left (START), Center (BEST MOMENT), Right (END). "
+    "FUNDAMENTAL CONTINUITY RULE: This image represents the passage of time within a SINGLE scene. Subjects on the left are the same ones continuing their action at the center and right. "
+    "Your task is to analyze how the scene and subjects move and evolve chronologically, providing a comprehensive assessment for editorial and commercial use. "
+    "TECHNICAL CONTEXT: The computer vision system has already detected {people_count} person(s) in this scene. Use this data to inform your analysis. "
+    "Respond EXCLUSIVELY with a valid JSON code block containing the following 4 nested objects and no other keys:\n"
+    "  'cinematography': {{ 'scene_description': str, 'lighting_type': str (e.g. NATURAL, STUDIO, MIXED, BACKLIT), 'visual_quality_score': int (1-10), 'technical_flaws': str (empty if none) }}\n"
+    "  'continuity': {{ 'action_description': str, 'emotion_arc': str, 'match_cut_potential': bool }}\n"
+    "  'commercial': {{ 'product_visibility': str (HIGH/MEDIUM/LOW/NONE), 'brand_safe': bool, 'reaction_type': str (e.g. JOY, SURPRISE, NEUTRAL, FOCUSED) }}\n"
+    "  'story': {{ 'narrative_role': str (e.g. ESTABLISHING, ACTION, REACTION, TRANSITION, FINALE), 'recommended_position': str (OPENING/MIDDLE/CLOSING), 'director_note': str }}\n"
+    "  'is_usable': bool"
 )
 
 def check_mlx_server_health():
@@ -75,7 +81,7 @@ def analyze_frame(image_path, people_count=0):
     base64_image = encode_image_to_base64(image_path)
     if not base64_image:
         return None
-    dynamic_prompt = PROMPT_TEXT + f"\nContesto tecnico: Il sistema ha rilevato {people_count} persona/e in scena."
+    dynamic_prompt = PROMPT_TEXT.format(people_count=people_count)
         
     payload = {
         "model": "mlx-community/gemma-4-e4b-it-4bit", # Identificativo completo HuggingFace per MLX
@@ -146,24 +152,64 @@ def process_stringout_batch(json_path):
         print(f"   ► Analisi [{idx+1}/{len(timeline)}]: {os.path.basename(storyboard_path)} ...", end="", flush=True)
         
         # CHIAMATA SINCRONA MLX API
-        people_count = clip.get("people_count", 0)
+        people_count = clip.get("yolo_omniscient_data", {}).get("total_objects", 0)
         semantic_data = analyze_frame(storyboard_path, people_count)
         
         if semantic_data:
             print(" ✅ OK")
-            # Iniezione chiavi forzata
-            clip["scene_and_lighting"] = semantic_data.get("scene_and_lighting", "")
-            clip["action_continuity"] = semantic_data.get("action_continuity", "")
-            clip["visual_quality_score"] = parse_quality_score(semantic_data.get("visual_quality_score", 0))
-            clip["technical_flaws"] = semantic_data.get("technical_flaws", "")
+            # Inject 4 nested macro-objects from Gemma response
+            cine = semantic_data.get("cinematography") or {}
+            cont = semantic_data.get("continuity") or {}
+            comm = semantic_data.get("commercial") or {}
+            stor = semantic_data.get("story") or {}
+
+            clip["cinematography"] = {
+                "scene_description":   cine.get("scene_description", "ANALYSIS_FAILED"),
+                "lighting_type":       cine.get("lighting_type", "ANALYSIS_FAILED"),
+                "visual_quality_score": parse_quality_score(cine.get("visual_quality_score", 0)),
+                "technical_flaws":     cine.get("technical_flaws", "")
+            }
+            clip["continuity"] = {
+                "action_description":  cont.get("action_description", "ANALYSIS_FAILED"),
+                "emotion_arc":         cont.get("emotion_arc", "ANALYSIS_FAILED"),
+                "match_cut_potential": cont.get("match_cut_potential", False)
+            }
+            clip["commercial"] = {
+                "product_visibility": comm.get("product_visibility", "ANALYSIS_FAILED"),
+                "brand_safe":         comm.get("brand_safe", True),
+                "reaction_type":      comm.get("reaction_type", "")
+            }
+            clip["story"] = {
+                "narrative_role":       stor.get("narrative_role", "ANALYSIS_FAILED"),
+                "recommended_position": stor.get("recommended_position", "MIDDLE"),
+                "director_note":        stor.get("director_note", "")
+            }
             clip["is_usable"] = semantic_data.get("is_usable", True)
             success_count += 1
         else:
             print(" ❌ Fallita")
-            clip["scene_and_lighting"] = "ANALYSIS_FAILED"
-            clip["action_continuity"] = "ANALYSIS_FAILED"
-            clip["visual_quality_score"] = 0
-            clip["technical_flaws"] = "ANALYSIS_FAILED"
+            # Structured fallback — all sub-keys are explicitly set to avoid missing keys downstream
+            clip["cinematography"] = {
+                "scene_description":    "ANALYSIS_FAILED",
+                "lighting_type":        "ANALYSIS_FAILED",
+                "visual_quality_score": 0,
+                "technical_flaws":      "ANALYSIS_FAILED"
+            }
+            clip["continuity"] = {
+                "action_description":  "ANALYSIS_FAILED",
+                "emotion_arc":         "ANALYSIS_FAILED",
+                "match_cut_potential": False
+            }
+            clip["commercial"] = {
+                "product_visibility": "ANALYSIS_FAILED",
+                "brand_safe":         True,
+                "reaction_type":      ""
+            }
+            clip["story"] = {
+                "narrative_role":       "ANALYSIS_FAILED",
+                "recommended_position": "MIDDLE",
+                "director_note":        ""
+            }
             clip["is_usable"] = False
             
         # Sovrascrittura atomica progressiva del JSON (salvataggio immediato post-clip)

@@ -1,29 +1,97 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.26 - 2026-05-19
+**Version:** v0.1.27 - 2026-05-19
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
+> È la fonte di verità tecnica. Non descrive il flusso temporale (→ `PIPELINE.md`) né le feature UI (→ `FEATURES.md`).
+
+---
 
 ## Architettura e Infrastruttura (Python AI Engine)
+
 - **Struttura:** Il cuore del motore è isolato nella cartella `engine/` ed eseguito in un Virtual Environment (Python 3.13).
-- **Core Tecnologico:** `OpenCV` (per analisi Laplaciana ed estrazione frame), `Ultralytics YOLOv8n` (per Person Detection).
-- **Infrastruttura Dati (Drop Zone):** L'Engine si basa su un'architettura **Symmetrical Workflow** totalmente agnostica basata sul protocollo EDL (CMX3600) a 50fps. Usa la cartella `engine/input/` come Drop-Zone per leggere dinamicamente qualsiasi container video.
-- **Topologia Stagna:** Gli output sono confinati in `engine/output/` con nomenclatura `_Stringout_Cut.edl`, e i file d'ingresso vengono automaticamente spostati in `engine/archive/` al termine del processo.
+- **Core Tecnologico:** `OpenCV` (analisi Laplaciana, Optical Flow Farneback, K-Means palette), `Ultralytics YOLOv8n` (Person Detection).
+- **Infrastruttura Dati (Drop Zone):** Architettura **Symmetrical Workflow** agnostica basata sul protocollo EDL (CMX3600) a 50fps. La cartella `engine/input/` funge da Drop-Zone a scansione automatica.
+- **Topologia Stagna:** Gli output sono confinati in `engine/output/{sequence_name}/LLM_Export_Package/`. I file d'ingresso vengono spostati nella stessa cartella di output al termine del processo (non in `archive/`).
 
-## Moduli a Microservizi
-1. **edl_parser.py**: Ingest EDL puro. Estrae la mappa temporale (Record IN / Source IN) e rileva automaticamente il Naming Base dalla root della clip ("* FROM CLIP NAME").
-2. **pancake_editor.py**: Motore semantico di analisi frame (Blacklist filtering, Center-Weighted Focus, Action Peak, Dual Threshold Soft Focus, Cinematic Palette K-Means, Optical Flow Sparse, Semantic Storyboard). Intercetta i Timecode IN sicuri e calcola dinamicamente il nome univoco per ciascun JPEG generato.
-3. **xml_exporter.py (ex edl_exporter.py)**: Esportatore Premiere-ready (FCP7 XML). È completamente "Resolution-Agnostic", legge la risoluzione custom dal file `hitl_data.json` o da UI, forza il Pixel Aspect Ratio (PAR) a square (1.0) ed è compatibile con le custom resolutions definite dal regista.
-4. **mlx_client.py**: Microservizio Sincrono che agisce come gateway LLM Vision. Interroga l'API locale `127.0.0.1:8080/v1/chat/completions` (OpenAI format, modello gemma-4-e4b) caricando i base64 per arricchire il JSON con punteggio e analisi semantica continuativa. Dotato di auto-retry e salvataggio incrementale atomico.
-5. **director.py**: AI Director generativo ("Regista Ragionante") che elabora il Final Cut montando sequenze logiche (CoT) partendo dallo Stringout e dai vincoli HITL, generando un _final_edit.json e un _gemma_recipe.json con reasoning dettagliato.
-6. **main.py**: Orchestratore CLI interamente automatizzato (Zero-Click Pipeline). Passa attraverso tre fasi (Taglio YOLO, Inferenza LLM Vision su MLX, e Scrittura XML).
-7. **Frontend HITL (React/Vite)**: Interfaccia utente Human-In-The-Loop. Architettura Split-View NLE-style con Video Player sincronizzato e Timeline Interattiva (Stringout & Director's Cut). Integra un'ingegneria Anti-Lag spinta (60fps): il data-binding temporale usa `requestAnimationFrame` scavalcando lo state React globale, e implementa navigazione tastiera e Vertical Playlist con `React.memo`. Include un sistema Multi-Anchor (vincoli multipli per clip), un sistema di Override Non-Distruttivo (KEEP/TRASH/BROLL) con filtri avanzati. La UI è sincronizzata real-time: cliccando un marker o una clip nell'inspector verticale, la playhead orizzontale esegue il seek istantaneamente. Include playhead "Premiere style" in SVG e settaggi risoluzione custom per l'export. I dati sono salvati su sidecar JSON (`_hitl_data.json`) via endpoint Node locale.
-   - **Timeline Orizzontale Interattiva (NLE DnD & Zoom Engine):** La `FinalCutTimeline` è un workspace NLE-style interattivo. I blocchi clip sono flex-item proporzionali alla durata (no `position: absolute`). Il drag orizzontale usa `@dnd-kit/core` + `horizontalListSortingStrategy` e un custom `snapToCursorModifier` per assicurare che il drag-overlay agganci perfettamente il cursore compensando il clamping della larghezza massima (max 350px) durante lo zoom spinto.
-   - **Zoom Engine e Clip Ghosting:** Integrazione di uno Zoom Engine `(1x - 50x)` controllato via slider UI o `Ctrl+Scroll`. Le clip riposizionate manualmente assumono uno stato "Dirty" o "Ghosting" in tempo reale (trasparenza globale con un elegante alone interno scuro e bordo bianco) finché il pulsante "SAVE ORDER" persiste l'ordine su `_hitl_data.json` sotto la chiave `clip_order_override`. Il salvataggio è ora puramente "Optimistico": lava lo stato dirty localmente e non scatena un re-fetch dell'Engine raw, preservando la personalizzazione anche in caso di ricaricamento della pagina (grazie a un intercept di mount su `PancakeDashboard`). Waveform overlay e playhead RAF-driven sono inviolabili e renderizzano Z-indexed sopra le clip in drag.
-   - **Director Settings Panel & Advanced Modal:** L'interfaccia si è sdoppiata in una sidebar rapida (con modello AI, risoluzione, e Analysis FPS agnostico) e un "Creative Settings" pop-up in full-screen (Portal) per la selezione esplicita del `Target Product`, dei `Soggetti Attesi` e il tracciamento visivo della `Focus Area`. 
-   - **Dynamic Hardware Profiler:** L'interfaccia integra un Widget di calcolo in real-time su ETA, Frames analizzati e Chunks. Usa una query asincrona al server locale Python (`/api/system/profiler`) che interroga il kernel macOS (`sysctl`) e `psutil` per rilevare l'esatto modello di chip (es. Apple M4 Max) e la Unified RAM installata, offrendo un fallback morbido "Mock Data" nel caso il backend sia offline.
+---
 
-## Automazione (Open Agent Manager)
-- **Trinity Ecosystem Startup:** Tramite il comando `npm run wolf:dev` (che usa `concurrently`), il sistema orchestra tre sottoprocessi dedicati: `dev:ui` (React Vite su 5173), `dev:api` (FastAPI su 8000), e `dev:llm` (MLX Server su 8080 con gemma-4), attivando per gli ultimi due il Virtual Environment locale in modo isolato.
-- I flussi di rilascio (`/wolf_flow`) validano e wrappano commit complessi sul repo `origin develop`.
+## Schema JSON del Payload Clip (Struttura Annidato — v0.1.26)
+
+Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi piatte legacy (`motion`, `people_count`, `cinematic_palette`, ecc.) sono state eliminate.
+
+**Fase 1 — Sempre presente dopo `pancake_editor.py`:**
+```json
+{
+  "start": 0.0, "end": 3.4, "tag": "MAIN_A", "best_moment": 1.2,
+  "storyboard_path": "...", "is_usable": true,
+  "technical_quality": { "blur_score": 42.7, "is_soft_focus": false, "motion_intensity": 1.4, "camera_direction": "PAN_LEFT", "cinematic_palette": ["#1a2b3c"] },
+  "spatial_configuration": { "safe_zone_tag": "MAIN_A", "focus_area": null },
+  "yolo_omniscient_data": { "total_objects": 2, "detections": [] }
+}
+```
+
+**Fase 2 — Opzionale, iniettato da `mlx_client.py` dopo la Vision LLM pass:**
+```json
+{
+  "cinematography": { "scene_description": "...", "lighting_type": "NATURAL", "visual_quality_score": 8, "technical_flaws": "" },
+  "continuity":     { "action_description": "...", "emotion_arc": "Calm", "match_cut_potential": true },
+  "commercial":     { "product_visibility": "LOW", "brand_safe": true, "reaction_type": "JOY" },
+  "story":          { "narrative_role": "ESTABLISHING", "recommended_position": "OPENING", "director_note": "..." }
+}
+```
+
+---
+
+## Moduli a Microservizi (Pipeline A→E)
+
+1. **`edl_parser.py`** — Ingest EDL puro. Estrae la mappa temporale (Record IN / Source IN) e il Naming Base dalla root della clip (`* FROM CLIP NAME`).
+2. **`pancake_editor.py`** — Motore semantico di Fase A. Center-Weighted Laplacian, Dual Threshold Soft Focus, Action Peak tracking, Cinematic Palette K-Means, Optical Flow Farneback, Semantic Storyboard. Tutta la logica di finalizzazione è centralizzata nell'helper privato `_finalize_block()` per eliminare duplicazioni.
+3. **`mlx_client.py`** — Fase B. Gateway HTTP sincrono verso `127.0.0.1:8080/v1/chat/completions`. Inietta i 4 macro-oggetti annidati (`cinematography`, `continuity`, `commercial`, `story`) con fallback strutturato esplicito per ogni sotto-chiave in caso di risposta malformata. Salvataggio atomico post-clip.
+4. **`bgm_generator.py`** — Fase C. Genera la BGM (click track mock o MusicGen). Estrae keyword da `cinematography.scene_description` e `continuity.action_description` per costruire il prompt musicale.
+5. **`audio_analyzer.py`** — Fase C. Estrae i beat timestamps dalla BGM e li salva in `_audio_beats.json`.
+6. **`director.py`** — Fase D. AI Director ragionante. Riceve la lista clip con i dati semantici, interpella Gemma 4 per una `editing_recipe`, poi applica la recipe su una griglia matematica di beat. Gestisce il sistema Pillar/Filler e il Safety Net auto-fill. Output: `_final_edit.json` + `_gemma_recipe.json`.
+7. **`edl_exporter.py`** — Fase E. Export Stringout grezzo in CMX3600 EDL.
+8. **`xml_exporter.py`** — Fase E. Export Director's Cut in FCP7 XML (Resolution-Agnostic, legge risoluzione da `hitl_data.json`).
+9. **`api_server.py`** — Runtime server FastAPI (:8000). Espone `/api/system/profiler` (rilevamento hardware Apple Silicon) e `/api/orchestrate` (endpoint POST che riceve il payload ibrido dalla UI e attiva la Fase D isolata).
+10. **`main.py`** — Orchestratore CLI Zero-Click. Esegue in sequenza le 5 fasi, con skip automatico della Fase B se MLX Server è offline.
+
+---
+
+## Il Principio della "Gerarchia del Calcolo" (UX Critica)
+
+> [!IMPORTANT]
+> **L'analisi visiva pesante avviene UNA SOLA VOLTA, nella pipeline `python main.py`.
+> Il bottone "Regenerate Cut" nella UI non ricalcola il video e non tocca i frame. Invoca solo l'LLM testuale (Director) per una riorganizzazione logica del JSON.**
+
+Il sistema applica una separazione netta tra i due tipi di operazione:
+
+| Operazione | Dove | Durata tipica | Cosa fa |
+|---|---|---|---|
+| `python main.py` | Terminale | **3-10 minuti** | Analisi frame fisici (YOLO), inferenza Vision LLM per ogni clip (Gemma Fase B), generazione beat. |
+| Bottone **"Regenerate Cut"** | UI | **1-3 secondi** | Passa lo stato JSON all'LLM (Fase D testuale) per farsi restituire una recipe di riordino logico. Non tocca pixel. |
+
+**Motivazione architetturale:** Il `_stringout.json` (il "Passaporto Semantico") è immutabile dopo la Fase B. Contiene già tutti i metadati fisici e semantici. Il Director (Fase D) riceve via API solo quel JSON testuale e i vincoli HITL dell'utente, chiedendo a Gemma una nuova `recipe` per riarrangiare i puntatori temporali (rispettando il parametro deterministico Seed). È l'equivalente di riordinare le righe di un foglio Excel tramite LLM — non di rielaborare visivamente il file video.
+
+**Implicazione per la UI:** Il feedback visivo del bottone deve comunicare chiaramente questa asimmetria. Un semplice spinner da 500ms è sufficiente e onesto. Non mostrare mai un progress bar che simuli un'elaborazione lunga su questa operazione.
+
+---
+
+## Frontend HITL (React/Vite)
+
+- **Interfaccia Split-View NLE-style:** Video Player sincronizzato + Timeline Interattiva (Stringout & Director's Cut). Anti-Lag Engine 60fps via `requestAnimationFrame` sul DOM, scavalcando il React state globale. `React.memo` su tutte le clip card.
+- **Timeline Orizzontale Interattiva (DnD & Zoom Engine):** `FinalCutTimeline` con blocchi flex proporzionali alla durata. Drag via `@dnd-kit/core` + `horizontalListSortingStrategy` + custom `snapToCursorModifier`. Zoom Engine `1x-50x` via slider o `Ctrl+Scroll`.
+- **Clip Ghosting & Save Order:** Clip riposizionate assumono stato "Dirty" (trasparenza + alone scuro + bordo bianco). Il salvataggio è ottimistico: persiste l'ordine in `_hitl_data.json` sotto `clip_order_override` senza trigger re-fetch dell'engine.
+- **Sistema Multi-Anchor (BM/IN/OUT):** Vincoli multipli per clip via shortcut (`M`, `I`, `O`), rimovibili chirurgicamente via `X`. Visualizzati come lista interattiva nella ClipCard.
+- **Override Non-Distruttivi (KEEP/TRASH/BROLL):** Shortcut `K`, `T`, `B`. Stato visualizzato istantaneamente con glow e badge. Salvati su sidecar `_hitl_data.json`.
+- **Director Settings Panel & Orchestrazione:** Sidebar rapida che invia l'intero stato ibrido (Seed, Constraints, Overrides, Analysis FPS) all'endpoint FastAPI `/api/orchestrate`. Creative Settings Portal full-screen per prompt e parametri NLP.
+- **Interfaccia TypeScript `PancakeClip`:** Rispecchia fedelmente lo schema JSON annidato v0.1.26 con 7 sotto-interfacce typed (`technical_quality`, `spatial_configuration`, `yolo_omniscient_data`, `cinematography?`, `continuity?`, `commercial?`, `story?`). Zero chiavi piatte legacy.
+
+---
+
+## Automazione (Wolf Stack)
+
+- **Trinity Startup:** `npm run wolf:dev` orchestra 3 sottoprocessi via `concurrently`: `dev:ui` (Vite :5173), `dev:api` (FastAPI :8000), `dev:llm` (MLX :8080 con gemma-4-e4b-it-4bit).
+- **`dev:all`:** Comando dormiente (Vite + Supabase Functions). Riservato alla futura integrazione del layer dati (autenticazione, profili). Non usare nella pipeline corrente.
+- **Release Flow:** `/wolf_flow` valida (ESLint + TSC), committa e pusha su `origin develop`.
