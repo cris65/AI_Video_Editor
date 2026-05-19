@@ -213,15 +213,33 @@ TASK_PROGRESS = {
     "phase": "",
     "percent": 0,
     "message": "",
-    "sequence_name": ""
+    "sequence_name": "",
+    "start_time": None,
+    "end_time": None,
+    "elapsed_seconds": 0
 }
 
 @app.get("/api/phase-a/progress")
 async def get_phase_a_progress():
+    global TASK_PROGRESS
+    import time
+    from datetime import datetime
+    if TASK_PROGRESS["status"] == "running" and TASK_PROGRESS["start_time"]:
+        try:
+            start_dt = datetime.fromisoformat(TASK_PROGRESS["start_time"])
+            elapsed = (datetime.now() - start_dt).total_seconds()
+            TASK_PROGRESS["elapsed_seconds"] = int(elapsed)
+        except Exception:
+            pass
     return TASK_PROGRESS
 
 def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_model_id: str, llm_model_id: str):
     global TASK_PROGRESS
+    import time
+    from datetime import datetime
+    import performance_tracker
+    
+    start_t = time.time()
     try:
         import os
         sequence_name, clip_map = edl_parser.parse_ingest_edl(edl_path)
@@ -230,26 +248,52 @@ def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_m
         TASK_PROGRESS["sequence_name"] = sequence_name
         TASK_PROGRESS["percent"] = 0
         TASK_PROGRESS["message"] = "Inizializzazione in corso..."
+        TASK_PROGRESS["start_time"] = datetime.now().isoformat()
+        TASK_PROGRESS["end_time"] = None
+        TASK_PROGRESS["elapsed_seconds"] = 0
         
         def update_progress(phase, percent, message):
             TASK_PROGRESS["phase"] = phase
             TASK_PROGRESS["percent"] = percent
             TASK_PROGRESS["message"] = message
+            TASK_PROGRESS["elapsed_seconds"] = int(time.time() - start_t)
 
-        # Note: We will pass density to PancakeEditor constructor or process method
+        # Get total frames of video for tracking
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap.isOpened() else 0
+        cap.release()
+        
+        extracted_frames = max(1, int(total_frames * density))
+
+        # Track Phase A OpenCV duration
+        cv_start = time.time()
         editor = pancake_editor.PancakeEditor(sequence_name, clip_map, sampling_density_percent=density, vlm_model_id=vlm_model_id, llm_model_id=llm_model_id)
         timeline, trash_timeline = editor.process_video(video_path, progress_callback=update_progress)
         json_path = editor.generate_json(timeline, trash_timeline)
         editor.generate_preview(video_path, timeline)
         editor.generate_trash_preview(video_path, trash_timeline)
         package_dir = editor._export_director_package()
-        print(f"✅ Phase A background task completed for {sequence_name}")
+        cv_duration = time.time() - cv_start
+        print(f"✅ Phase A background task completed for {sequence_name} in {cv_duration:.2f}s")
 
-        # Chain Phase B: Semantic VLM Analysis
+        # Track Phase B MLX duration
+        mlx_start = time.time()
         import mlx_client
         exported_json_path = os.path.join(package_dir, os.path.basename(json_path))
         print(f"🚀 Avvio MLX Client su: {exported_json_path}")
         mlx_client.process_stringout_batch(exported_json_path, progress_callback=update_progress)
+        mlx_duration = time.time() - mlx_start
+        print(f"✅ Phase B MLX task completed for {sequence_name} in {mlx_duration:.2f}s")
+        
+        # Save performance metrics to local JSON history for self-correction
+        performance_tracker.record_run(
+            vlm_model_id=vlm_model_id,
+            total_frames=total_frames,
+            extracted_frames=extracted_frames,
+            cv_duration=cv_duration,
+            mlx_duration=mlx_duration
+        )
         
         # Archiving source files to target output folder
         import shutil
@@ -265,13 +309,18 @@ def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_m
         except Exception as archive_err:
             print(f"⚠️ Failed to archive source files to {editor.output_dir}: {archive_err}")
         
+        end_t = time.time()
         TASK_PROGRESS["status"] = "completed"
         TASK_PROGRESS["percent"] = 100
         TASK_PROGRESS["message"] = "Pipeline completata con successo"
-        print(f"✅ Phase A/B complete pipeline finished for {sequence_name}")
+        TASK_PROGRESS["end_time"] = datetime.now().isoformat()
+        TASK_PROGRESS["elapsed_seconds"] = int(end_t - start_t)
+        print(f"✅ Phase A/B complete pipeline finished for {sequence_name} in {end_t - start_t:.2f}s")
     except Exception as e:
         TASK_PROGRESS["status"] = "error"
         TASK_PROGRESS["message"] = f"Errore critico: {e}"
+        TASK_PROGRESS["end_time"] = datetime.now().isoformat()
+        TASK_PROGRESS["elapsed_seconds"] = int(time.time() - start_t)
         print(f"❌ Phase A background task failed: {e}")
 
 @app.post("/api/phase-a/run")
@@ -288,6 +337,13 @@ async def run_phase_a(payload: PhaseAPayload, background_tasks: BackgroundTasks)
         payload.llm_model_id
     )
     return {"ok": True, "status": "Engine Started"}
+
+@app.get("/api/phase-a/estimate")
+async def get_duration_estimate(total_frames: int, density: float, vlm_model_id: str):
+    import performance_tracker
+    extracted_frames = max(1, int(total_frames * density))
+    est = performance_tracker.estimate_duration(vlm_model_id, total_frames, extracted_frames)
+    return {"estimated_seconds": est}
 
 
 @app.get("/api/videos/list")

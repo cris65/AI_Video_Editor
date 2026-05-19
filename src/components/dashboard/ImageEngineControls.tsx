@@ -16,6 +16,9 @@ interface TaskProgress {
   percent: number;
   message: string;
   sequence_name: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  elapsed_seconds?: number;
 }
 
 interface ImageEngineControlsProps {
@@ -116,11 +119,29 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
   const totalFrames = selectedClip ? selectedClip.total_frames : 0;
   const extractedFrames = selectedClip ? Math.max(1, Math.floor(totalFrames * density)) : 0;
   
-  const mlxMultiplier = vlmModel === 'mlx-community/gemma-4-31b-it-4bit' ? 12 : 6;
-  const estimatedClips = totalFrames / 100;
-  const tempoOpenCV = extractedFrames * 0.05;
-  const tempoMLX = estimatedClips * mlxMultiplier;
-  const estimatedSeconds = tempoOpenCV + tempoMLX;
+  const [estimatedSeconds, setEstimatedSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    if (totalFrames <= 0) return;
+    const fetchEstimate = async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/api/phase-a/estimate?total_frames=${totalFrames}&density=${density}&vlm_model_id=${vlmModel}`);
+        const data = await res.json();
+        if (data.estimated_seconds !== undefined) {
+          setEstimatedSeconds(data.estimated_seconds);
+        }
+      } catch (e) {
+        // Fallback to local default estimate if backend is not reachable
+        const mlxMultiplier = vlmModel === 'mlx-community/gemma-4-31b-it-4bit' ? 12 : 6;
+        const estimatedClips = totalFrames / 100;
+        const tempoOpenCV = extractedFrames * 0.05;
+        const tempoMLX = estimatedClips * mlxMultiplier;
+        setEstimatedSeconds(tempoOpenCV + tempoMLX);
+      }
+    };
+    fetchEstimate();
+  }, [totalFrames, density, vlmModel, extractedFrames]);
+
   let estimatedTimeString = '';
   if (estimatedSeconds < 60) {
     estimatedTimeString = `${estimatedSeconds.toFixed(1)}s`;
@@ -381,17 +402,55 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                   style={{ width: `${taskProgress.percent}%` }}
                 ></div>
               </div>
-              <p className="text-[10px] text-slate-500 font-mono truncate">{taskProgress.message}</p>
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-[10px] text-slate-500 font-mono truncate max-w-[70%]">{taskProgress.message}</p>
+                {taskProgress.elapsed_seconds !== undefined && (
+                  <span className="text-[10px] text-orange-400 font-bold font-mono">
+                    ELAPSED: {Math.floor(taskProgress.elapsed_seconds / 60)}m {taskProgress.elapsed_seconds % 60}s
+                  </span>
+                )}
+              </div>
+              {taskProgress.start_time && (
+                <div className="text-[9px] text-slate-600 font-mono flex justify-between border-t border-slate-850 pt-2">
+                  <span>Start Time: {new Date(taskProgress.start_time).toLocaleTimeString()}</span>
+                </div>
+              )}
             </div>
           )}
           
           {engineStatus === 'success' && taskProgress && (
-            <button
-              onClick={() => onComplete && onComplete(taskProgress.sequence_name)}
-              className="w-full mt-4 py-4 rounded-xl font-bold uppercase tracking-wider transition-all duration-200 shadow-xl border bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-emerald-900/30"
-            >
-              Go to Timeline (Completed)
-            </button>
+            <div className="w-full mt-4 bg-[#111318] rounded-xl p-4 border border-emerald-950/60 shadow-inner">
+              <div className="flex items-center gap-2 mb-3 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                <CheckCircle2 className="w-4 h-4" />
+                Pipeline Stats
+              </div>
+              <div className="space-y-1.5 mb-4 text-xs font-mono">
+                {taskProgress.start_time && (
+                  <div className="flex justify-between text-slate-400">
+                    <span>Started At:</span>
+                    <span className="text-slate-200">{new Date(taskProgress.start_time).toLocaleTimeString()}</span>
+                  </div>
+                )}
+                {taskProgress.end_time && (
+                  <div className="flex justify-between text-slate-400">
+                    <span>Ended At:</span>
+                    <span className="text-slate-200">{new Date(taskProgress.end_time).toLocaleTimeString()}</span>
+                  </div>
+                )}
+                {taskProgress.elapsed_seconds !== undefined && (
+                  <div className="flex justify-between text-emerald-400 font-bold">
+                    <span>Total Duration:</span>
+                    <span>{Math.floor(taskProgress.elapsed_seconds / 60)}m {taskProgress.elapsed_seconds % 60}s</span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => onComplete && onComplete(taskProgress.sequence_name)}
+                className="w-full py-4 rounded-xl font-bold uppercase tracking-wider transition-all duration-200 shadow-xl border bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-emerald-900/30"
+              >
+                Go to Timeline
+              </button>
+            </div>
           )}
           
         </div>
