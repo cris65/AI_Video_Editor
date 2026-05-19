@@ -6,9 +6,12 @@ from moviepy import VideoFileClip, concatenate_videoclips
 from ultralytics import YOLO
 
 class PancakeEditor:
-    def __init__(self, sequence_name="Pancake_Sequence", clip_map=None):
+    def __init__(self, sequence_name="Pancake_Sequence", clip_map=None, sampling_density_percent=0.15, vlm_model_id="google/gemma-4-E4B-it", llm_model_id="google/gemma-4-9b-it"):
         self.sequence_name = sequence_name
         self.clip_map = clip_map or []
+        self.sampling_density_percent = sampling_density_percent
+        self.vlm_model_id = vlm_model_id
+        self.llm_model_id = llm_model_id
         
         # 1. Parametri di Soglia
         self.BLUR_THRESHOLD = 10.0
@@ -158,17 +161,44 @@ class PancakeEditor:
         ]
         cinematic_palette = self.extract_cinematic_palette(frames_for_palette)
 
-        # 3. Storyboard generation
-        storyboard_img = np.hstack((
-            block.get("_sb_in"),
-            block.get("_sb_best"),
-            block.get("_sb_out")
-        ))
-        naming_base = self.get_clip_naming(block['start'])
-        sb_filename = f"{naming_base}.jpg"
-        sb_path = os.path.join(self.storyboard_dir, sb_filename)
-        cv2.imwrite(sb_path, storyboard_img)
-        block["storyboard_path"] = sb_path
+        # 3. Dynamic Storyboard Extraction (NO TRIPTYCH)
+        storyboard_paths = []
+        duration = block.get("end", 0) - block.get("start", 0)
+        
+        # Avoid opening VideoCapture if duration is 0
+        if duration > 0 and hasattr(self, 'video_path') and os.path.exists(self.video_path):
+            total_frames_in_block = duration * self.fps
+            extract_count = max(1, int(total_frames_in_block * self.sampling_density_percent))
+            
+            # We open the video to jump to exact equidistant frames
+            temp_cap = cv2.VideoCapture(self.video_path)
+            if temp_cap.isOpened():
+                start_frame = int(block.get("start", 0) * self.fps)
+                
+                # Calculate equidistant frame indices
+                if extract_count == 1:
+                    frame_indices = [start_frame + int(total_frames_in_block / 2)]
+                else:
+                    step = max(1, int(total_frames_in_block / (extract_count - 1)))
+                    frame_indices = [start_frame + i * step for i in range(extract_count)]
+                    # Ensure the last frame index does not exceed the block end
+                    frame_indices[-1] = min(frame_indices[-1], start_frame + int(total_frames_in_block) - 1)
+                
+                naming_base = self.get_clip_naming(block['start'])
+                
+                for i, f_idx in enumerate(frame_indices):
+                    temp_cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
+                    ret, fr = temp_cap.read()
+                    if ret:
+                        sb_frame = cv2.resize(fr, (480, 270))
+                        sb_filename = f"{naming_base}_frame_{i+1:03d}.jpg"
+                        sb_path = os.path.join(self.storyboard_dir, sb_filename)
+                        cv2.imwrite(sb_path, sb_frame)
+                        storyboard_paths.append(sb_path)
+                
+                temp_cap.release()
+                
+        block["storyboard_paths"] = storyboard_paths
 
         # 4. Motion aggregation
         samples = block.get("_motion_samples", [])
@@ -233,7 +263,7 @@ class PancakeEditor:
                 break
         return f"{clip_base}_{tc_safe}"
 
-    def process_video(self, video_path):
+    def process_video(self, video_path, progress_callback=None):
         """
         3. Logica di Costruzione Stringout
         """
@@ -245,6 +275,7 @@ class PancakeEditor:
         self.fps = cap.get(cv2.CAP_PROP_FPS)
         self.width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.video_path = video_path
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         timeline = []
@@ -404,6 +435,8 @@ class PancakeEditor:
             
             if next_pos % 500 < step:
                 print(f"  Analizzati {int(next_pos)}/{total_frames} frames...")
+                if progress_callback:
+                    progress_callback("A_OPENCV", int((next_pos / total_frames) * 100), f"Estrazione frame OpenCV: {int(next_pos)}/{total_frames}")
                 
         if current_block is not None:
             # Force end to the last available timestamp to cover the full video duration
@@ -436,6 +469,8 @@ class PancakeEditor:
             trash_timeline.append(current_trash)
                 
         cap.release()
+        if progress_callback:
+            progress_callback("A_OPENCV", 100, f"Analisi Stringout completata. {len(timeline)} clip valide.")
         print(f"✅ Analisi Stringout completata. Trovati {len(timeline)} segmenti validi e {len(trash_timeline)} scarti.")
         return timeline, trash_timeline
 
@@ -449,7 +484,8 @@ class PancakeEditor:
                 "resolution": {
                     "width": getattr(self, 'width', 1920),
                     "height": getattr(self, 'height', 1080)
-                }
+                },
+                "vlm_model_id": self.vlm_model_id
             },
             "stringout_timeline": timeline,
             "trash_timeline": trash_timeline or []
@@ -540,9 +576,9 @@ class PancakeEditor:
 # ==============================================================================
 # ENTRY POINT PER L'ORCHESTRATORE
 # ==============================================================================
-def process_pancake_video(video_path, sequence_name="Pancake_Sequence", clip_map=None):
-    editor = PancakeEditor(sequence_name, clip_map)
-    timeline, trash_timeline = editor.process_video(video_path)
+def process_pancake_video(video_path, sequence_name="Pancake_Sequence", clip_map=None, sampling_density_percent=0.15, vlm_model_id="google/gemma-4-E4B-it", llm_model_id="google/gemma-4-9b-it", progress_callback=None):
+    editor = PancakeEditor(sequence_name, clip_map, sampling_density_percent, vlm_model_id, llm_model_id)
+    timeline, trash_timeline = editor.process_video(video_path, progress_callback)
     json_path = editor.generate_json(timeline, trash_timeline)
     preview_path = editor.generate_preview(video_path, timeline)
     trash_path = editor.generate_trash_preview(video_path, trash_timeline)

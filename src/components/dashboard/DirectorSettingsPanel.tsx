@@ -127,8 +127,8 @@ export function DirectorSettingsPanel({
               onSave(updated);
             }}
           >
-            <option value="gemma-4-4b">Gemma 4 (4B) - Fast Local</option>
-            <option value="gemma-4-31b">Gemma 4 (31B) - Deep Reasoning</option>
+            <option value="gemma-4-4b">Gemma 4 (E4B) - Fast Local</option>
+            <option value="gemma-4-31b">Gemma 4 (31B) - Deep Insight</option>
           </select>
         </div>
 
@@ -283,7 +283,7 @@ export function DirectorSettingsPanel({
                   </li>
                   <li className="flex justify-between">
                     <span className="text-slate-500">Modello AI:</span>
-                    <span>{aiModel === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (4B)'}</span>
+                    <span>{aiModel === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (E4B)'}</span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-slate-500">Estimated Performance:</span>

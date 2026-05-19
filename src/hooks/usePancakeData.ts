@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface DirectorConfig {
   ai_model?: 'gemma-4-4b' | 'gemma-4-31b';
@@ -23,6 +23,11 @@ export interface FinalCutClip {
   timeline_out: number;
   role: 'PILLAR' | 'FILLER';
   tag: string;
+  // --- HITL Lock Fields (optional — present when clip is manually anchored) ---
+  locked?: boolean;            // true = clip is anchored by the human director
+  absolute_in?: number;        // source_in at lock time (seconds, source space)
+  absolute_out?: number;       // source_out at lock time (seconds, source space)
+  timeline_position?: number;  // timeline_in absolute (seconds). 0.0 = IN_GLOBAL, target_dur - clip_dur = OUT_GLOBAL
 }
 
 export interface PancakeClip {
@@ -98,6 +103,31 @@ export function usePancakeData(sequenceName: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchFinalCut = useCallback(async () => {
+    try {
+      const finalRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_final_edit.json?t=${Date.now()}`);
+      if (finalRes.ok) {
+        const finalJson = await finalRes.json();
+        setFinalCutTimeline(finalJson.final_edit_timeline || []);
+      }
+    } catch (e) {
+      console.warn("Final edit file not found. Director's Cut Preview not available.");
+    }
+    
+    try {
+      const recipeRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_gemma_recipe.json?t=${Date.now()}`);
+      if (recipeRes.ok) {
+        const recipeJson = await recipeRes.json();
+        setGemmaRecipe(recipeJson);
+      } else {
+        setGemmaRecipe(null);
+      }
+    } catch (e) {
+      setGemmaRecipe(null);
+      console.warn("Gemma recipe file not found.");
+    }
+  }, [sequenceName]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -172,32 +202,7 @@ export function usePancakeData(sequenceName: string) {
     };
 
     fetchData();
-  }, [sequenceName]);
-
-  const fetchFinalCut = async () => {
-    try {
-      const finalRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_final_edit.json?t=${Date.now()}`);
-      if (finalRes.ok) {
-        const finalJson = await finalRes.json();
-        setFinalCutTimeline(finalJson.final_edit_timeline || []);
-      }
-    } catch (e) {
-      console.warn("Final edit file not found. Director's Cut Preview not available.");
-    }
-    
-    try {
-      const recipeRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_gemma_recipe.json?t=${Date.now()}`);
-      if (recipeRes.ok) {
-        const recipeJson = await recipeRes.json();
-        setGemmaRecipe(recipeJson);
-      } else {
-        setGemmaRecipe(null);
-      }
-    } catch (e) {
-      setGemmaRecipe(null);
-      console.warn("Gemma recipe file not found.");
-    }
-  };
+  }, [sequenceName, fetchFinalCut]);
 
   return { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveform, loading, error, refetchFinalCut: fetchFinalCut };
 }

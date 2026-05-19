@@ -1,5 +1,5 @@
 # 🧪 TESTING DOCTRINE: WOLF-PROTOCOL FOR E2E (PLAYWRIGHT)
-
+**Version:** v0.1.27 - 2026-05-19
 This document functions as the programmable memory for E2E testing quirks, rules, and mandatory architectural guardrails specifically designed for the **Hybrid Immovable Local-First Architecture** (Dexie + Orchestrator + Supabase Realtime).
 
 Whenever a complex testing race condition or framework anomaly is encountered and resolved, the underlying rule strictly appending it to this living document must be codified.
@@ -122,5 +122,4 @@ await page.reload();
   2. Implement an ultra-resilient UI physical fallback click targeting generic `button` tags with text filters bounded to the root modal `[role="dialog"]`. Ensure this fallback click is *conditional* (i.e., wrapped in an `if (await modalHeading.isVisible())` block) to prevent race conditions if the native `Enter` press succeeded gracefully.
 
 ---
-
 

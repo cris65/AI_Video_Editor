@@ -161,6 +161,14 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
 ### LAW 6 — THE EMPIRICAL VERIFICATION AXIOM (NO BLIND TRUST ON DOCUMENTATION)
 - **THE LAW:** You are STRICTLY FORBIDDEN from blindly accepting documentation updates or architecture claims about the state of the codebase without first empirically verifying the reality using search/grep or file-reading tools. The codebase is the absolute ground truth. If a requested change contradicts the existing implementation, you MUST halt and correct the assumption before updating `.gemini` docs. **CRITICAL EXCEPTION:** This law applies strictly to *documenting state*. It does NOT prevent you from writing new code if the Tech Lead explicitly orders you to execute a change via `/override`.
 
+### LAW 7 — ESLINT & TYPESCRIPT NVM SANDBOX CONSTRAINTS
+- **THE LAW:** When running automated validation scripts like `npm run wolf:audit` inside the AI Agent Sandbox, the system `npm` binary may fail with `MODULE_NOT_FOUND` due to `nvm` shell wrapper resolution issues in non-interactive macOS environments.
+- **THE EXECUTION CHAIN:** The AI must NEVER rely on global `npm` or `npx` inside the sandbox if they fail to resolve. You MUST directly invoke the local workspace binaries. To perform the `wolf:audit` strictly within the sandbox without asking the human for terminal assistance, execute this exact command:
+  ```bash
+  ./node_modules/.bin/eslint . && ./node_modules/.bin/tsc --noEmit
+  ```
+- **ESLINT V9 CONFIG REQUIREMENT:** If `eslint` fails with `ESLint couldn't find an eslint.config.(js|mjs|cjs) file`, you must verify if an `eslint.config.js` exists in the root. If not, autonomously create one compatible with Vite+React and TypeScript before linting.
+
 ## 10. 🧱 DRAG & DROP, OPTIMISTIC UI & PORTAL PROTOCOL
 
 1. **Hybrid Sensors Only:** NEVER use `PointerSensor` blocking mobile scroll. Use `MouseSensor` and `TouchSensor` with delay/tolerance.

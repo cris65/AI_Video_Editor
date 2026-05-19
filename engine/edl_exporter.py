@@ -3,6 +3,7 @@ import os
 
 def seconds_to_timecode(seconds, fps=50):
     """Converte un float di secondi nel formato SMPTE standard HH:MM:SS:FF."""
+    fps = int(round(fps))  # Garantisce int: il JSON può passare fps come float (es. 50.0)
     total_frames = int(round(seconds * fps))
     ff = total_frames % fps
     ss = (total_frames // fps) % 60

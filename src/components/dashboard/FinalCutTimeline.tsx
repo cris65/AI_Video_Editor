@@ -15,7 +15,7 @@ import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-
 import type { FinalCutClip } from '../../hooks/usePancakeData';
 import type { UserConstraint } from './PancakeDashboard';
 import { SortableTimelineClip, StaticClipPreview } from './SortableTimelineClip';
-import { Save, Info } from 'lucide-react';
+import { Save, Info, LogIn, LogOut } from 'lucide-react';
 
 interface Props {
   timeline: FinalCutClip[];
@@ -25,6 +25,7 @@ interface Props {
   onSeek: (time: number) => void;
   onReorder: (newTimeline: FinalCutClip[], seekToTimelineIn?: number) => void;
   onSaveOrder: () => void;
+  targetDuration?: number; // Required for OUT_GLOBAL calculation
   userConstraints?: Record<string, UserConstraint[]>;
   audioWaveform?: number[];
   audioDuration?: number;
@@ -38,6 +39,7 @@ export const FinalCutTimeline: React.FC<Props> = ({
   onSeek,
   onReorder,
   onSaveOrder,
+  targetDuration = 60,
   userConstraints = {},
   audioWaveform = [],
   audioDuration = 0,
@@ -115,7 +117,7 @@ export const FinalCutTimeline: React.FC<Props> = ({
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         setZoomFactor((prev) => {
-          let next = prev - e.deltaY * 0.01;
+          const next = prev - e.deltaY * 0.01;
           return Math.max(1, Math.min(50, next));
         });
       }
@@ -157,7 +159,6 @@ export const FinalCutTimeline: React.FC<Props> = ({
       const { active, over } = event;
       if (!over || active.id === over.id) return;
 
-      // Functional arrayMove — pure, no stale closure risk
       const oldIndex = timeline.findIndex(
         c => `${c.source_clip_start}_${c.source_in}` === String(active.id)
       );
@@ -171,23 +172,37 @@ export const FinalCutTimeline: React.FC<Props> = ({
         ? (currentTime - oldClip.timeline_in)
         : 0.01;
 
-      // Traccia la clip esplicitamente mossa
       setManuallyMovedIds(prev => {
         const next = new Set(prev);
         next.add(String(active.id));
         return next;
       });
 
-      const newTimeline = arrayMove(timeline, oldIndex, newIndex);
+      const rawTimeline = arrayMove(timeline, oldIndex, newIndex);
 
-      // Sposta la playhead alla nuova posizione mantenendo l'offset relativo se eravamo sulla clip
+      // HITL LOCK: recalculate linear positions and flag the dragged clip as locked
+      let cursor = 0;
+      const lockedTimeline: FinalCutClip[] = rawTimeline.map(c => {
+        const dur = c.source_out - c.source_in;
+        const isDragged = `${c.source_clip_start}_${c.source_in}` === String(active.id);
+        const updated: FinalCutClip = {
+          ...c,
+          timeline_in: cursor,
+          timeline_out: cursor + dur,
+          ...(isDragged
+            ? { locked: true, absolute_in: c.source_in, absolute_out: c.source_out, timeline_position: cursor }
+            : {}),
+        };
+        cursor += dur;
+        return updated;
+      });
+
       let newTimelineIn = 0;
       for (let i = 0; i < newIndex; i++) {
-        const c = newTimeline[i];
-        newTimelineIn += (c.source_out - c.source_in);
+        newTimelineIn += (lockedTimeline[i].source_out - lockedTimeline[i].source_in);
       }
-      
-      onReorder(newTimeline, newTimelineIn + offset);
+
+      onReorder(lockedTimeline, newTimelineIn + offset);
     },
     [timeline, currentTime, onReorder]
   );
@@ -204,6 +219,124 @@ export const FinalCutTimeline: React.FC<Props> = ({
     },
     [activeDragId, totalDuration, onSeek]
   );
+
+  // HITL Double-click unlock: removes lock fields from an anchored clip
+  const handleClipDoubleClick = useCallback(
+    (e: React.MouseEvent, clipId: string) => {
+      e.stopPropagation();
+      const idx = timeline.findIndex(
+        c => `${c.source_clip_start}_${c.source_in}` === clipId
+      );
+      if (idx === -1 || !timeline[idx].locked) return;
+      const unlockedTimeline: FinalCutClip[] = timeline.map((c, i) =>
+        i === idx
+          ? { ...c, locked: false, absolute_in: undefined, absolute_out: undefined, timeline_position: undefined }
+          : c
+      );
+      onReorder(unlockedTimeline);
+    },
+    [timeline, onReorder]
+  );
+
+  // IN_GLOBAL macro: lock active clip at timeline position 0 (sequence start)
+  const handleInGlobal = useCallback(() => {
+    const activeIdx = timeline.findIndex(
+      c => currentTime >= c.timeline_in && currentTime < c.timeline_out
+    );
+    if (activeIdx === -1) return;
+    const clip = timeline[activeIdx];
+    const srcOffset = currentTime - clip.timeline_in;
+    const newAbsoluteIn = clip.source_in + srcOffset;
+    const reordered = [
+      { ...clip, locked: true, absolute_in: newAbsoluteIn, absolute_out: clip.source_out, timeline_position: 0 },
+      ...timeline.filter((_, i) => i !== activeIdx),
+    ];
+    let cur = 0;
+    const recalced: FinalCutClip[] = reordered.map(c => {
+      const dur = c.source_out - c.source_in;
+      const result: FinalCutClip = { ...c, timeline_in: cur, timeline_out: cur + dur };
+      cur += dur;
+      return result;
+    });
+    onReorder(recalced, 0);
+  }, [timeline, currentTime, onReorder]);
+
+  // OUT_GLOBAL macro: lock active clip at sequence end (targetDuration - clipDur)
+  const handleOutGlobal = useCallback(() => {
+    const activeIdx = timeline.findIndex(
+      c => currentTime >= c.timeline_in && currentTime < c.timeline_out
+    );
+    if (activeIdx === -1) return;
+    const clip = timeline[activeIdx];
+    const srcOffset = currentTime - clip.timeline_in;
+    const newAbsoluteOut = clip.source_in + srcOffset;
+    const clipDur = newAbsoluteOut - clip.source_in;
+    const bookendPos = Math.max(0, targetDuration - clipDur);
+    const reordered = [
+      ...timeline.filter((_, i) => i !== activeIdx),
+      { ...clip, locked: true, absolute_in: clip.source_in, absolute_out: newAbsoluteOut, timeline_position: bookendPos },
+    ];
+    let cur = 0;
+    const recalced: FinalCutClip[] = reordered.map(c => {
+      const dur = c.source_out - c.source_in;
+      const result: FinalCutClip = { ...c, timeline_in: cur, timeline_out: cur + dur };
+      cur += dur;
+      return result;
+    });
+    onReorder(recalced, recalced[recalced.length - 1]?.timeline_in ?? 0);
+  }, [timeline, currentTime, targetDuration, onReorder]);
+
+  // TOGGLE LOCK macro: manually toggle lock state for the active clip at its current position
+  const handleLockToggle = useCallback(() => {
+    const activeIdx = timeline.findIndex(
+      c => currentTime >= c.timeline_in && currentTime < c.timeline_out
+    );
+    if (activeIdx === -1) return;
+    const clip = timeline[activeIdx];
+    const newLockedState = !clip.locked;
+    const reordered: FinalCutClip[] = timeline.map((c, i) =>
+      i === activeIdx
+        ? {
+            ...c,
+            locked: newLockedState,
+            absolute_in: newLockedState ? c.source_in : undefined,
+            absolute_out: newLockedState ? c.source_out : undefined,
+            timeline_position: newLockedState ? c.timeline_in : undefined,
+          }
+        : c
+    );
+    onReorder(reordered);
+  }, [timeline, currentTime, onReorder]);
+
+  // Keyboard Shortcuts for Final Cut Macros
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignora se l'utente sta digitando in un input
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+      switch (e.code) {
+        case 'KeyL':
+          e.preventDefault();
+          handleLockToggle();
+          break;
+        case 'KeyI':
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleInGlobal();
+          }
+          break;
+        case 'KeyO':
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleOutGlobal();
+          }
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleLockToggle, handleInGlobal, handleOutGlobal]);
 
   // Clip being dragged (for DragOverlay preview)
   const activeDragClip = useMemo(
@@ -307,11 +440,36 @@ export const FinalCutTimeline: React.FC<Props> = ({
                 <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
                 <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
                 <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
+                <div className="w-full h-px bg-slate-800 my-1" />
+                <div className="flex justify-between items-center"><span>Toggle Lock (Anchor Clip)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">L</kbd></div>
+                <div className="flex justify-between items-center"><span>Sequence IN (Bookend)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">Shift + I</kbd></div>
+                <div className="flex justify-between items-center"><span>Sequence OUT (Bookend)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">Shift + O</kbd></div>
               </div>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+          {/* Bookend Macro Buttons: lock active clip to sequence start/end */}
+          <div className="flex items-center gap-1 mr-1">
+            <button
+              id="btn-in-global"
+              onClick={handleInGlobal}
+              title="Lock active clip as Sequence IN (position 0). Double-click a locked clip to unlock."
+              className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
+            >
+              <LogIn size={10} />
+              IN
+            </button>
+            <button
+              id="btn-out-global"
+              onClick={handleOutGlobal}
+              title="Lock active clip as Sequence OUT (end position). Double-click a locked clip to unlock."
+              className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
+            >
+              <LogOut size={10} />
+              OUT
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 mr-2">
             <span className="text-[9px] uppercase tracking-widest text-slate-500">Zoom</span>
             <input
@@ -383,14 +541,20 @@ export const FinalCutTimeline: React.FC<Props> = ({
                 const isMoved = manuallyMovedIds.has(clipId);
 
                 return (
-                  <SortableTimelineClip
+                  <div
                     key={clipId}
-                    id={clipId}
-                    clip={clip}
-                    widthPct={widthPct}
-                    seqLabel={seqLabel}
-                    isMoved={isMoved}
-                  />
+                    onDoubleClick={(e) => handleClipDoubleClick(e, clipId)}
+                    style={{ flex: `0 0 ${widthPct}%`, height: '100%', position: 'relative' }}
+                  >
+                    <SortableTimelineClip
+                      id={clipId}
+                      clip={clip}
+                      widthPct={100}
+                      seqLabel={seqLabel}
+                      isMoved={isMoved}
+                      isLocked={clip.locked === true}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -531,6 +695,9 @@ export const FinalCutTimeline: React.FC<Props> = ({
 
       {/* Legend */}
       <div className="flex gap-4 mt-1 text-[10px] font-mono text-slate-500 justify-center">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-blue-600 rounded shadow-[0_0_4px_rgba(59,130,246,0.7)]" /> 🔒 LOCKED
+        </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 bg-amber-500 rounded" /> PILLARS (BM)
         </span>

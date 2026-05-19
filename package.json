@@ -1,14 +1,14 @@
 {
   "name": "ai-video-editor",
   "private": true,
-  "version": "0.1.27",
+  "version": "0.1.28",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:ui": "vite",
     "dev:api": "cd engine && source venv/bin/activate && uvicorn api_server:app --reload --port 8000",
-    "dev:llm": "cd engine && source venv/bin/activate && python -m mlx_lm.server --model mlx-community/gemma-4-e4b-it-4bit --port 8080",
-    "wolf:dev": "concurrently -c \"blue,green,magenta\" -n \"UI,API,LLM\" \"npm run dev:ui\" \"npm run dev:api\" \"npm run dev:llm\"",
+    "dev:llm": "cd engine && source venv/bin/activate && python -m mlx_vlm.server --model mlx-community/gemma-4-e4b-it-4bit --port 8080",
+    "wolf:dev": "osascript -e 'tell app \"Terminal\" to do script \"cd \\\"'$PWD'\\\" && npm run dev:api\"' && npm run dev:ui",
     "sb:serve": "supabase functions serve --no-verify-jwt",
     "dev:all": "concurrently -c \"cyan,magenta\" -n \"VITE,SUPABASE\" \"npm run dev\" \"npm run sb:serve\"",
     "build": "tsc -b && vite build",

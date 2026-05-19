@@ -2,23 +2,24 @@ import os
 import sys
 import json
 import base64
-import requests
 import re
 import time
 
-MLX_ENDPOINT = "http://127.0.0.1:8080/v1/chat/completions"
-MLX_MODELS_ENDPOINT = "http://127.0.0.1:8080/v1/models"
-MAX_RETRIES = 3
-TIMEOUT_SECONDS = 60
+try:
+    from mlx_vlm import load, generate
+    MLX_VLM_AVAILABLE = True
+except ImportError:
+    MLX_VLM_AVAILABLE = False
 
 PROMPT_TEXT = (
     "You are a Senior Video Editor, Director of Photography, and Commercial Creative Director. "
-    "You are analyzing a single continuous video shot, displayed across 3 temporal frames in one image: Left (START), Center (BEST MOMENT), Right (END). "
-    "FUNDAMENTAL CONTINUITY RULE: This image represents the passage of time within a SINGLE scene. Subjects on the left are the same ones continuing their action at the center and right. "
+    "You are analyzing a single continuous video shot, displayed across {num_frames} sequential temporal frames. "
+    "FUNDAMENTAL CONTINUITY RULE: These frames represent the chronological passage of time within a SINGLE scene. Subjects in earlier frames are the same ones continuing their action in later frames. "
     "Your task is to analyze how the scene and subjects move and evolve chronologically, providing a comprehensive assessment for editorial and commercial use. "
     "TECHNICAL CONTEXT: The computer vision system has already detected {people_count} person(s) in this scene. Use this data to inform your analysis. "
-    "Respond EXCLUSIVELY with a valid JSON code block containing the following 4 nested objects and no other keys:\n"
+    "Respond EXCLUSIVELY with a valid JSON code block containing the following 5 nested objects and no other keys:\n"
     "  'cinematography': {{ 'scene_description': str, 'lighting_type': str (e.g. NATURAL, STUDIO, MIXED, BACKLIT), 'visual_quality_score': int (1-10), 'technical_flaws': str (empty if none) }}\n"
+    "  'semantic_analysis': {{ 'subject_action': str, 'gaze_direction': str, 'emotional_tone': str, 'narrative_energy_score': int (1-10) }}\n"
     "  'continuity': {{ 'action_description': str, 'emotion_arc': str, 'match_cut_potential': bool }}\n"
     "  'commercial': {{ 'product_visibility': str (HIGH/MEDIUM/LOW/NONE), 'brand_safe': bool, 'reaction_type': str (e.g. JOY, SURPRISE, NEUTRAL, FOCUSED) }}\n"
     "  'story': {{ 'narrative_role': str (e.g. ESTABLISHING, ACTION, REACTION, TRANSITION, FINALE), 'recommended_position': str (OPENING/MIDDLE/CLOSING), 'director_note': str }}\n"
@@ -26,29 +27,18 @@ PROMPT_TEXT = (
 )
 
 def check_mlx_server_health():
-    """Verifica rapida se l'API MLX è attiva e in ascolto locale."""
-    try:
-        response = requests.get(MLX_MODELS_ENDPOINT, timeout=2.0)
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
-        return False
-
-def encode_image_to_base64(image_path):
-    """Converte un frame JPEG in payload Base64."""
-    if not os.path.exists(image_path):
-        return None
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+    """
+    Ritorna True se la libreria mlx_vlm nativa è installata.
+    """
+    return MLX_VLM_AVAILABLE
 
 def clean_json_response(raw_text):
     """Estrae l'oggetto JSON eliminando i markdown e commenti."""
     try:
-        # Tenta il parse diretto
         return json.loads(raw_text)
     except json.JSONDecodeError:
         pass
         
-    # Pattern regex per estrarre roba contenuta fra backticks o l'oggetto nativo
     json_pattern = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
     if json_pattern:
         try:
@@ -56,7 +46,6 @@ def clean_json_response(raw_text):
         except json.JSONDecodeError:
             pass
             
-    # Prova a pescare l'oggetto root nudo e crudo
     root_pattern = re.search(r'(\{.*?\})', raw_text, re.DOTALL)
     if root_pattern:
         try:
@@ -76,57 +65,47 @@ def parse_quality_score(raw_score):
         pass
     return 5
 
-def analyze_frame(image_path, people_count=0):
-    """Interroga il server MLX passando l'immagine base64 (Retry Sync)."""
-    base64_image = encode_image_to_base64(image_path)
-    if not base64_image:
+def analyze_frame(model, processor, image_paths, people_count=0):
+    """Interroga direttamente il modello MLX locale."""
+    if not image_paths:
         return None
-    dynamic_prompt = PROMPT_TEXT.format(people_count=people_count)
         
-    payload = {
-        "model": "mlx-community/gemma-4-e4b-it-4bit", # Identificativo completo HuggingFace per MLX
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": dynamic_prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
-                        }
-                    }
-                ]
-            }
-        ],
-        "max_tokens": 512,
-        "temperature": 0.2
-    }
+    num_frames = len(image_paths)
+    dynamic_prompt = PROMPT_TEXT.format(people_count=people_count, num_frames=num_frames)
     
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = requests.post(MLX_ENDPOINT, json=payload, timeout=TIMEOUT_SECONDS)
-            response.raise_for_status()
+    # Per modelli vision, formattiamo con apply_chat_template se disponibile
+    try:
+        if hasattr(processor, "apply_chat_template") and processor.chat_template:
+            # Per evitare crash se il tokenizer richiede input stringa o list di dict
+            chat_input = [{"role": "user", "content": dynamic_prompt}]
+            prompt = processor.apply_chat_template(chat_input, tokenize=False, add_generation_prompt=True)
+        else:
+            prompt = dynamic_prompt
             
-            data = response.json()
-            message_content = data['choices'][0]['message']['content']
-            parsed_json = clean_json_response(message_content)
+        output = generate(
+            model,
+            processor,
+            prompt=prompt,
+            image=image_paths,
+            max_tokens=512,
+            temperature=0.2,
+            verbose=False
+        )
+        
+        message_content = output.text
+        parsed_json = clean_json_response(message_content)
+        
+        if parsed_json:
+            return parsed_json
+        else:
+            print(f"      [MLX Client] Errore Parsing JSON: Impossibile mappare la risposta.")
             
-            if parsed_json:
-                return parsed_json
-            else:
-                print(f"      [MLX Client] Errore Parsing JSON: Impossibile mappare la risposta.")
-                
-        except requests.exceptions.RequestException as e:
-            print(f"      [MLX Client] Fallimento Rete (Tentativo {attempt}/{MAX_RETRIES}): {e}")
-            
-        # Retry Delay backoff
-        if attempt < MAX_RETRIES:
-            time.sleep(2)
-            
+    except Exception as e:
+        print(f"      [MLX Client] Fallimento Inferenza: {e}")
+        
     return None
 
-def process_stringout_batch(json_path):
+def process_stringout_batch(json_path, progress_callback=None):
     """Apre il JSON principale, analizza ogni clip, inietta il semantic payload e salva atomico."""
     if not os.path.exists(json_path):
         print("❌ MLX Client Errore: File Stringout JSON non trovato.")
@@ -140,25 +119,62 @@ def process_stringout_batch(json_path):
         print("⚠️ Nessuna timeline valida trovata nel JSON.")
         return
         
-    print(f"🔄 Avvio processo batch MLX su {len(timeline)} segmenti. (Modalità: Sincrono-Sequenziale)")
+    vlm_model_id = data.get("metadata", {}).get("vlm_model_id", "mlx-community/gemma-4-e4b-it-4bit")
+    print(f"🔄 Avvio processo batch MLX su {len(timeline)} segmenti.")
+    print(f"⏳ Downloading model weights (if not cached) and Loading {vlm_model_id}...")
+    try:
+        model, processor = load(vlm_model_id)
+        print("✅ Model loaded successfully!")
+    except Exception as e:
+        print(f"❌ Impossibile caricare il modello MLX: {e}")
+        return
+
     success_count = 0
     
     for idx, clip in enumerate(timeline):
-        storyboard_path = clip.get("storyboard_path")
-        
-        if not storyboard_path or not os.path.exists(storyboard_path):
+        # --- SMART RESUME: Skip incrementale per-clip ---
+        # Note: backwards compatibility: read storyboard_path if storyboard_paths is empty
+        storyboard_paths = clip.get("storyboard_paths", [])
+        legacy_path = clip.get("storyboard_path")
+        if not storyboard_paths and legacy_path and os.path.exists(legacy_path):
+            storyboard_paths = [legacy_path]
+
+        if not storyboard_paths:
             continue
-            
-        print(f"   ► Analisi [{idx+1}/{len(timeline)}]: {os.path.basename(storyboard_path)} ...", end="", flush=True)
-        
-        # CHIAMATA SINCRONA MLX API
+
+        # --- SMART RESUME: Skip incrementale per-clip ---
+        # Una clip è considerata già analizzata se ha semantic_analysis con dati reali
+        existing_semantic = clip.get("semantic_analysis", {})
+        if (
+            existing_semantic
+            and existing_semantic.get("subject_action", "ANALYSIS_FAILED") != "ANALYSIS_FAILED"
+        ):
+            print(f"   ► [{idx+1}/{len(timeline)}]: {os.path.basename(storyboard_paths[0])} (+{len(storyboard_paths)-1} frames) — ⏭️  SKIP (già analizzata)")
+            success_count += 1
+            continue
+
+        if progress_callback:
+            progress_callback("B_MLX", int((idx / len(timeline)) * 100), f"Analisi semantica MLX: clip {idx+1}/{len(timeline)}")
+
+        print(f"   ► Analisi [{idx+1}/{len(timeline)}]: {os.path.basename(storyboard_paths[0])} (+{len(storyboard_paths)-1} frames) ...", end="", flush=True)
+
+        # SUB-SAMPLING (Hard-cap at 16 frames to prevent KV Cache explosion)
+        MAX_VLM_FRAMES = 16
+        if len(storyboard_paths) > MAX_VLM_FRAMES:
+            step = len(storyboard_paths) / MAX_VLM_FRAMES
+            sampled_paths = [storyboard_paths[int(i * step)] for i in range(MAX_VLM_FRAMES)]
+        else:
+            sampled_paths = storyboard_paths
+
+        # CHIAMATA SINCRONA MLX NATIVA
         people_count = clip.get("yolo_omniscient_data", {}).get("total_objects", 0)
-        semantic_data = analyze_frame(storyboard_path, people_count)
+        semantic_data = analyze_frame(model, processor, sampled_paths, people_count)
         
         if semantic_data:
             print(" ✅ OK")
-            # Inject 4 nested macro-objects from Gemma response
+            # Inject nested macro-objects from Gemma response
             cine = semantic_data.get("cinematography") or {}
+            sema = semantic_data.get("semantic_analysis") or {}
             cont = semantic_data.get("continuity") or {}
             comm = semantic_data.get("commercial") or {}
             stor = semantic_data.get("story") or {}
@@ -168,6 +184,12 @@ def process_stringout_batch(json_path):
                 "lighting_type":       cine.get("lighting_type", "ANALYSIS_FAILED"),
                 "visual_quality_score": parse_quality_score(cine.get("visual_quality_score", 0)),
                 "technical_flaws":     cine.get("technical_flaws", "")
+            }
+            clip["semantic_analysis"] = {
+                "subject_action":         sema.get("subject_action", "ANALYSIS_FAILED"),
+                "gaze_direction":         sema.get("gaze_direction", "ANALYSIS_FAILED"),
+                "emotional_tone":         sema.get("emotional_tone", "ANALYSIS_FAILED"),
+                "narrative_energy_score": parse_quality_score(sema.get("narrative_energy_score", 1))
             }
             clip["continuity"] = {
                 "action_description":  cont.get("action_description", "ANALYSIS_FAILED"),
@@ -195,6 +217,12 @@ def process_stringout_batch(json_path):
                 "visual_quality_score": 0,
                 "technical_flaws":      "ANALYSIS_FAILED"
             }
+            clip["semantic_analysis"] = {
+                "subject_action":         "ANALYSIS_FAILED",
+                "gaze_direction":         "ANALYSIS_FAILED",
+                "emotional_tone":         "ANALYSIS_FAILED",
+                "narrative_energy_score": 1
+            }
             clip["continuity"] = {
                 "action_description":  "ANALYSIS_FAILED",
                 "emotion_arc":         "ANALYSIS_FAILED",
@@ -216,4 +244,6 @@ def process_stringout_batch(json_path):
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         
+    if progress_callback:
+        progress_callback("B_MLX", 100, f"MLX Completato ({success_count}/{len(timeline)})")
     print(f"✅ MLX Client Completato. Elaborate {success_count}/{len(timeline)} clip con successo.")

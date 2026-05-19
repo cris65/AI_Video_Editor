@@ -66,7 +66,7 @@ export function useSequencePlayer(
       video.removeEventListener('pause', handlePause);
       if (audio) audio.pause();
     };
-  }, [isPreviewMode, finalCutTimeline]);
+  }, [isPreviewMode, finalCutTimeline, videoRef, audioRef]);
 
   // Main Sequence Loop (60fps)
   useEffect(() => {
@@ -83,8 +83,8 @@ export function useSequencePlayer(
       if (!isSeeking.current) {
         const vTime = video.currentTime;
         
-        let currentIndex = activeClipIndex;
-        let currentClip = finalCutTimeline[currentIndex];
+        const currentIndex = activeClipIndex;
+        const currentClip = finalCutTimeline[currentIndex];
 
         // 1. Calculate global timeline time
         const elapsed = vTime - currentClip.source_in;
@@ -133,7 +133,7 @@ export function useSequencePlayer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isPreviewMode, finalCutTimeline, activeClipIndex]);
+  }, [isPreviewMode, finalCutTimeline, activeClipIndex, videoRef, audioRef]);
 
   // Esponiamo un metodo per fare seek direttamente sulla timeline finale
   const seekToTimelineTime = useCallback((targetTime: number) => {
