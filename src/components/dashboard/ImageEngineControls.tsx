@@ -44,6 +44,9 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
           if (data.status === 'completed') {
             setEngineStatus('success');
             clearInterval(interval);
+            if (onComplete) {
+              onComplete(data.sequence_name);
+            }
           } else if (data.status === 'error') {
             setEngineStatus('error');
             clearInterval(interval);
@@ -56,7 +59,7 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
     return () => {
       if (interval) clearInterval(interval);
     }
-  }, [engineStatus]);
+  }, [engineStatus, onComplete]);
 
   // Load clips on mount
   useEffect(() => {

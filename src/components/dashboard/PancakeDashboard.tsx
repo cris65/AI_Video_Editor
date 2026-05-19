@@ -7,7 +7,7 @@ import { InteractiveTimeline } from './InteractiveTimeline';
 import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X } from 'lucide-react';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity } from 'lucide-react';
 
 // Pure function: recalculates timeline_in/timeline_out after manual reorder.
 // Durations are invariant (source_out - source_in). Returns a new immutable array.
@@ -635,19 +635,15 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             
             {isPreviewMode ? (
-              // In Preview Mode, mostriamo le clip nell'ordine CORRENTE (orderedFinalCut)
-              // CRITICAL: finalCutTimeline (immutabile) NON va usato qui — avrebbe timeline_in obsoleti post-DnD.
               orderedFinalCut.map((clip, idx) => {
-                // Find constraints for this clip
-                let constraints: UserConstraint[] = [];
-                let matchedKey = clip.source_clip_start.toString();
-                for (const key of Object.keys(userConstraints)) {
-                  if (Math.abs(parseFloat(key) - clip.source_clip_start) < 0.1) {
-                    constraints = userConstraints[key];
-                    matchedKey = key;
-                    break;
-                  }
-                }
+                const matchingPancakeClip = combinedTimeline.find(
+                  pc => Math.abs(pc.start - clip.source_clip_start) < 0.1
+                );
+                const matchedSemantic = matchingPancakeClip?.semantic_analysis;
+                const matchedCine = matchingPancakeClip?.cinematography;
+                const matchedStory = matchingPancakeClip?.story;
+
+
                 // Original Gemma index: position in the immutable source (for reference numbering)
                 const originalIdx = finalCutTimeline.findIndex(
                   c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1 && Math.abs(c.source_in - clip.source_in) < 0.01
@@ -679,64 +675,39 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                        <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
                      </div>
                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
-             Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                       Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
                      </div>
-                     
-                     {/* Constraints List */}
-                     {constraints && constraints.length > 0 && (
-                       <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-800">
-                         {constraints.map((c, cIdx) => {
-                           const isOrphan = c.time < clip.source_in || c.time > clip.source_out;
-                           const globalTime = clip.timeline_in + (c.time - clip.source_in);
-                           const isMarkerActive = !isOrphan && isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
-                           const markerKey = `${clip.source_clip_start.toFixed(3)}_${cIdx}`;
-                           const markerNum = globalMarkerNumbers.get(markerKey);
-                           return (
-                              <div
-                                key={cIdx}
-                                className={`flex items-center justify-between px-2 py-1.5 rounded border transition-all ${isOrphan ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'} ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isOrphan) return;
-                                  seekToTimelineTime(globalTime);
-                                }}
-                                title={isOrphan ? `⚠️ Marker fuori range clip (${c.time.toFixed(2)}s non è in ${clip.source_in.toFixed(1)}–${clip.source_out.toFixed(1)})` : undefined}
-                              >
-                               <div className="flex items-center gap-2 flex-1 min-w-0">
-                                 <div className="w-4 flex justify-center shrink-0">
-                                   {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
-                                   {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
-                                   {c.type === 'BM' && (
-                                     <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
-                                       <path d="M0 0H10V10L5 14L0 10V0Z" />
-                                     </svg>
-                                   )}
-                                 </div>
-                                 {markerNum !== undefined && (
-                                   <span className="text-[9px] font-bold font-mono bg-slate-700 text-slate-300 px-1 py-0.5 rounded shrink-0">
-                                     M{markerNum}
-                                   </span>
-                                 )}
-                                 <span className="text-[11px] font-mono font-bold text-slate-100 shrink-0">
-                                   {isOrphan ? '⚠️' : `${globalTime.toFixed(2)}s`}
-                                 </span>
-                                 <span className="text-[9px] font-mono text-slate-500 truncate">
-                                   src {c.time.toFixed(2)}s
-                                 </span>
-                               </div>
-                               <button
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   handleRemoveSpecificConstraint(matchedKey, c.time);
-                                 }}
-                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 shrink-0"
-                                 title="Rimuovi"
-                               >
-                                 <X size={12} />
-                               </button>
+                      
+                     {/* Semantic Analysis Panel */}
+                     {(matchedSemantic || matchedCine || matchedStory) && (
+                       <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
+                         <div className="flex flex-wrap items-center gap-1.5">
+                           {matchedSemantic?.narrative_energy_score !== undefined && (
+                             <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 text-[10px] text-amber-400 font-medium">
+                               <Activity size={10} className="shrink-0" />
+                               <span>Energy: {matchedSemantic.narrative_energy_score}/10</span>
                              </div>
-                           );
-                         })}
+                           )}
+                           {matchedSemantic?.emotional_tone && matchedSemantic.emotional_tone !== 'ANALYSIS_FAILED' && (
+                             <div className="bg-blue-500/10 border border-blue-500/25 rounded px-1.5 py-0.5 text-[10px] text-blue-400 font-medium">
+                               <span>Tone: {matchedSemantic.emotional_tone}</span>
+                             </div>
+                           )}
+                         </div>
+
+                         {matchedCine?.scene_description && matchedCine.scene_description !== 'ANALYSIS_FAILED' && (
+                           <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-900/60">
+                             <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-0.5">Scene Description</span>
+                             {matchedCine.scene_description}
+                           </div>
+                         )}
+
+                         {matchedStory?.director_note && matchedStory.director_note !== 'ANALYSIS_FAILED' && (
+                           <div className="text-[11px] text-slate-400 italic leading-relaxed border-l-2 border-slate-700 pl-2 py-0.5">
+                             <span className="text-[9px] text-slate-500 font-bold not-italic block uppercase tracking-wider mb-0.5">Director's Note</span>
+                             "{matchedStory.director_note}"
+                           </div>
+                         )}
                        </div>
                      )}
                   </div>

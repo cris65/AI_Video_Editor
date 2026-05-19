@@ -1,6 +1,6 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.26 - 2026-05-19
+**Version:** v0.1.29 - 2026-05-20
 
 > [!NOTE]
 > Questo documento descrive le **Feature** — ovvero il valore funzionale esposto all'utente finale,
@@ -28,8 +28,9 @@ Il sistema estrapola un'unica timeline ottimizzata per massimizzare la velocità
 L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard OpenAI-compatible (`http://127.0.0.1:8080/v1/chat/completions`), il sistema analizza la timeline di Stringout:
 - Convertendo al volo lo Semantic Storyboard in `base64` e inviando il contesto tecnico YOLO (numero soggetti rilevati in scena).
 - Iniettando un Context Prompt specifico sulla Continuità Cronologica e sull'analisi commerciale.
-- Ricevendo da Gemma 4 un payload JSON strutturato in **4 macro-oggetti annidati** che arricchisce ogni clip:
+- Ricevendo da Gemma 4 un payload JSON strutturato in **5 macro-oggetti annidati** che arricchisce ogni clip:
   - `cinematography` → `scene_description`, `lighting_type`, `visual_quality_score`, `technical_flaws`
+  - `semantic_analysis` → `subject_action`, `gaze_direction`, `emotional_tone`, `narrative_energy_score`
   - `continuity` → `action_description`, `emotion_arc`, `match_cut_potential`
   - `commercial` → `product_visibility`, `brand_safe`, `reaction_type`
   - `story` → `narrative_role`, `recommended_position`, `director_note`

@@ -62,6 +62,12 @@ export interface PancakeClip {
     visual_quality_score: number;
     technical_flaws: string;
   };
+  semantic_analysis?: {
+    subject_action: string;
+    gaze_direction: string;
+    emotional_tone: string;
+    narrative_energy_score: number;
+  };
   continuity?: {
     action_description: string;
     emotion_arc: string;

@@ -1,10 +1,10 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.27 - 2026-05-19
+**Version:** v0.1.29 - 2026-05-20
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
-> È la fonte di verità tecnica. Non descrive il flusso temporale (→ `PIPELINE.md`) né le feature UI (→ `FEATURES.md`).
+> È la fonte di verità tecnica. Non descrive il flusso temporale (→ `PIPELINE.md`) né le feature UI (→ `FEATURES.md`)
 
 ---
 
@@ -17,7 +17,7 @@
 
 ---
 
-## Schema JSON del Payload Clip (Struttura Annidato — v0.1.26)
+## Schema JSON del Payload Clip (Struttura Annidato — v0.1.29)
 
 Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi piatte legacy (`motion`, `people_count`, `cinematic_palette`, ecc.) sono state eliminate.
 
@@ -36,6 +36,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 ```json
 {
   "cinematography": { "scene_description": "...", "lighting_type": "NATURAL", "visual_quality_score": 8, "technical_flaws": "" },
+  "semantic_analysis": { "subject_action": "...", "gaze_direction": "...", "emotional_tone": "...", "narrative_energy_score": 7 },
   "continuity":     { "action_description": "...", "emotion_arc": "Calm", "match_cut_potential": true },
   "commercial":     { "product_visibility": "LOW", "brand_safe": true, "reaction_type": "JOY" },
   "story":          { "narrative_role": "ESTABLISHING", "recommended_position": "OPENING", "director_note": "..." }

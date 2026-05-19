@@ -122,12 +122,12 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
               `}>
                 {constraints[0].type === 'IN' && 'FORCED IN'}
                 {constraints[0].type === 'OUT' && 'FORCED OUT'}
-                {constraints[0].type === 'BM' && '🔥 ANCHOR'}
+                {constraints[0].type === 'BM' && '🔥 BEST MOMENT'}
                 <span className="opacity-80 ml-1">[{constraints[0].time.toFixed(2)}s]</span>
               </span>
             ) : (
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md shadow-lg bg-slate-900/90 text-emerald-400 border-emerald-500/50">
-                🔥 {constraints.length} ANCHORS SET
+                🔥 {constraints.length} MARKERS SET
               </span>
             )}
           </div>
@@ -256,10 +256,28 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
                 <p className="text-red-300/90 leading-relaxed font-medium">{clip.cinematography.technical_flaws}</p>
               </div>
             )}
+            {clip.semantic_analysis && (
+              <div className={`grid grid-cols-2 gap-2 border-b border-slate-800 pb-2 ${isRejected ? 'opacity-70' : ''}`}>
+                <div>
+                  <strong className="text-slate-300 block mb-0.5">Narrative Energy</strong>
+                  <span className="text-amber-400 font-bold font-mono">{clip.semantic_analysis.narrative_energy_score}/10</span>
+                </div>
+                <div>
+                  <strong className="text-slate-300 block mb-0.5">Emotional Tone</strong>
+                  <span className="text-blue-400 font-semibold">{clip.semantic_analysis.emotional_tone || 'N/A'}</span>
+                </div>
+              </div>
+            )}
             <div className={isRejected ? 'opacity-70' : ''}>
               <strong className="text-slate-300 block mb-1">Scene & Lighting</strong>
               <p className="leading-relaxed">{clip.cinematography?.scene_description || 'N/A'}</p>
             </div>
+            {clip.story?.director_note && clip.story.director_note !== 'ANALYSIS_FAILED' && (
+              <div className={`border-t border-slate-800 pt-2 ${isRejected ? 'opacity-70' : ''}`}>
+                <strong className="text-slate-300 block mb-1">Director's Note</strong>
+                <p className="leading-relaxed italic text-slate-300">"{clip.story.director_note}"</p>
+              </div>
+            )}
             <div className={isRejected ? 'opacity-70' : ''}>
               <strong className="text-slate-300 block mb-1">Action Continuity</strong>
               <p className="leading-relaxed">{clip.continuity?.action_description || 'N/A'}</p>
