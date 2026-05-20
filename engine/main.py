@@ -152,6 +152,7 @@ def run_pipeline(force: bool = False):
     print("\n--- FASE A: Analisi EDL e Pancake Cut ---")
     preview_main_path = None
     trash_preview_path = None
+    valid_cuts_count = 0
 
     import time
     from datetime import datetime
@@ -178,7 +179,7 @@ def run_pipeline(force: bool = False):
             cached_data, cached_timeline = load_phase_a_cache(json_main_path)
             if cached_data is not None:
                 phase_a_skipped = True
-                valid_cuts_count = len(cached_timeline)
+                valid_cuts_count = len(cached_timeline) if cached_timeline is not None else 0
                 preview_main_path = os.path.join(
                     DIR_OUTPUT, sequence_name,
                     f"{sequence_name}_preview_stringout.mp4"
@@ -266,7 +267,7 @@ def run_pipeline(force: bool = False):
     # Record telemetry
     try:
         import cv2
-        cap = cv2.VideoCapture(FILE_PROXY_IN)
+        cap = cv2.VideoCapture(FILE_PROXY_IN or "")
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap.isOpened() else 0
         cap.release()
         

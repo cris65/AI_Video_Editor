@@ -348,7 +348,7 @@ class PancakeEditor:
             if tag.startswith('TRASH'):
                 if current_block is not None:
                     current_block["end"] = timestamp_sec
-                    duration = cast(float, current_block["end"]) - cast(float, current_block["start"])
+                    duration = current_block["end"] - cast(float, current_block["start"])
 
                     current_block = self._finalize_block(current_block, frame)
 
@@ -467,7 +467,7 @@ class PancakeEditor:
         if current_block is not None:
             # Force end to the last available timestamp to cover the full video duration
             current_block["end"] = total_frames / self.fps
-            duration = cast(float, current_block["end"]) - cast(float, current_block["start"])
+            duration = current_block["end"] - cast(float, current_block["start"])
 
             current_block = self._finalize_block(current_block, prev_frame)
 

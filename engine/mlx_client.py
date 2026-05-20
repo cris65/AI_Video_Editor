@@ -4,6 +4,7 @@ import json
 import base64
 import re
 import time
+from typing import cast
 
 try:
     from mlx_vlm import load, generate
@@ -115,7 +116,7 @@ def analyze_frame(model, processor, image_paths, people_count=0):
         output = generate(
             model,
             processor,
-            prompt=prompt,
+            prompt=cast(str, prompt),
             image=image_paths,
             max_tokens=1500,
             temperature=1.0,
