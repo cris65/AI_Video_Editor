@@ -4,6 +4,7 @@ import json
 import numpy as np
 from moviepy import VideoFileClip, concatenate_videoclips
 from ultralytics import YOLO
+from typing import cast
 
 class PancakeEditor:
     def __init__(self, sequence_name="Pancake_Sequence", clip_map=None, sampling_density_percent=0.15, vlm_model_id="google/gemma-4-E4B-it", llm_model_id="google/gemma-4-9b-it"):
@@ -121,7 +122,8 @@ class PancakeEditor:
         if len(pixel_data) < K:
             return []
             
-        _, _, centers = cv2.kmeans(pixel_data, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+        bestLabels = np.zeros((pixel_data.shape[0], 1), dtype=np.int32)
+        _, _, centers = cv2.kmeans(pixel_data, K, bestLabels, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
         
         palette_hex = []
         for center in centers:
@@ -346,7 +348,7 @@ class PancakeEditor:
             if tag.startswith('TRASH'):
                 if current_block is not None:
                     current_block["end"] = timestamp_sec
-                    duration = float(current_block["end"]) - float(current_block["start"])
+                    duration = cast(float, current_block["end"]) - cast(float, current_block["start"])
 
                     current_block = self._finalize_block(current_block, frame)
 
@@ -465,7 +467,7 @@ class PancakeEditor:
         if current_block is not None:
             # Force end to the last available timestamp to cover the full video duration
             current_block["end"] = total_frames / self.fps
-            duration = float(current_block["end"]) - float(current_block["start"])
+            duration = cast(float, current_block["end"]) - cast(float, current_block["start"])
 
             current_block = self._finalize_block(current_block, prev_frame)
 

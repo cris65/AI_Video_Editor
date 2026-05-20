@@ -12,6 +12,13 @@ from typing import Optional, Literal, Union
 import uvicorn
 import os
 import director as director_module
+import logging
+
+class ProgressEndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("/api/phase-a/progress") == -1
+
+logging.getLogger("uvicorn.access").addFilter(ProgressEndpointFilter())
 
 app = FastAPI(title="AI Video Editor Engine API", version="0.1.0")
 

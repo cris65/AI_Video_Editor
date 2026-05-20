@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Users, Info, Activity, X, MapPin, Tag } from 'lucide-react';
+import { Users, Info, Activity, X, MapPin, Tag, AlertCircle } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
 interface ClipCardProps {
@@ -23,6 +23,7 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
   
   const isRejected = !finalUsable;
   const [expanded, setExpanded] = useState(false);
+  const [showRejectPopup, setShowRejectPopup] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -255,15 +256,32 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           </div>
         )}
 
-        <button 
-          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-          className={`mt-auto w-full flex items-center justify-between text-xs py-2 border-t transition-colors ${
-            isRejected ? 'text-red-400 hover:text-red-300 border-red-500/20' : 'text-slate-400 hover:text-slate-200 border-slate-800/50'
-          }`}
-        >
-          <span className="flex items-center gap-1.5"><Info size={14} /> Semantic Analysis</span>
-          <span className="font-mono">{expanded ? '-' : '+'}</span>
-        </button>
+        <div className="relative w-full">
+          {showRejectPopup && (
+            <div className="absolute bottom-[calc(100%+4px)] left-0 w-full p-2 bg-slate-900 border border-red-900 rounded-md text-center shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-1 duration-200">
+              <p className="text-[10px] text-red-400 font-bold leading-tight flex items-center justify-center gap-1">
+                <AlertCircle size={10} className="shrink-0" /> Clip rejected due to technical flaws. Semantic analysis bypassed.
+              </p>
+            </div>
+          )}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              if (isRejected) {
+                setShowRejectPopup(true);
+                setTimeout(() => setShowRejectPopup(false), 2500);
+                return;
+              }
+              setExpanded(!expanded); 
+            }}
+            className={`w-full flex items-center justify-between text-[10px] uppercase font-bold tracking-wider py-1.5 border-t transition-colors ${
+              isRejected ? 'text-red-400 hover:text-red-300 border-red-500/20 cursor-not-allowed opacity-70 bg-red-950/20' : 'text-slate-400 hover:text-slate-200 border-slate-800/50 bg-slate-900/50'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 px-2"><Info size={12} /> Semantic Analysis</span>
+            <span className="font-mono px-2">{expanded ? '-' : '+'}</span>
+          </button>
+        </div>
 
         {expanded && (
           <div className="mt-2 space-y-3 text-xs text-slate-400 bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">

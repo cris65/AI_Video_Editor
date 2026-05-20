@@ -36,7 +36,7 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
     return () => cancelAnimationFrame(animationFrameId);
   }, [videoRef, duration]);
 
-  if (!timeline || timeline.length === 0 || duration <= 0) return null;
+  if (!timeline || duration <= 0) return null;
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();

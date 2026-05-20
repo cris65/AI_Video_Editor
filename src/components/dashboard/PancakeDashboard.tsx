@@ -8,6 +8,7 @@ import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 // Pure function: recalculates timeline_in/timeline_out after manual reorder.
 // Durations are invariant (source_out - source_in). Returns a new immutable array.
@@ -475,6 +476,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
   return (
     <div className="h-screen bg-slate-950 text-slate-200 flex flex-col overflow-hidden">
+      <Toaster position="top-right" />
       {/* Header */}
       <header className="shrink-0 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-md z-50">
         <div className="flex items-center gap-3">
@@ -549,36 +551,41 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           </button>
         </div>
         
-        <div className="flex items-center gap-3">
-           <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mr-2">
+        <div className="flex items-center gap-1.5">
+           <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-700 shadow-inner">
              <button 
                onClick={() => setFilterMode('ALL')}
-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
              >
                ALL
              </button>
              <button 
                onClick={() => setFilterMode('VALID')}
-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
              >
                VALID
              </button>
              <button 
                onClick={() => setFilterMode('BROLL')}
-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
              >
                B-ROLL
              </button>
              <button 
                onClick={() => setFilterMode('TRASH')}
-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
              >
                TRASH
              </button>
            </div>
-           <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 rounded-full text-xs font-medium text-slate-300 border border-slate-700 shadow-sm">
-             <Filter size={14} className="text-blue-400" />
-             {filteredTimeline.length} Clips
+           <span className={`flex items-center gap-1 px-2 py-0.5 bg-slate-900/80 rounded-md text-[10px] font-bold border shadow-sm whitespace-nowrap transition-colors ${
+             filterMode === 'VALID' ? 'text-emerald-400 border-emerald-500/30' :
+             filterMode === 'BROLL' ? 'text-blue-400 border-blue-500/30' :
+             filterMode === 'TRASH' ? 'text-red-400 border-red-500/30' :
+             'text-slate-300 border-slate-700'
+           }`}>
+             <Filter size={10} className="opacity-80" />
+             {filterMode === 'BROLL' ? 'B-ROLL' : filterMode}: {filteredTimeline.length} Clips
            </span>
         </div>
       </header>
