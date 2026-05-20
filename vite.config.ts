@@ -37,7 +37,20 @@ const engineAssetsPlugin = () => ({
     });
 
     server.middlewares.use('/engine/output', (req: any, res: any, next: any) => {
-      const filePath = path.join(process.cwd(), 'engine', 'output', req.url.split('?')[0]);
+      let filePath = path.join(process.cwd(), 'engine', 'output', req.url.split('?')[0]);
+      
+      if (!fs.existsSync(filePath)) {
+        // Fallback to engine/input if the requested video file is the raw sequence video
+        const relativePath = req.url.split('?')[0];
+        const parts = relativePath.split('/').filter(Boolean);
+        if (parts.length === 2 && parts[1].endsWith('.mp4')) {
+          const inputPath = path.join(process.cwd(), 'engine', 'input', parts[1]);
+          if (fs.existsSync(inputPath)) {
+            filePath = inputPath;
+          }
+        }
+      }
+
       if (fs.existsSync(filePath)) {
         const ext = path.extname(filePath).toLowerCase();
         const stat = fs.statSync(filePath);

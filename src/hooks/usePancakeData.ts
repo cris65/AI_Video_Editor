@@ -62,17 +62,23 @@ export interface PancakeClip {
     lighting_type: string;
     visual_quality_score: number;
     technical_flaws: string;
+    shot_size: 'ECU' | 'CU' | 'MCU' | 'MS' | 'FS' | 'WS' | 'INSERT';
   };
   semantic_analysis?: {
     subject_action: string;
-    gaze_direction: string;
+    gaze_direction: 'LEFT' | 'RIGHT' | 'CENTER' | 'DOWN' | 'UP' | 'NONE';
     emotional_tone: string;
     narrative_energy_score: number;
+    subject_screen_position: 'LEFT_THIRD' | 'CENTER' | 'RIGHT_THIRD' | 'NONE';
+    subject_count: number;
+    setting_location: string;
+    key_props: string[];
   };
   continuity?: {
     action_description: string;
     emotion_arc: string;
     match_cut_potential: boolean;
+    match_cut_vector: 'PAN_LEFT' | 'PAN_RIGHT' | 'TILT_UP' | 'TILT_DOWN' | 'PUSH_IN' | 'PULL_OUT' | 'STATIC' | 'NONE';
   };
   commercial?: {
     product_visibility: string;

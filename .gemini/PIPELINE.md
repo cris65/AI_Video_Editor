@@ -1,46 +1,46 @@
-# 🎬 AI Video Editor — Pipeline Operativa & Flusso di Produzione
+# 🎬 AI Video Editor — Operational Pipeline & Production Flow
 
-**Version:** v0.1.33 - 2026-05-20
-**Scope:** Guida operativa per l'avvio dell'ambiente di sviluppo e l'esecuzione della pipeline di analisi video completa.
+**Version:** v0.1.34 - 2026-05-20
+**Scope:** Operational guide for booting the development environment and executing the full video analysis pipeline.
 
 ---
 
-## 1. 🚀 Avvio Ambiente di Sviluppo (The Trinity Stack)
+## 1. 🚀 Booting the Development Environment (The Trinity Stack)
 
-Il progetto richiede **3 server attivi contemporaneamente**. Il comando master è:
+The project requires **3 servers running simultaneously**. The master command is:
 
 ```bash
 npm run wolf:dev
 ```
 
-Questo comando lancia in parallelo (via `concurrently`) i tre processi:
+This command launches three parallel processes (via `concurrently`):
 
-| Label | Comando sottostante | Servizio | Porta |
+| Label | Underlying Command | Service | Port |
 |---|---|---|---|
 | `UI` | `npm run dev:ui` | Vite (React Frontend) | `:5173` |
 | `API` | `npm run dev:api` | FastAPI (The Surveyor) | `:8000` |
 | `LLM` | `npm run dev:llm` | MLX Server (Gemma 4 4-bit) | `:8080` |
 
-> **📌 NOTA su `dev:all`:** Questo comando avvia Vite + Supabase Functions ed è al momento un comando dormiente ereditato dal boilerplate Wolf-Stack. **Non serve nella pipeline attuale**, ma è intenzionalmente mantenuto per la futura integrazione di Supabase (autenticazione utenti, profili, gestione progetti). Quando quella fase sarà attiva, `dev:all` diventerà il comando di boot per l'intero stack compreso il layer dati.
+> **📌 NOTE on `dev:all`:** This command boots Vite + Supabase Functions and is currently a dormant command inherited from the Wolf-Stack boilerplate. **It is not needed in the current pipeline**, but is intentionally maintained for future Supabase integration (user auth, profiles, project management). When that phase is active, `dev:all` will become the boot command for the entire stack, including the data layer.
 
-**Verifica che tutti e 3 i server siano attivi** prima di procedere con qualsiasi operazione engine:
+**Verify that all 3 servers are active** before proceeding with any engine operations:
 - UI: `http://localhost:5173`
 - API: `http://localhost:8000/docs`
 - LLM: `http://localhost:8080/v1/models`
 
 ---
 
-## 2. 🎞️ Pipeline di Analisi Video (Il Flusso Completo)
+## 2. 🎞️ Video Analysis Pipeline (The Full Flow)
 
-### Prerequisiti
+### Prerequisites
 
-Posizionare i file di input nella cartella `engine/input/`:
-- `[nome_sequenza].edl` → il file EDL di Ingest esportato da Premiere/FCPX
-- `[proxy_video].[mp4|mov|mxf|avi]` → il file video proxy concatenato
+Place input files in the `engine/input/` folder:
+- `[sequence_name].edl` → the Ingest EDL file exported from Premiere/FCPX
+- `[proxy_video].[mp4|mov|mxf|avi]` → the concatenated proxy video file
 
-L'engine rileva automaticamente il primo `.edl` e il primo video trovati nella cartella.
+The engine automatically detects the first `.edl` and the first video found in the folder.
 
-### Avvio Pipeline
+### Starting the Pipeline
 
 ```bash
 cd engine
@@ -48,116 +48,116 @@ source venv/bin/activate
 python main.py
 ```
 
-La pipeline è **completamente automatica** e non richiede interazioni durante l'esecuzione.
+The pipeline is **fully automatic** and does not require interactions during execution.
 
 ---
 
-## 3. 🔄 Le 5 Fasi della Pipeline
+## 3. 🔄 The 5 Phases of the Pipeline
 
 ```
-Input: engine/input/[sequenza].edl + [proxy].mp4
+Input: engine/input/[sequence].edl + [proxy].mp4
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  FASE A — Analisi EDL & Pancake Cut (YOLO + OpenCV)         │
-│  Output: _stringout.json (JSON tecnico annidato)            │
-│          _preview_stringout.mp4 (anteprima montaggio)       │
-│          _preview_TRASH.mp4 (anteprima scarti)              │
+│  PHASE A — EDL Analysis & Pancake Cut (YOLO + OpenCV)       │
+│  Output: _stringout.json (Nested technical JSON)             │
+│          _preview_stringout.mp4 (Assembly preview)          │
+│          _preview_TRASH.mp4 (Discarded footage preview)     │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  FASE B — Analisi Semantica Vision (MLX Server :8080)       │
-│  Modello: mlx-community/gemma-4-e4b-it-4bit                 │
-│  Output: _stringout.json arricchito con i 4 macro-oggetti:  │
+│  PHASE B — Vision LLM Semantic Analysis (MLX Server :8080)  │
+│  Model: mlx-community/gemma-4-e4b-it-4bit                   │
+│  Output: _stringout.json enriched with the 5 macro-objects: │
 │          cinematography, continuity, commercial, story       │
-│  ⚠️ Skip automatico se il server MLX è offline              │
+│  ⚠️ Auto-skipped if MLX server is offline                   │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  FASE C — Generazione BGM & Beat Extraction                 │
-│  Output: _bgm.wav (click track mock o MusicGen reale)       │
-│          _audio_beats.json (array di timestamp beat)        │
+│  PHASE C — BGM Generation & Beat Extraction                 │
+│  Output: _bgm.wav (Mock click track or real MusicGen)       │
+│          _audio_beats.json (Beat timestamps array)          │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  FASE D — AI Director (Risoluzione Vincoli HITL)            │
-│  Input aggiuntivo: _hitl_data.json (vincoli UI utente)      │
-│  Output: _final_edit.json (timeline Director's Cut)         │
-│          _gemma_recipe.json (reasoning del Director)        │
+│  PHASE D — AI Director (HITL Constraint Resolution)         │
+│  Additional Input: _hitl_data.json (UI user constraints)    │
+│  Output: _final_edit.json (Internal timeline)               │
+│          _gemma_recipe.json (Director's reasoning)          │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  FASE E — Export EDL & XML (Premiere Ready)                 │
-│  Output: _Stringout_Cut.edl (Stringout grezzo)              │
-│          _FinalCut.xml (Director's Cut per Premiere/FCPX)   │
+│  PHASE E — EDL & XML Export (Premiere Ready)                 │
+│  Output: _Stringout_Cut.edl (Raw Stringout EDL)             │
+│          _FinalCut.xml (Director's Cut for Premiere/FCPX)   │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
-Output: engine/output/[sequenza]/LLM_Export_Package/
+Output: engine/output/[sequence]/LLM_Export_Package/
 ```
 
 ---
 
-## 4. 📂 Struttura Output per Sequenza
+## 4. 📂 Output Structure Per Sequence
 
-Dopo l'esecuzione, tutti i file vengono organizzati in:
+After execution, all files are organized into:
 
 ```
 engine/output/[SEQUENCE_NAME]/
-├── [SEQUENCE_NAME].edl               ← EDL originale (spostato da input/)
-├── [SEQUENCE_NAME].mp4               ← Video proxy (spostato da input/)
+├── [SEQUENCE_NAME].edl               ← Original EDL (moved from input/)
+├── [SEQUENCE_NAME].mp4               ← Proxy video (moved from input/)
 ├── [SEQUENCE_NAME]_preview_stringout.mp4
 ├── [SEQUENCE_NAME]_preview_TRASH.mp4
 ├── storyboards/
-│   └── [CLIP_NAME]_[TC].jpg          ← Storyboard a 3 frame (IN / BEST / OUT)
+│   └── [CLIP_NAME]_[TC].jpg          ← 3-frame storyboard (IN / BEST / OUT)
 └── LLM_Export_Package/
-    ├── [SEQUENCE_NAME]_stringout.json      ← JSON completo (Phase 1 + 2)
-    ├── [SEQUENCE_NAME]_hitl_data.json      ← Vincoli HITL dalla UI (scritto dal frontend)
+    ├── [SEQUENCE_NAME]_stringout.json      ← Full JSON (Phase 1 + 2)
+    ├── [SEQUENCE_NAME]_hitl_data.json      ← HITL constraints from UI (written by frontend)
     ├── [SEQUENCE_NAME]_final_edit.json     ← Director's Cut timeline
-    ├── [SEQUENCE_NAME]_gemma_recipe.json   ← Reasoning AI del Director
-    ├── [SEQUENCE_NAME]_bgm.wav             ← Musica generata
+    ├── [SEQUENCE_NAME]_gemma_recipe.json   ← Director's AI reasoning
+    ├── [SEQUENCE_NAME]_bgm.wav             ← Generated music
     ├── [SEQUENCE_NAME]_audio_beats.json    ← Beat timestamps
-    ├── [SEQUENCE_NAME]_Stringout_Cut.edl   ← Export EDL Stringout
-    └── [SEQUENCE_NAME]_FinalCut.xml        ← Export XML per NLE
+    ├── [SEQUENCE_NAME]_Stringout_Cut.edl   ← Exported Stringout EDL
+    └── [SEQUENCE_NAME]_FinalCut.xml        ← Exported XML for NLE
 ```
 
 ---
 
-## 5. 🖱️ Bottone "Generate Director's Cut" nella UI
+## 5. 🖱️ "Generate Director's Cut" Button in the UI
 
-Il bottone nella Pancake Dashboard **non rilancia la pipeline completa**. Invoca **esclusivamente la Fase D** (AI Director) in isolamento tramite una chiamata all'API FastAPI.
+The button in the Pancake Dashboard **does not restart the full pipeline**. It **only invokes Phase D** (AI Director) in isolation via a FastAPI API call.
 
-**Quando usarlo:** dopo aver impostato i vincoli HITL nella UI (marker IN/OUT/BM, override KEEP/TRASH/BROLL, target duration, style prompt) per rigenerare il `_final_edit.json` senza rielaborare il video.
+**When to use it:** after setting HITL constraints in the UI (IN/OUT/BM markers, KEEP/TRASH/BROLL overrides, target duration, style prompt) to regenerate the `_final_edit.json` without reprocessing the video.
 
-**Non usarlo se:** devi rielaborare il video da zero (es. hai cambiato i file sorgente). In quel caso serve `python main.py`.
+**Do not use it if:** you need to reprocess the video from scratch (e.g., source files have changed). In that case, use `python main.py`.
 
 ---
 
-## 6. 🐺 Cheat Sheet Comandi Rapidi
+## 6. 🐺 Quick Commands Cheat Sheet
 
 ```bash
-# Avvia tutto l'ambiente di sviluppo
+# Start the entire development environment
 npm run wolf:dev
 
-# Esegui la pipeline completa (da terminale separato, col venv attivo)
+# Run the complete pipeline (from a separate terminal with venv active)
 cd engine && source venv/bin/activate && python main.py
 
-# Valida TypeScript + ESLint (prima di ogni commit)
+# Validate TypeScript + ESLint (before every commit)
 npm run wolf:audit
 
-# Commit + Push (WOLF-FLOW completo)
-# → Usa il comando /wolf_flow
+# Commit + Push (Full WOLF-FLOW)
+# → Use the /wolf_flow command
 ```
 
 ---
 
-## 7. 📐 Schema JSON Clip (Riferimento Rapido)
+## 7. 📐 Clip JSON Schema (Quick Reference)
 
-Il `_stringout.json` prodotto dalla pipeline ha questa struttura per ogni clip:
+The `_stringout.json` produced by the pipeline has this structure for each clip:
 
 ```json
 {
@@ -188,12 +188,14 @@ Il `_stringout.json` prodotto dalla pipeline ha questa struttura per ogni clip:
     "scene_description": "Two people sitting on a swing...",
     "lighting_type": "NATURAL",
     "visual_quality_score": 8,
-    "technical_flaws": ""
+    "technical_flaws": "",
+    "shot_size": "MS"
   },
   "continuity": {
     "action_description": "Subject sits down on the swing",
     "emotion_arc": "Calm, relaxed",
-    "match_cut_potential": true
+    "match_cut_potential": true,
+    "match_cut_vector": "NONE"
   },
   "commercial": {
     "product_visibility": "LOW",

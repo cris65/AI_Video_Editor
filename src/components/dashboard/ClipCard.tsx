@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Users, Info, Activity, X } from 'lucide-react';
+import { Users, Info, Activity, X, MapPin, Tag } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
 interface ClipCardProps {
@@ -274,19 +274,63 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
               </div>
             )}
             {clip.semantic_analysis && (
-              <div className={`grid grid-cols-2 gap-2 border-b border-slate-800 pb-2 ${isRejected ? 'opacity-70' : ''}`}>
-                <div>
-                  <strong className="text-slate-300 block mb-0.5">Narrative Energy</strong>
-                  <span className="text-amber-400 font-bold font-mono">{clip.semantic_analysis.narrative_energy_score}/10</span>
+              <div className={`border-b border-slate-800 pb-2 ${isRejected ? 'opacity-70' : ''}`}>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <strong className="text-slate-300 block mb-0.5">Narrative Energy</strong>
+                    <span className="text-amber-400 font-bold font-mono">{clip.semantic_analysis.narrative_energy_score}/10</span>
+                  </div>
+                  <div>
+                    <strong className="text-slate-300 block mb-0.5">Emotional Tone</strong>
+                    <span className="text-blue-400 font-semibold">{clip.semantic_analysis.emotional_tone || 'N/A'}</span>
+                  </div>
                 </div>
-                <div>
-                  <strong className="text-slate-300 block mb-0.5">Emotional Tone</strong>
-                  <span className="text-blue-400 font-semibold">{clip.semantic_analysis.emotional_tone || 'N/A'}</span>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {clip.semantic_analysis.subject_count !== undefined && (
+                    <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                      Subjects: {clip.semantic_analysis.subject_count}
+                    </span>
+                  )}
+                  {clip.semantic_analysis.gaze_direction && clip.semantic_analysis.gaze_direction !== 'NONE' && (
+                    <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                      Gaze: {clip.semantic_analysis.gaze_direction}
+                    </span>
+                  )}
+                  {clip.semantic_analysis.subject_screen_position && clip.semantic_analysis.subject_screen_position !== 'NONE' && (
+                    <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                      Pos: {clip.semantic_analysis.subject_screen_position.replace('_', ' ')}
+                    </span>
+                  )}
                 </div>
+                
+                {/* Location and Props */}
+                {clip.semantic_analysis.setting_location && clip.semantic_analysis.setting_location !== 'ANALYSIS_FAILED' && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-300 bg-slate-900/50 px-2 py-0.5 rounded border border-slate-800/80 w-fit">
+                    <MapPin size={11} className="text-rose-400 shrink-0" />
+                    <span className="font-semibold text-slate-300">{clip.semantic_analysis.setting_location}</span>
+                  </div>
+                )}
+                {clip.semantic_analysis.key_props && clip.semantic_analysis.key_props.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+                    <Tag size={10} className="text-sky-400 shrink-0 mr-0.5" />
+                    {clip.semantic_analysis.key_props.map((prop, pidx) => (
+                      <span key={pidx} className="bg-sky-950/40 border border-sky-900/50 text-sky-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                        {prop}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <div className={isRejected ? 'opacity-70' : ''}>
-              <strong className="text-slate-300 block mb-1">Scene & Lighting</strong>
+              <strong className="text-slate-300 block mb-1">Cinematography & Scene</strong>
+              {clip.cinematography?.shot_size && (
+                <div className="mb-1.5">
+                  <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+                    Size: {clip.cinematography.shot_size}
+                  </span>
+                </div>
+              )}
               <p className="leading-relaxed">{clip.cinematography?.scene_description || 'N/A'}</p>
             </div>
             {clip.story?.director_note && clip.story.director_note !== 'ANALYSIS_FAILED' && (
@@ -297,6 +341,18 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
             )}
             <div className={isRejected ? 'opacity-70' : ''}>
               <strong className="text-slate-300 block mb-1">Action Continuity</strong>
+              {clip.continuity?.match_cut_potential && (
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    MATCH CUT
+                  </span>
+                  {clip.continuity.match_cut_vector && clip.continuity.match_cut_vector !== 'NONE' && (
+                    <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                      {clip.continuity.match_cut_vector}
+                    </span>
+                  )}
+                </div>
+              )}
               <p className="leading-relaxed">{clip.continuity?.action_description || 'N/A'}</p>
             </div>
           </div>

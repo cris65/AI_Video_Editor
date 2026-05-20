@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.33 - 2026-05-20
+**Version:** v0.1.34 - 2026-05-20
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -17,7 +17,7 @@
 
 ---
 
-## Schema JSON del Payload Clip (Struttura Annidato — v0.1.33)
+## Schema JSON del Payload Clip (Struttura Annidato — v0.1.34)
 
 Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi piatte legacy (`motion`, `people_count`, `cinematic_palette`, ecc.) sono state eliminate.
 
@@ -35,9 +35,9 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 **Fase 2 — Opzionale, iniettato da `mlx_client.py` dopo la Vision LLM pass:**
 ```json
 {
-  "cinematography": { "scene_description": "...", "lighting_type": "NATURAL", "visual_quality_score": 8, "technical_flaws": "" },
-  "semantic_analysis": { "subject_action": "...", "gaze_direction": "...", "emotional_tone": "...", "narrative_energy_score": 7 },
-  "continuity":     { "action_description": "...", "emotion_arc": "Calm", "match_cut_potential": true },
+  "cinematography": { "scene_description": "...", "lighting_type": "NATURAL", "visual_quality_score": 8, "technical_flaws": "", "shot_size": "MS" },
+  "semantic_analysis": { "subject_action": "...", "gaze_direction": "NONE", "emotional_tone": "...", "narrative_energy_score": 7, "subject_screen_position": "NONE", "subject_count": 1, "setting_location": "Outdoor Garden", "key_props": ["Wicker Swing"] },
+  "continuity":     { "action_description": "...", "emotion_arc": "Calm", "match_cut_potential": true, "match_cut_vector": "NONE" },
   "commercial":     { "product_visibility": "LOW", "brand_safe": true, "reaction_type": "JOY" },
   "story":          { "narrative_role": "ESTABLISHING", "recommended_position": "OPENING", "director_note": "..." }
 }
@@ -49,7 +49,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 
 1. **`edl_parser.py`** — Ingest EDL puro. Estrae la mappa temporale (Record IN / Source IN) e il Naming Base dalla root della clip (`* FROM CLIP NAME`).
 2. **`pancake_editor.py`** — Motore semantico di Fase A. Center-Weighted Laplacian, Dual Threshold Soft Focus, Action Peak tracking, Cinematic Palette K-Means, Optical Flow Farneback, Semantic Storyboard. Tutta la logica di finalizzazione è centralizzata nell'helper privato `_finalize_block()` per eliminare duplicazioni.
-3. **`mlx_client.py`** — Fase B. Gateway HTTP sincrono verso `127.0.0.1:8080/v1/chat/completions`. Inietta i 4 macro-oggetti annidati (`cinematography`, `continuity`, `commercial`, `story`) con fallback strutturato esplicito per ogni sotto-chiave in caso di risposta malformata. Salvataggio atomico post-clip.
+3. **`mlx_client.py`** — Fase B. Gateway nativo MLX locale per l'inferenza Vision LLM. Esegue l'analisi con temperatura hardcodata a 0.0 per la stabilità ed estrae i dettagli semantici estesi (setting_location, key_props). Inietta i 5 macro-oggetti annidati con fallback strutturato esplicito e salvataggio atomico progressivo.
 4. **`bgm_generator.py`** — Fase C. Genera la BGM (click track mock o MusicGen). Estrae keyword da `cinematography.scene_description` e `continuity.action_description` per costruire il prompt musicale.
 5. **`audio_analyzer.py`** — Fase C. Estrae i beat timestamps dalla BGM e li salva in `_audio_beats.json`.
 6. **`director.py`** — Fase D. AI Director ragionante. Riceve la lista clip con i dati semantici, interpella Gemma 4 per una `editing_recipe`, poi applica la recipe su una griglia matematica di beat. Gestisce il sistema Pillar/Filler e il Safety Net auto-fill. Output: `_final_edit.json` + `_gemma_recipe.json`.
@@ -87,7 +87,7 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 - **Sistema Multi-Anchor (BM/IN/OUT):** Vincoli multipli per clip via shortcut (`M`, `I`, `O`), rimovibili chirurgicamente via `X`. Visualizzati come lista interattiva nella ClipCard.
 - **Override Non-Distruttivi (KEEP/TRASH/BROLL):** Shortcut `K`, `T`, `B`. Stato visualizzato istantaneamente con glow e badge. Salvati su sidecar `_hitl_data.json`.
 - **Director Settings Panel & Orchestrazione:** Sidebar rapida che invia l'intero stato ibrido (Seed, Constraints, Overrides, Analysis FPS) all'endpoint FastAPI `/api/orchestrate`. Creative Settings Portal full-screen per prompt e parametri NLP.
-- **Interfaccia TypeScript `PancakeClip`:** Rispecchia fedelmente lo schema JSON annidato v0.1.26 con 7 sotto-interfacce typed (`technical_quality`, `spatial_configuration`, `yolo_omniscient_data`, `cinematography?`, `continuity?`, `commercial?`, `story?`). Zero chiavi piatte legacy.
+- **Interfaccia TypeScript `PancakeClip`:** Rispecchia fedelmente lo schema JSON annidato v0.1.34 con 7 sotto-interfacce typed (`technical_quality`, `spatial_configuration`, `yolo_omniscient_data`, `cinematography?`, `continuity?`, `commercial?`, `story?`). Zero chiavi piatte legacy.
 
 ---
 

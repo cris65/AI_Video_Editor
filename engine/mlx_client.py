@@ -12,15 +12,15 @@ except ImportError:
     MLX_VLM_AVAILABLE = False
 
 PROMPT_TEXT = (
-    "You are a Senior Video Editor, Director of Photography, and Commercial Creative Director. "
+    "You are a literal, objective, and highly observant continuity supervisor. You MUST NOT invent or hallucinate settings, lighting, or emotions. Describe exactly what is in the frame. Your observations must be literal, factual, and prop-aware. "
     "You are analyzing a single continuous video shot, displayed across {num_frames} sequential temporal frames. "
     "FUNDAMENTAL CONTINUITY RULE: These frames represent the chronological passage of time within a SINGLE scene. Subjects in earlier frames are the same ones continuing their action in later frames. "
     "Your task is to analyze how the scene and subjects move and evolve chronologically, providing a comprehensive assessment for editorial and commercial use. "
     "TECHNICAL CONTEXT: The computer vision system has already detected {people_count} person(s) in this scene. Use this data to inform your analysis. "
     "Respond EXCLUSIVELY with a valid JSON code block containing the following 5 nested objects and no other keys:\n"
-    "  'cinematography': {{ 'scene_description': str, 'lighting_type': str (e.g. NATURAL, STUDIO, MIXED, BACKLIT), 'visual_quality_score': int (1-10), 'technical_flaws': str (empty if none) }}\n"
-    "  'semantic_analysis': {{ 'subject_action': str, 'gaze_direction': str, 'emotional_tone': str, 'narrative_energy_score': int (1-10) }}\n"
-    "  'continuity': {{ 'action_description': str, 'emotion_arc': str, 'match_cut_potential': bool }}\n"
+    "  'cinematography': {{ 'scene_description': str, 'lighting_type': str (e.g. NATURAL, STUDIO, MIXED, BACKLIT), 'visual_quality_score': int (1-10), 'technical_flaws': str (empty if none), 'shot_size': str (must be exactly one of: ECU, CU, MCU, MS, FS, WS, INSERT) }}\n"
+    "  'semantic_analysis': {{ 'subject_action': str, 'gaze_direction': str (must be exactly one of: LEFT, RIGHT, CENTER, DOWN, UP, NONE), 'emotional_tone': str, 'narrative_energy_score': int (1-10), 'subject_screen_position': str (must be exactly one of: LEFT_THIRD, CENTER, RIGHT_THIRD, NONE), 'subject_count': int, 'setting_location': str (2-3 words concise physical space description, e.g. 'Outdoor Garden', 'City Street'), 'key_props': list[str] (1 to 3 interactive objects present in the scene, e.g. ['Wicker Swing']) }}\n"
+    "  'continuity': {{ 'action_description': str, 'emotion_arc': str, 'match_cut_potential': bool, 'match_cut_vector': str (must be exactly one of: PAN_LEFT, PAN_RIGHT, TILT_UP, TILT_DOWN, PUSH_IN, PULL_OUT, STATIC, NONE) }}\n"
     "  'commercial': {{ 'product_visibility': str (HIGH/MEDIUM/LOW/NONE), 'brand_safe': bool, 'reaction_type': str (e.g. JOY, SURPRISE, NEUTRAL, FOCUSED) }}\n"
     "  'story': {{ 'narrative_role': str (e.g. ESTABLISHING, ACTION, REACTION, TRANSITION, FINALE), 'recommended_position': str (OPENING/MIDDLE/CLOSING), 'director_note': str }}\n"
     "  'is_usable': bool"
@@ -88,7 +88,7 @@ def analyze_frame(model, processor, image_paths, people_count=0):
             prompt=prompt,
             image=image_paths,
             max_tokens=512,
-            temperature=0.2,
+            temperature=0.0,
             verbose=False
         )
         
@@ -148,6 +148,7 @@ def process_stringout_batch(json_path, progress_callback=None):
         if (
             existing_semantic
             and existing_semantic.get("subject_action", "ANALYSIS_FAILED") != "ANALYSIS_FAILED"
+            and "setting_location" in existing_semantic
         ):
             print(f"   ► [{idx+1}/{len(timeline)}]: {os.path.basename(storyboard_paths[0])} (+{len(storyboard_paths)-1} frames) — ⏭️  SKIP (già analizzata)")
             success_count += 1
@@ -179,22 +180,69 @@ def process_stringout_batch(json_path, progress_callback=None):
             comm = semantic_data.get("commercial") or {}
             stor = semantic_data.get("story") or {}
 
+            # Helpers for parsing and validation
+            def get_validated_enum(val, allowed, default):
+                if not val:
+                    return default
+                s_val = str(val).strip().upper()
+                return s_val if s_val in allowed else default
+
+            shot_size = get_validated_enum(
+                cine.get("shot_size"), 
+                {"ECU", "CU", "MCU", "MS", "FS", "WS", "INSERT"}, 
+                "MS"
+            )
+            gaze = get_validated_enum(
+                sema.get("gaze_direction"), 
+                {"LEFT", "RIGHT", "CENTER", "DOWN", "UP", "NONE"}, 
+                "NONE"
+            )
+            screen_pos = get_validated_enum(
+                sema.get("subject_screen_position"), 
+                {"LEFT_THIRD", "CENTER", "RIGHT_THIRD", "NONE"}, 
+                "NONE"
+            )
+            match_vector = get_validated_enum(
+                cont.get("match_cut_vector"), 
+                {"PAN_LEFT", "PAN_RIGHT", "TILT_UP", "TILT_DOWN", "PUSH_IN", "PULL_OUT", "STATIC", "NONE"}, 
+                "NONE"
+            )
+
+            try:
+                sub_count = int(sema.get("subject_count", 0))
+            except (ValueError, TypeError):
+                sub_count = 0
+
+            # Extracted setting_location and key_props
+            setting_loc = str(sema.get("setting_location") or "ANALYSIS_FAILED").strip()
+            raw_props = sema.get("key_props")
+            if isinstance(raw_props, list):
+                props = [str(p).strip() for p in raw_props if p][:3]
+            else:
+                props = []
+
             clip["cinematography"] = {
                 "scene_description":   cine.get("scene_description", "ANALYSIS_FAILED"),
                 "lighting_type":       cine.get("lighting_type", "ANALYSIS_FAILED"),
                 "visual_quality_score": parse_quality_score(cine.get("visual_quality_score", 0)),
-                "technical_flaws":     cine.get("technical_flaws", "")
+                "technical_flaws":     cine.get("technical_flaws", ""),
+                "shot_size":           shot_size
             }
             clip["semantic_analysis"] = {
                 "subject_action":         sema.get("subject_action", "ANALYSIS_FAILED"),
-                "gaze_direction":         sema.get("gaze_direction", "ANALYSIS_FAILED"),
+                "gaze_direction":         gaze,
                 "emotional_tone":         sema.get("emotional_tone", "ANALYSIS_FAILED"),
-                "narrative_energy_score": parse_quality_score(sema.get("narrative_energy_score", 1))
+                "narrative_energy_score": parse_quality_score(sema.get("narrative_energy_score", 1)),
+                "subject_screen_position": screen_pos,
+                "subject_count":           sub_count,
+                "setting_location":        setting_loc,
+                "key_props":               props
             }
             clip["continuity"] = {
                 "action_description":  cont.get("action_description", "ANALYSIS_FAILED"),
                 "emotion_arc":         cont.get("emotion_arc", "ANALYSIS_FAILED"),
-                "match_cut_potential": cont.get("match_cut_potential", False)
+                "match_cut_potential": cont.get("match_cut_potential", False),
+                "match_cut_vector":    match_vector
             }
             clip["commercial"] = {
                 "product_visibility": comm.get("product_visibility", "ANALYSIS_FAILED"),
@@ -215,18 +263,24 @@ def process_stringout_batch(json_path, progress_callback=None):
                 "scene_description":    "ANALYSIS_FAILED",
                 "lighting_type":        "ANALYSIS_FAILED",
                 "visual_quality_score": 0,
-                "technical_flaws":      "ANALYSIS_FAILED"
+                "technical_flaws":      "ANALYSIS_FAILED",
+                "shot_size":            "MS"
             }
             clip["semantic_analysis"] = {
                 "subject_action":         "ANALYSIS_FAILED",
-                "gaze_direction":         "ANALYSIS_FAILED",
+                "gaze_direction":         "NONE",
                 "emotional_tone":         "ANALYSIS_FAILED",
-                "narrative_energy_score": 1
+                "narrative_energy_score": 1,
+                "subject_screen_position": "NONE",
+                "subject_count":           0,
+                "setting_location":        "ANALYSIS_FAILED",
+                "key_props":               []
             }
             clip["continuity"] = {
                 "action_description":  "ANALYSIS_FAILED",
                 "emotion_arc":         "ANALYSIS_FAILED",
-                "match_cut_potential": False
+                "match_cut_potential": False,
+                "match_cut_vector":    "NONE"
             }
             clip["commercial"] = {
                 "product_visibility": "ANALYSIS_FAILED",

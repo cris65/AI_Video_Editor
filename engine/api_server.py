@@ -239,6 +239,7 @@ def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_m
     from datetime import datetime
     import performance_tracker
     
+    session_start_dt = datetime.now()
     start_t = time.time()
     try:
         import os
@@ -286,13 +287,16 @@ def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_m
         mlx_duration = time.time() - mlx_start
         print(f"✅ Phase B MLX task completed for {sequence_name} in {mlx_duration:.2f}s")
         
+        session_end_dt = datetime.now()
         # Save performance metrics to local JSON history for self-correction
         performance_tracker.record_run(
             vlm_model_id=vlm_model_id,
+            session_start_time=session_start_dt.isoformat(),
+            session_end_time=session_end_dt.isoformat(),
             total_frames=total_frames,
             extracted_frames=extracted_frames,
-            cv_duration=cv_duration,
-            mlx_duration=mlx_duration
+            cv_duration_sec=cv_duration,
+            mlx_duration_sec=mlx_duration
         )
         
         # Archiving source files to target output folder
@@ -344,6 +348,20 @@ async def get_duration_estimate(total_frames: int, density: float, vlm_model_id:
     extracted_frames = max(1, int(total_frames * density))
     est = performance_tracker.estimate_duration(vlm_model_id, total_frames, extracted_frames)
     return {"estimated_seconds": est}
+
+@app.get("/api/performance/history")
+async def get_performance_history():
+    import performance_tracker
+    import os, json
+    if os.path.exists(performance_tracker.HISTORY_FILE):
+        try:
+            with open(performance_tracker.HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+                return history
+        except Exception as e:
+            return {"error": f"Failed to read history: {e}"}
+    return []
+
 
 
 @app.get("/api/videos/list")

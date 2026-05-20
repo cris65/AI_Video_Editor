@@ -9,3 +9,4 @@ supabase/.branches
 WOLF_EXPORTS/
 engine/.env
 engine/output/
+system_logs/

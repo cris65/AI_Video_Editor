@@ -1,20 +1,20 @@
 # 📘 VISION
 
 > [!NOTE]
-> AG: Progetto Local-First per AI Video Editing incentrato su automazione offline e alta professionalità (zero cloud dependencies).
+> AG: Local-First project for AI Video Editing focused on offline automation and high professional standards (zero cloud dependencies).
 
-## Il Modello "Symmetrical EDL Workflow"
+## The "Symmetrical EDL Workflow" Model
 
-L'architettura del sistema si fonda su un flusso simmetrico basato unicamente sullo standard industriale **EDL CMX3600**, garantendo una comunicazione nativa ed esatta con Adobe Premiere Pro (o qualsiasi NLE affine). 
+The system architecture is based on a symmetrical workflow based solely on the industry standard **EDL CMX3600**, ensuring native and exact communication with Adobe Premiere Pro (or any similar NLE). 
 
-Il ciclo vitale del progetto prevede:
-1. **Ingestione Simmetrica:** Il motore importa la mappa temporale della sequenza esportata da Premiere tramite file `.edl`.
-2. **AI Processing:** Attraverso modelli avanzati YOLOv8n e algoritmi OpenCV, il sistema scansiona il proxy offline, classificando dinamicamente il girato in una *Main Track* (solista) e una *B-Roll Track* (dettagli e coperture), con filtri adattivi di "Dynamic Backtrack" per tolleranza mosso/sfocato.
-3. **Esportazione Simmetrica:** L'AI rigenera la timeline delle decisioni confezionando un nuovo file `.edl` in uscita, che re-injetterà nella NLE la sequenza pre-montata ricollegandola automaticamente e chirurgicamente ai file RAW originali ad altissima risoluzione (tramite i commenti CMX3600 nativi).
+The lifecycle of the project involves:
+1. **Symmetrical Ingest:** The engine imports the temporal map of the sequence exported from Premiere via `.edl` files.
+2. **AI Processing:** Through advanced YOLOv8n models and OpenCV algorithms, the system scans the offline proxy, dynamically classifying the footage into a *Main Track* (solos) and a *B-Roll Track* (details and coverage), with adaptive "Dynamic Backtrack" filters for motion/blur tolerance.
+3. **Symmetrical Export:** The AI regenerates the decision timeline, packaging a new outgoing `.edl` file, which will reinject the pre-edited sequence back into the NLE, automatically and surgically reconnecting it to the original high-resolution RAW files (via native CMX3600 comments).
 
-Questo ecosistema consente al montatore umano di abbattere i tempi di pre-selezione, mantenendo una gestione dei dati strettamente locale, sicura, e pienamente in sintonia con i workflow televisivi e cinematografici broadcast-grade a 50fps.
+This ecosystem allows human editors to drastically reduce pre-selection time while keeping data management strictly local, secure, and fully aligned with broadcast-grade 50fps television and cinema workflows.
 
-## L'Endgame: Adobe Premiere CEP Plugin
+## The Endgame: Adobe Premiere CEP Plugin
 
-L'obiettivo finale del progetto non è una web-app standalone, ma la trasformazione dell'intero frontend React in un'estensione nativa (CEP Panel) eseguita direttamente all'interno di Adobe Premiere Pro.
-L'interazione con l'utente e il sistema avverrà importando ed esportando silenziosamente i file EDL, sfruttando l'ambiente Node.js integrato nei pannelli CEP per pilotare direttamente in locale il Python Engine, rendendo il flusso di lavoro completamente trasparente e integrato per il montatore.
+The ultimate goal of the project is not a standalone web app, but the transformation of the entire React frontend into a native extension (CEP Panel) running directly inside Adobe Premiere Pro.
+User interaction and system integration will happen by silently importing and exporting EDL files, leveraging the integrated Node.js environment in CEP panels to drive the local Python Engine directly, making the workflow completely transparent and integrated for the editor.

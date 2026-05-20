@@ -1,96 +1,87 @@
-# 🗺️ STRUCTURE (Architettura delle Directory)
+# 🗺️ STRUCTURE (Directory Architecture)
 
-**Version:** v0.1.33 - 2026-05-20
+**Version:** v0.1.34 - 2026-05-20
 
 > [!NOTE]
-> Questo documento mappa la topologia ufficiale del repository per l'AI Video
-> Editor. Consulta questo file prima di assumere path relativi o assoluti, con
-> particolare attenzione alla cartella output dell'engine.
+> This document maps the official repository topology for the AI Video Editor. Refer to this file before assuming relative or absolute paths, with particular attention to the engine's output folder.
 
 ---
 
-## Il Modello Concettuale a 3 Dimensioni
+## The 3-Dimensional Conceptual Model
 
-Il sistema è definito da tre dimensioni ortogonali e complementari:
+The system is defined by three orthogonal and complementary dimensions:
 
-- **STRUTTURA** (questo file) → *Come* i dati sono organizzati: il JSON annidato, l'albero delle directory, i moduli Python. Lo scheletro statico.
-- **PIPELINE** (vedi `PIPELINE.md`) → *Quando* i dati si muovono: la sequenza temporale Fase A→E. Il nastro trasportatore.
-- **FEATURE** (vedi `FEATURES.md`) → *Cosa* vede l'utente: i bottoni UI, i pannelli, gli shortcut. Il volante dell'auto.
+- **STRUCTURE** (this file) → *How* data is organized: the nested JSON, directory tree, Python modules. The static skeleton.
+- **PIPELINE** (see `PIPELINE.md`) → *When* data moves: the Phase A→E temporal sequence. The conveyor belt.
+- **FEATURE** (see `FEATURES.md`) → *What* the user sees: UI buttons, panels, shortcuts. The car's steering wheel.
 
 ---
 
 ## 📁 ROOT Directory (`/`)
 
-La radice del progetto funge da **Frontend Command Center**. Contiene
-l'applicazione React (Vite) e i file di configurazione principali:
+The root of the project serves as the **Frontend Command Center**. It contains the React (Vite) application and the main configuration files:
 
-- `src/`: Codice sorgente React/TypeScript, componenti UI per il sistema HITL (Human-In-The-Loop).
-- `package.json` / `vite.config.ts`: Configurazione Frontend e comandi Node (`npm run`).
-- `tailwind.config.js`: Design System e configurazione CSS.
-- `.gemini/`: Knowledge Base del Wolf Stack (vedere sezione dedicata).
+- `src/`: React/TypeScript source code, UI components for the HITL (Human-In-The-Loop) system.
+- `system_logs/`: Directory for storing local performance telemetry logs (`performance_history.json`).
+- `package.json` / `vite.config.ts`: Frontend configuration and Node commands (`npm run`).
+- `tailwind.config.js`: Design System and CSS configuration.
+- `.gemini/`: Knowledge Base of the Wolf Stack (see dedicated section).
 
 ---
 
 ## 📁 ENGINE Directory (`/engine`)
 
-Il cuore dell'elaborazione AI (Python). Questo ambiente isolato è strettamente
-Offline-First. Non interagisce direttamente con il frontend via codice, ma
-tramite payload generati su file system.
+The heart of the AI processing (Python). This isolated environment is strictly Offline-First. It does not interact directly with the frontend via code, but via payloads generated on the file system.
 
-- `venv/`: Virtual Environment Python (Py 3.13).
-- `input/`: Drop-Zone per i file video grezzi (`.mp4`, `.mov`, `.mxf`, `.avi`) e gli EDL di partenza.
-- `archive/`: Storage di quarantena/pulizia post-elaborazione.
-- `output/`: Destinazione degli artefatti elaborati. Struttura interna rigorosa:
-  - `output/{sequence_name}/`: Cartella radice per la singola timeline.
-  - `output/{sequence_name}/storyboards/`: I frame `.jpg` estratti a 3 (IN / BEST / OUT) e uniti orizzontalmente.
-  - `output/{sequence_name}/LLM_Export_Package/`: Il "caveau" dei dati. Contiene il Passaporto Semantico (`_stringout.json`), letto e arricchito atomicamente dalle Fasi A e B, più tutti i file prodotti dalle Fasi C, D, E.
+- `venv/`: Python Virtual Environment (Py 3.13).
+- `input/`: Drop-Zone for raw video files (`.mp4`, `.mov`, `.mxf`, `.avi`) and source EDLs.
+- `archive/`: Quarantine/clean storage for post-processing files.
+- `output/`: Destination for processed artifacts. Strict internal structure:
+  - `output/{sequence_name}/`: Root directory for the individual timeline.
+  - `output/{sequence_name}/storyboards/`: Extracted `.jpg` frames (IN / BEST / OUT) combined horizontally.
+  - `output/{sequence_name}/LLM_Export_Package/`: The data "vault". Contains the Semantic Passport (`_stringout.json`), read and enriched atomically by Phases A and B, plus all files produced by Phases C, D, and E.
 
-### Moduli Python (Engine)
+### Python Modules (Engine)
 
-| File | Fase | Ruolo |
+| File | Phase | Role |
 |---|---|---|
-| `main.py` | Orchestratore | Entry point CLI. Esegue le Fasi A→E in sequenza. |
-| `edl_parser.py` | Fase A | Ingest protocollo CMX3600. Estrae `sequence_name` e `clip_map`. |
-| `pancake_editor.py` | Fase A | Motore semantico OpenCV + YOLOv8. Produce il `_stringout.json` con schema annidato. |
-| `mlx_client.py` | Fase B | Gateway HTTP sincrono verso MLX Server (:8080). Arricchisce il JSON con i 4 macro-oggetti LLM. |
-| `bgm_generator.py` | Fase C | Genera la colonna sonora (mock click track o MusicGen reale). |
-| `audio_analyzer.py` | Fase C | Estrae i beat timestamps dal file audio. |
-| `director.py` | Fase D | AI Director. Risolve i vincoli HITL e produce il `_final_edit.json`. |
-| `edl_exporter.py` | Fase E | Export del Stringout grezzo in formato CMX3600 EDL. |
-| `xml_exporter.py` | Fase E | Export del Director's Cut in formato FCP7 XML per Premiere/FCPX. |
-| `api_server.py` | Runtime | FastAPI server (:8000). Espone `/api/system/profiler` per il Hardware Profiler UI. |
+| `main.py` | Orchestrator | CLI entry point. Executes Phases A→E in sequence. |
+| `edl_parser.py` | Phase A | Ingests CMX3600 protocol. Extracts `sequence_name` and `clip_map`. |
+| `pancake_editor.py` | Phase A | OpenCV + YOLOv8 semantic engine. Produces the `_stringout.json` with a nested schema. |
+| `mlx_client.py` | Phase B | Synchronous HTTP gateway to the MLX Server (:8080). Enriches the JSON with the 4 LLM macro-objects. |
+| `bgm_generator.py` | Phase C | Generates the background music (mock click track or real MusicGen). |
+| `audio_analyzer.py` | Phase C | Extracts beat timestamps from the audio file. |
+| `director.py` | Phase D | AI Director. Resolves HITL constraints and produces `_final_edit.json`. |
+| `edl_exporter.py` | Phase E | Exports raw stringout in CMX3600 EDL format. |
+| `xml_exporter.py` | Phase E | Exports Director's Cut in FCP7 XML format for Premiere/FCPX. |
+| `api_server.py` | Runtime | FastAPI server (:8000). Exposes `/api/system/profiler` for the Hardware Profiler UI. |
 
 ---
 
 ## 📁 SUPABASE Directory (`/supabase`)
 
-Contiene le migrazioni SQL e la configurazione dell'infrastruttura di database.
+Contains SQL migrations and database infrastructure configuration.
 
-> **📌 Stato attuale: DORMIENTE.** L'infrastruttura Supabase è presente nel
-> repository ma non è attiva nella pipeline corrente. È mantenuta per la futura
-> integrazione del layer dati (autenticazione utenti, profili, gestione progetti).
-> Quando quella fase sarà attiva, `npm run dev:all` diventerà il comando di boot
-> per l'intero stack compreso il layer dati.
+> **📌 Current Status: DORMANT.** The Supabase infrastructure is present in the repository but is not active in the current pipeline. It is maintained for future data layer integration (user auth, profiles, project management). When that phase is active, `npm run dev:all` will become the boot command for the entire stack, including the data layer.
 
-- `migrations/`: Script SQL atomici incrementali.
-- `seed.sql`: Dati di base per la simulazione e testing locale.
+- `migrations/`: Atomic incremental SQL scripts.
+- `seed.sql`: Baseline data for simulation and local testing.
 
 ---
 
-## 📁 .GEMINI Directory (`/.gemini` e `.agents`)
+## 📁 .GEMINI Directory (`/.gemini` and `.agents`)
 
-Il cervello del WOLF STACK. Contiene la Knowledge Base, i file di
-configurazione dell'agente e i workflow in `.agents/workflows/`.
+The brain of the WOLF STACK. Contains the Knowledge Base, agent configurations, and workflows under `.agents/workflows/`.
 
-| File | Scopo |
+| File | Purpose |
 |---|---|
-| `PIPELINE.md` | Flusso operativo completo: avvio server, fasi A→E, struttura output, cheat sheet. |
-| `FEATURES.md` | Specifiche funzionali: capacità engine e UI HITL. |
-| `STRUCTURE.md` | Questo file. Topologia del repository. |
-| `SOTA.md` | State of the Art: architettura tecnica implementata. |
-| `SCHEMA.md` | Interfacce TypeScript e struttura JSON dei payload. |
-| `WOLF_PROTOCOL.md` | Lifecycle di sviluppo e regole operative del Wolf Stack. |
-| `TESTING.md` | Dottrina di testing ibrida locale. |
-| `VISION.md` | Visione prodotto e obiettivi a lungo termine. |
-| `EVOLUTION.md` | Roadmap e fasi di sviluppo. |
-| `plans/` | Documenti di pianificazione e audit generati da AG. |
+| `PIPELINE.md` | Complete operational flow: server launch, phases A→E, output structure, cheat sheet. |
+| `FEATURES.md` | Functional specifications: engine capabilities and HITL UI. |
+| `STRUCTURE.md` | This file. Repository topology. |
+| `SOTA.md` | State of the Art: technical architecture implemented. |
+| `SCHEMA.md` | TypeScript interfaces and JSON schema of payloads. |
+| `WOLF_PROTOCOL.md` | Development lifecycle and operational rules of the Wolf Stack. |
+| `TESTING.md` | Hybrid local testing doctrine. |
+| `VISION.md` | Product vision and long-term goals. |
+| `EVOLUTION.md` | Roadmap and development phases. |
+| `plans/` | Planning and audit documents generated by AG. |

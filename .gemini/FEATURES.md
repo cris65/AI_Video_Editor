@@ -1,64 +1,62 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.33 - 2026-05-20
+**Version:** v0.1.34 - 2026-05-20
 
 > [!NOTE]
-> Questo documento descrive le **Feature** — ovvero il valore funzionale esposto all'utente finale,
-> sia come capacità dell'engine che come interfaccia UI. Non descrive come i dati sono strutturati
-> (→ `STRUCTURE.md`) né il flusso temporale di esecuzione (→ `PIPELINE.md`).
+> This document describes the **Features** — i.e., the functional value exposed to the end user, both as engine capabilities and UI interfaces. It does not describe how the data is structured (→ `STRUCTURE.md`) nor the temporal execution flow (→ `PIPELINE.md`).
 
 ## Core Capabilities (Stringout AI Engine)
 
-### 1. Taglio a Singolo Binario (Stringout Workflow)
-Il sistema estrapola un'unica timeline ottimizzata per massimizzare la velocità di post-produzione offline:
-- **Stringout Track:** Raccoglie tutti i frammenti utilizzabili del girato, classificandoli semanticamente (MAIN_A, B-ROLL, EDGE_DANGER).
-- **Trash Reel:** Binario parallelo invisibile all'EDL finale ma renderizzato in `.mp4` (preview_TRASH) per il Quality Control visivo di ciò che l'algoritmo ha scartato.
+### 1. Single Track Cut (Stringout Workflow)
+The system extrapolates a single optimized timeline to maximize offline post-production speed:
+- **Stringout Track:** Gathers all usable fragments of the footage, classifying them semantically (MAIN_A, B-ROLL, EDGE_DANGER).
+- **Trash Reel:** A parallel timeline invisible to the final EDL but rendered in `.mp4` (preview_TRASH) for visual Quality Control of what the algorithm discarded.
 
-### 2. Filtri Fisici e Saliency (Action Peak)
-- **Center-Weighted Focus:** Il filtro Laplaciano calcola la cecità (blur) esclusivamente sul 50% centrale dell'inquadratura, tollerando lenti luminose e forti effetti bokeh ai lati.
-- **Dual Threshold Soft Focus:** Seleziona rigorosamente i frame: `TRASH_BLUR` sotto `10.0`, mentre la "zona grigia" (10-25) viene ammessa nella timeline ma taggata con il suffisso `_SOFT` (es. `MAIN_A_SOFT`).
-- **MOTION_THRESHOLD:** Scarta movimenti di camera estremi o sballottamenti (soglia `40.0`).
-- **Action Peak (Best Moment):** Tracciamento in tempo reale del picco di nitidezza. L'engine memorizza la chiave temporanea `_max_lap` e certifica all'interno della metadata clip il `best_moment`, ovvero il millisecondo esatto del fotogramma perfetto per gli LLM successivi.
-- **Boundary Crossing Split:** Tagli proxy che scavallano il bordo della clip originale vengono spezzati dinamicamente durante l'export EDL per prevenire errori "Media Offline" o pattern zebrati su Adobe Premiere.
-- **DNA Cromatico (Cinematic Palette):** Tramite K-Means Clustering su OpenCV, l'algoritmo estrae al volo i 5 colori HEX dominanti di ogni clip. Il campionamento fonde 3 matrici (IN, OUT, e BEST) per una color-continuity perfetta senza pesare sulle performance CPU e RAM (Zero-Seeking).
-- **Optical Flow (Motion Scoring):** Calcolo vettoriale `Farneback` ultraleggero a 160x90 per ogni blocco. Restituisce `motion_intensity` (float) e `camera_direction` (PAN_LEFT, PAN_RIGHT, TILT_UP, TILT_DOWN, STATIC) nel macro-oggetto annidato `technical_quality` dello `stringout.json`.
-- **Semantic Storyboard & Smart Naming:** Estrazione al volo di tre frame (IN, BEST, OUT) a 480x270, uniti orizzontalmente. I frame estratti non sono più anonimi, ma intercettano dalla mappa EDL il VERO nome nativo (`C4369`) e il Timecode sicuro calcolato dal motore, generando `{clip_name}_{tc_safe}.jpg`.
+### 2. Physical Filters and Saliency (Action Peak)
+- **Center-Weighted Focus:** The Laplacian filter calculates blur exclusively on the central 50% of the frame, tolerating fast lenses and strong bokeh effects at the sides.
+- **Dual Threshold Soft Focus:** Strictly selects frames: `TRASH_BLUR` below `10.0`, while the "gray zone" (10-25) is allowed in the timeline but tagged with the `_SOFT` suffix (e.g., `MAIN_A_SOFT`).
+- **MOTION_THRESHOLD:** Discards extreme camera movements or shaking (threshold `40.0`).
+- **Action Peak (Best Moment):** Real-time tracking of sharpness peaks. The engine stores the temporary key `_max_lap` and certifies the `best_moment` (the exact millisecond of the perfect frame) in the clip metadata for subsequent LLMs.
+- **Boundary Crossing Split:** Proxy cuts that cross the boundary of the original clip are dynamically split during EDL export to prevent "Media Offline" errors or zebra patterns in Adobe Premiere.
+- **Chromatic DNA (Cinematic Palette):** Using K-Means Clustering via OpenCV, the algorithm extracts the 5 dominant HEX colors of each clip on the fly. Sampling merges 3 matrices (IN, OUT, and BEST) for perfect color continuity without weighing on CPU and RAM performance (Zero-Seeking).
+- **Optical Flow (Motion Scoring):** Ultra-lightweight `Farneback` vector calculation at 160x90 for each block. Returns `motion_intensity` (float) and `camera_direction` (PAN_LEFT, PAN_RIGHT, TILT_UP, TILT_DOWN, STATIC) in the nested `technical_quality` macro-object of `stringout.json`.
+- **Semantic Storyboard & Smart Naming:** On-the-fly extraction of three frames (IN, BEST, OUT) at 480x270, merged horizontally. The extracted frames are no longer anonymous but intercept the REAL native name (`C4369`) from the EDL map and the safe timecode calculated by the engine, generating `{clip_name}_{tc_safe}.jpg`.
 
-### 3. FASE B - Vision LLM Inference (MLX Server)
-L'Engine non è più "cieco". Integrando l'ecosistema MLX locale via standard OpenAI-compatible (`http://127.0.0.1:8080/v1/chat/completions`), il sistema analizza la timeline di Stringout:
-- Convertendo al volo lo Semantic Storyboard in `base64` e inviando il contesto tecnico YOLO (numero soggetti rilevati in scena).
-- Iniettando un Context Prompt specifico sulla Continuità Cronologica e sull'analisi commerciale.
-- Ricevendo da Gemma 4 un payload JSON strutturato in **5 macro-oggetti annidati** che arricchisce ogni clip:
-  - `cinematography` → `scene_description`, `lighting_type`, `visual_quality_score`, `technical_flaws`
-  - `semantic_analysis` → `subject_action`, `gaze_direction`, `emotional_tone`, `narrative_energy_score`
-  - `continuity` → `action_description`, `emotion_arc`, `match_cut_potential`
+### 3. PHASE B - Vision LLM Inference (MLX Server)
+The Engine is no longer "blind". Integrating the local MLX ecosystem via an OpenAI-compatible standard (`http://127.0.0.1:8080/v1/chat/completions`), the system analyzes the Stringout timeline:
+- Converting the Semantic Storyboard to `base64` on the fly and sending the technical YOLO context (number of subjects detected in the scene).
+- Injecting a specific Context Prompt on Chronological Continuity and commercial analysis.
+- Receiving a structured JSON payload from Gemma 4 nested in **5 macro-objects** that enriches each clip:
+  - `cinematography` → `scene_description`, `lighting_type`, `visual_quality_score`, `technical_flaws`, `shot_size`
+  - `semantic_analysis` → `subject_action`, `gaze_direction`, `emotional_tone`, `narrative_energy_score`, `subject_screen_position`, `subject_count`, `setting_location`, `key_props`
+  - `continuity` → `action_description`, `emotion_arc`, `match_cut_potential`, `match_cut_vector`
   - `commercial` → `product_visibility`, `brand_safe`, `reaction_type`
   - `story` → `narrative_role`, `recommended_position`, `director_note`
-- Salvando il risultato validato nel dict JSON tramite una logica tollerante e autonoma (retry x3, regex cleaning, fallback strutturato esplicito per ogni sotto-chiave, salvataggio JSON progressivo atomico post-clip).
-- Bypass morfologico (Skip Morbido) per l'ingest automatico se il server MLX non è avviato.
-- **Integrazione Nativa Apple Silicon**: L'ambiente Python (`engine/requirements.txt`) è equipaggiato nativamente con i framework `mlx` e `mlx-lm` per l'inferenza LLM diretta sulla Unified Memory, senza dipendere da server esterni.
+- Saving the validated result in the JSON dict through tolerant and autonomous logic (retry x3, regex cleaning, explicit structured fallback for each sub-key, progressive atomic JSON saving post-clip).
+- Morphological bypass (Soft Skip) for automatic ingest if the MLX server is not started.
+- **Native Apple Silicon Integration**: The Python environment (`engine/requirements.txt`) is natively equipped with the `mlx` and `mlx-lm` frameworks for direct LLM inference on Unified Memory, without depending on external servers.
 
-### 4. Automazione Drop-Zone Flessibile
-- **Ingest Agnostico:** Supporto esteso a `.mp4`, `.mov`, `.mxf`, `.avi`, `.mkv`.
-- **Auto-Cleanup:** Una volta emesso il file EDL (`_Stringout_Cut.edl`), i file originali nella drop zone vengono puliti e spostati direttamente nella cartella di output della rispettiva sequenza per evitare strascichi.
-- **Esportazione Diretta:** Eliminato il gate manuale [Y/N]; il motore macina proxy, calcola scarti e genera CMX3600 in autonomia totale a 50fps.
+### 4. Flexible Drop-Zone Automation
+- **Agnostic Ingest:** Extended support for `.mp4`, `.mov`, `.mxf`, `.avi`, `.mkv`.
+- **Auto-Cleanup:** Once the EDL file is issued (`_Stringout_Cut.edl`), original files in the drop zone are cleaned up and moved directly to the output folder of their respective sequence to avoid residue.
+- **Direct Export:** Removed manual gate [Y/N]; the engine processes proxies, calculates discards, and generates CMX3600 in total autonomy at 50fps.
 
-### 5. FASE D - AI Director (Risoluzione Vincoli HITL)
-Il Director è il modulo che chiude il loop tra l'analisi AI e le decisioni umane:
-- **LLM Editing Recipe:** Gemma 4 riceve la lista dei clip usabili (con Score, Scene, Action Strategy) e produce una `editing_recipe` JSON che definisce l'ordine narrativo e i beat musicali assegnati a ogni clip.
-- **Beat-Sync Math:** La recipe LLM viene applicata su una griglia matematica di beat timestamps (`_audio_beats.json`). Ogni clip viene troncata/estesa in modo da essere perfettamente sincronizzata con il ritmo musicale.
-- **Pillar & Filler System:** Le clip con marker BM (Best Moment) impostati dall'utente diventano PILLAR ancorati sul beat più vicino. Le clip senza vincoli diventano FILLER, ordinati per `visual_quality_score` come criterio di spareggio.
-- **Safety Net Auto-Fill:** Se la recipe LLM è troppo corta rispetto alla target duration, il Director attiva autonomamente un fallback euristico a 4-beat per riempire i gap rimanenti.
-- **Export Dual-Track:** Produce `_final_edit.json` (timeline interna) + `_FinalCut.xml` (FCP7 XML pronto per Premiere/FCPX) + `_gemma_recipe.json` (reasoning del Director per debug e trasparenza).
+### 5. PHASE D - AI Director (HITL Constraint Resolution)
+The Director is the module that closes the loop between AI analysis and human decisions:
+- **LLM Editing Recipe:** Gemma 4 receives the list of usable clips (with Scores, Scene, Action Strategy) and produces a JSON `editing_recipe` defining the narrative order and musical beats assigned to each clip.
+- **Beat-Sync Math:** The LLM recipe is applied to a mathematical grid of beat timestamps (`_audio_beats.json`). Each clip is truncated/extended to synchronize perfectly with the musical rhythm.
+- **Pillar & Filler System:** Clips with user-defined BM (Best Moment) markers become PILLARS anchored to the nearest beat. Clips without constraints become FILLERS, ordered by `visual_quality_score` as a tie-breaker.
+- **Safety Net Auto-Fill:** If the LLM recipe is too short compared to the target duration, the Director autonomously triggers a 4-beat heuristic fallback to fill the remaining gaps.
+- **Dual-Track Export:** Produces `_final_edit.json` (internal timeline) + `_FinalCut.xml` (FCP7 XML ready for Premiere/FCPX) + `_gemma_recipe.json` (Director's AI reasoning for debugging and transparency).
 
 ## Frontend (React HITL Dashboard)
 
 ### 1. NLE-Style Split-View
-- **Interactive Timeline**: Barra temporale sincronizzata al millisecondo, renderizza cromaticamente i segmenti validi (Verde MAIN, Blu B-ROLL) e scartati (Rosso). Supporta Filtri dinamici (ALL/VALID/BROLL/TRASH) che lasciano spazi vuoti ("buchi neri") fisici per rispettare il timing.
-- **Vertical Playlist Auto-Scrollante**: L'ispettore laterale scorre autonomamente e tiene sempre a fuoco la clip attiva nel video, garantendo una UX immersiva.
-- **Multi-Anchor System (BM/IN/OUT)**: Gli editor umani possono applicare molteplici vincoli temporali (markers) sulla stessa clip premendo `M`, `I`, `O`. Rimuovibili in modo chirurgico e frame-accurate tramite `X`, o visualizzati come lista interattiva direttamente nella ClipCard.
-- **Forced Overrides Non-Distruttivi**: Tasti `K` (Keep), `T` (Trash), e `B` (B-Roll) permettono all'umano di scavalcare l'Intelligenza Artificiale, forzando lo stato di una clip. Le modifiche sono visualizzate istantaneamente con glow e badge (es. `FORCED B-ROLL`), e salvate in parallelo su sidecar JSON.
-- **Keyboard Shortcuts Professionali**: Integrazione standard per il montaggio. Spazio per Play/Pausa, frecce orizzontali per lo scrubbing (10 frames base, +Shift per 1 frame, +Alt per 30 frames), frecce verticali per "saltare" istantaneamente ai tagli successivi/precedenti calcolati dall'Engine. Menu informativo (Info Popup) "on-click" per tutte le timeline.
-- **Anti-Lag Engine (60fps)**: Data-binding del tempo completamente sganciato dal React State e demandato a un `requestAnimationFrame` diretto sul DOM. I re-render React sono bloccati tramite `React.memo` tranne quando il video sorpassa un effettivo "taglio" dell'EDL virtuale.
-- **Director Settings Panel & Advanced Modal**: L'utente può accedere a un panel avanzato `🎨 AI Director Creative Settings` (tramite createPortal per superare limiti di z-index) dove impostare il *Target Product*, *Expected Subjects*, *Focus Area* e parametri NLP, salvati all'interno della `DirectorConfig`.
-- **Dynamic Hardware Profiler & Trinity Startup**: L'intero ecosistema (React + Python) si avvia in parallelo con un singolo comando (`npm run wolf:dev`). Il widget hardware integrato non usa più dati mockati, ma legge il profilo dal backend (`/api/system/profiler`) che a sua volta estrae l'esatto modello del chip e la Unified RAM interrogando nativamente il kernel macOS (`sysctl`). L'ETA e i lotti di inferenza (Chunks) sono calcolati matematicamente in real-time.
+- **Interactive Timeline**: Timebar synchronized to the millisecond, chromatically rendering valid (Green MAIN, Blue B-ROLL) and discarded (Red) segments. Supports dynamic filters (ALL/VALID/BROLL/TRASH) that leave physical empty spaces ("black holes") to respect timing.
+- **Auto-Scrolling Vertical Playlist**: The side inspector autonomously scrolls and keeps the active clip in focus on the video player, ensuring an immersive UX.
+- **Multi-Anchor System (BM/IN/OUT)**: Human editors can apply multiple temporal constraints (markers) on the same clip by pressing `M`, `I`, `O`. Surgically removable and frame-accurate via `X`, or displayed as an interactive list directly in the ClipCard.
+- **Non-Destructive Forced Overrides**: `K` (Keep), `T` (Trash), and `B` (B-Roll) keys allow the human to override the AI, forcing the clip state. Changes are instantly visualized with glows and badges (e.g., `FORCED B-ROLL`) and saved in parallel on a sidecar JSON.
+- **Professional Keyboard Shortcuts**: Standard integration for editing. Space for Play/Pause, horizontal arrows for scrubbing (10 frames base, +Shift for 1 frame, +Alt for 30 frames), vertical arrows to instantly "jump" to next/previous cuts calculated by the Engine. Info popup "on-click" for all timelines.
+- **Anti-Lag Engine (60fps)**: Time data-binding completely detached from React State and offloaded to a direct `requestAnimationFrame` on the DOM. React re-renders are blocked via `React.memo` except when the video passes a real cut of the virtual EDL.
+- **Director Settings Panel & Advanced Modal**: The user can access an advanced panel `🎨 AI Director Creative Settings` (via createPortal to bypass z-index limits) to set *Target Product*, *Expected Subjects*, *Focus Area*, and NLP parameters, saved inside the `DirectorConfig`.
+- **Dynamic Hardware Profiler & Trinity Startup**: The entire ecosystem (React + Python) boots in parallel with a single command (`npm run wolf:dev`). The integrated hardware widget no longer uses mocked data but reads the profile from the backend (`/api/system/profiler`), which extracts the exact chip model and Unified RAM by querying the macOS kernel (`sysctl`) natively. ETA and inference batches (Chunks) are calculated mathematically in real-time.

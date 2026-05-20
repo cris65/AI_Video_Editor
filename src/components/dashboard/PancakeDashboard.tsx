@@ -7,7 +7,7 @@ import { InteractiveTimeline } from './InteractiveTimeline';
 import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity } from 'lucide-react';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag } from 'lucide-react';
 
 // Pure function: recalculates timeline_in/timeline_out after manual reorder.
 // Durations are invariant (source_out - source_in). Returns a new immutable array.
@@ -23,6 +23,17 @@ function recalcTimeline(clips: FinalCutClip[]): FinalCutClip[] {
     cursor += duration;
     return recalculated;
   });
+}
+
+interface TelemetryRecord {
+  vlm_model_id: string;
+  session_start_time: string;
+  session_end_time: string;
+  total_frames: number;
+  extracted_frames: number;
+  cv_duration_sec: number;
+  mlx_duration_sec: number;
+  total_duration_sec: number;
 }
 
 interface PancakeDashboardProps {
@@ -56,6 +67,30 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
   const hasAutoSuggested = useRef(false);
+  const [lastTelemetry, setLastTelemetry] = useState<TelemetryRecord | null>(null);
+
+  const formatModelName = (modelId: string) => {
+    if (!modelId) return "VLM";
+    if (modelId.includes("gemma-4-e4b")) return "Gemma 4 E-B";
+    return modelId.split('/').pop() || modelId;
+  };
+
+  useEffect(() => {
+    const fetchTelemetry = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/performance/history');
+        if (res.ok) {
+          const history = await res.json();
+          if (Array.isArray(history) && history.length > 0) {
+            setLastTelemetry(history[history.length - 1]);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch telemetry history:", err);
+      }
+    };
+    fetchTelemetry();
+  }, []);
 
   useEffect(() => {
     if (hitlData && Object.keys(hitlData.hitl_constraints || {}).length > 0 && Object.keys(userConstraints).length === 0) {
@@ -436,8 +471,17 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Pancake HITL Dashboard</h1>
-            <div className="flex items-center gap-3 mt-0.5">
-              <p className="text-xs text-slate-500 font-mono">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</p>
+            <div className="flex items-center gap-3 mt-0.5 font-mono text-xs">
+              <span className="text-slate-500">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</span>
+              {lastTelemetry && (
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <span>•</span>
+                  <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[10px]">
+                    {formatModelName(lastTelemetry.vlm_model_id)}
+                  </span>
+                  <span>Analyzed {lastTelemetry.extracted_frames} frames in {Math.round(lastTelemetry.total_duration_sec)}s</span>
+                </span>
+              )}
               
               {/* Save Status Indicator */}
               <div className="flex items-center gap-1.5 min-w-[80px]">
@@ -677,9 +721,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
                        Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
                      </div>
-                      
-                     {/* Semantic Analysis Panel */}
-                     {(matchedSemantic || matchedCine || matchedStory) && (
+                            {/* Semantic Analysis Panel */}
+                     {(matchingPancakeClip) && (
                        <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
                          <div className="flex flex-wrap items-center gap-1.5">
                            {matchedSemantic?.narrative_energy_score !== undefined && (
@@ -693,12 +736,70 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                                <span>Tone: {matchedSemantic.emotional_tone}</span>
                              </div>
                            )}
+                           {matchedCine?.shot_size && (
+                             <div className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-300 font-bold">
+                               <span>Size: {matchedCine.shot_size}</span>
+                             </div>
+                           )}
                          </div>
+
+                         {matchedSemantic && (
+                           <>
+                             <div className="flex flex-wrap gap-1 mt-1">
+                               {matchedSemantic.subject_count !== undefined && (
+                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                   Subjects: {matchedSemantic.subject_count}
+                                 </span>
+                               )}
+                               {matchedSemantic.gaze_direction && matchedSemantic.gaze_direction !== 'NONE' && (
+                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                   Gaze: {matchedSemantic.gaze_direction}
+                                 </span>
+                               )}
+                               {matchedSemantic.subject_screen_position && matchedSemantic.subject_screen_position !== 'NONE' && (
+                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                   Pos: {matchedSemantic.subject_screen_position.replace('_', ' ')}
+                                 </span>
+                               )}
+                             </div>
+
+                             {/* Location and Props */}
+                             {matchedSemantic.setting_location && matchedSemantic.setting_location !== 'ANALYSIS_FAILED' && (
+                               <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-slate-300 bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800/80 w-fit">
+                                 <MapPin size={9} className="text-rose-400 shrink-0" />
+                                 <span className="font-semibold text-slate-300">{matchedSemantic.setting_location}</span>
+                               </div>
+                             )}
+                             {matchedSemantic.key_props && matchedSemantic.key_props.length > 0 && (
+                               <div className="mt-1 flex flex-wrap gap-1 items-center">
+                                 <Tag size={9} className="text-sky-400 shrink-0 mr-0.5" />
+                                 {matchedSemantic.key_props.map((prop, pidx) => (
+                                   <span key={pidx} className="bg-sky-950/40 border border-sky-900/50 text-sky-400 px-1 py-0.5 rounded text-[8px] font-medium">
+                                     {prop}
+                                   </span>
+                                 ))}
+                               </div>
+                             )}
+                           </>
+                         )}
 
                          {matchedCine?.scene_description && matchedCine.scene_description !== 'ANALYSIS_FAILED' && (
                            <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-900/60">
                              <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-0.5">Scene Description</span>
                              {matchedCine.scene_description}
+                           </div>
+                         )}
+
+                         {matchingPancakeClip.continuity?.match_cut_potential && (
+                           <div className="flex items-center gap-1.5 mt-1">
+                             <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                               MATCH CUT
+                             </span>
+                             {matchingPancakeClip.continuity.match_cut_vector && matchingPancakeClip.continuity.match_cut_vector !== 'NONE' && (
+                               <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider">
+                                 {matchingPancakeClip.continuity.match_cut_vector}
+                               </span>
+                             )}
                            </div>
                          )}
 

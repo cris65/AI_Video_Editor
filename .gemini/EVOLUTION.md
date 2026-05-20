@@ -1,89 +1,86 @@
-# 🚀 EVOLUTION (Roadmap & Fasi)
+# 🚀 EVOLUTION (Roadmap & Phases)
+
+**Version:** v0.1.34 - 2026-05-20
 
 > [!NOTE]
-> Questo documento traccia la direzione del prodotto e la fase corrente di
-> sviluppo per l'AI Video Editor. Mantiene lo stato di avanzamento rigorosamente
-> allineato all'architettura Offline-First (Python/MLX/YOLO) e all'interfaccia
-> HITL (React).
+> This document tracks the product direction and the current phase of development for the AI Video Editor. It keeps the development progress strictly aligned with the Offline-First architecture (Python/MLX/YOLO) and the HITL interface (React).
 
-## 🎯 Obiettivo Globale
+## 🎯 Global Goal
 
-Creare un ecosistema di montaggio video Local-First e automatizzato, che abbatte
-i tempi di pre-selezione tramite inferenza AI (YOLO + MLX Vision) pur mantenendo
-totale agnosticità (EDL CMX3600) verso Adobe Premiere Pro.
+Create a Local-First and automated video editing ecosystem that reduces pre-selection time via AI inference (YOLO + MLX Vision) while maintaining complete agnosticism (EDL CMX3600) toward Adobe Premiere Pro.
 
 ---
 
-## 🟢 FASE 1: Core AI Engine & Ingest Pipeline (COMPLETATA)
+## 🟢 PHASE 1: Core AI Engine & Ingest Pipeline (COMPLETED)
 
-La pipeline "pesante" (Velocità 1) che gira una sola volta per mappare il video.
+The "heavy" pipeline (Speed 1) that runs only once to map the video.
 
-**FASE A: Analisi Spaziale & Tecnica (Pancake Cut / OpenCV + YOLO)**
-- [x] Generazione Stringout e Asset Proxy (estrazione frame temporalizzati).
-- [x] Slicing deterministico basato su FPS originali e target `analysis_fps`.
-- [x] Rilevamento della Safe Zone dinamica tramite YOLO.
-- [x] Estrazione nitidezza (Laplaciano) e Motion Flow.
-- [x] Generazione payload nidificato: `technical_quality`, `spatial_configuration`, `yolo_omniscient_data`.
+**PHASE A: Spatial & Technical Analysis (Pancake Cut / OpenCV + YOLO)**
+- [x] Stringout generation and Proxy Asset (timecoded frame extraction).
+- [x] Deterministic slicing based on original FPS and target `analysis_fps`.
+- [x] Dynamic Safe Zone detection via YOLO.
+- [x] Sharpness extraction (Laplacian) and Motion Flow.
+- [x] Nested payload generation: `technical_quality`, `spatial_configuration`, `yolo_omniscient_data`.
 
-**FASE A2: Analisi Audio (BGM & Transienti)**
-- [x] Implementazione script Python (`bgm_generator.py`) per generare tracce.
-- [x] Iniezione dei timecode dei beat e della waveform nel JSON base per consentire il futuro "Cut on Beat".
+**PHASE A2: Audio Analysis (BGM & Transients)**
+- [x] Implementation of Python script (`bgm_generator.py`) to generate tracks.
+- [x] Injection of beat timecodes and waveform in the base JSON to allow future "Cut on Beat".
 
-**FASE B: Analisi Semantica (MLX Vision + Gemma 4)**
-- [x] Sviluppo `mlx_client.py` con prompt strutturato (Rule of Six).
-- [x] Chiamate sincrone-sequenziali per protezione VRAM.
-- [x] Iniezione incrementale nel JSON dei macro-oggetti: `cinematography`, `continuity`, `commercial`, `story`.
-- [x] Salvataggio JSON atomico (`_stringout.json`).
-
----
-
-## 🟡 FASE 2: Frontend HITL & Orchestrazione (COMPLETATA)
-
-**FASE C: L'Interfaccia Umana (React UI)**
-- [x] Dashboard HITL Split-View con Video Player Sincronizzato e Timeline Interattiva.
-- [x] Sincronizzazione Anti-Lag a 60fps con disaccoppiamento dello stato temporale.
-- [x] Override manuali (KEEP/TRASH/BROLL, IN/OUT/BM) persistiti in `_hitl_data.json`.
-- [x] Settings Panel avanzato: Safe Zone margins, Target Duration, Expected Subjects.
-- [x] Drag & Drop (dnd-kit) sulla timeline orizzontale Director's Cut.
-
-**FASE D: Il Cablaggio e Il "Regista" (API Gateway)**
-- [x] Endpoint FastAPI `POST /api/orchestrate`.
-- [x] Payload ibrido validato tramite `Pydantic` strict typing.
-- [x] Propagazione del `Seed` per determinismo stocastico.
-- [x] Esecuzione isolata (Velocità 2) che rigenera solo il testo e i JSON senza ricalcolare il video, restituendo il `_final_edit.json`.
+**PHASE B: Semantic Analysis (MLX Vision + Gemma 4)**
+- [x] Development of `mlx_client.py` with structured prompt (Rule of Six).
+- [x] Synchronous-sequential calls for VRAM protection.
+- [x] Incremental injection of macro-objects in the JSON: `cinematography`, `continuity`, `commercial`, `story`.
+- [x] Atomic JSON saving (`_stringout.json`).
 
 ---
 
-## 🔴 FASE 3: Esportazione & Integrazione Nativa (Endgame) - PROSSIMA
+## 🟡 PHASE 2: Frontend HITL & Orchestration (COMPLETED)
 
-- [ ] Supporto ai "Pinned Anchors": Gemma 4 rispetta il riordino manuale (Forced Order) e i Global START/END provenienti dall'HITL.
-- [ ] Rilevamento di anomalie video avanzate (micro-mosso, drop frame).
-- [ ] Esportazione XML multi-track per NLE (Premiere Pro / DaVinci / FCPX) (Fase E).
-- [ ] Refactoring del Frontend React in Adobe CEP Extension (Manifest XML, ExtendScript) per sincronizzazione automatica della timeline attiva.
-- [ ] Installer "One-Click" (macOS .pkg o PyInstaller) per rendere il server MLX invisibile e friction-less.
-- [ ] Motore Audio-Generativo Locale (MusicGen / Stable Audio) offline.
+**PHASE C: The Human Interface (React UI)**
+- [x] HITL Split-View Dashboard with Synchronized Video Player and Interactive Timeline.
+- [x] Anti-Lag 60fps synchronization with temporal state decoupling.
+- [x] Manual overrides (KEEP/TRASH/BROLL, IN/OUT/BM) persisted in `_hitl_data.json`.
+- [x] Advanced Settings Panel: Safe Zone margins, Target Duration, Expected Subjects.
+- [x] Drag & Drop (dnd-kit) on the horizontal Director's Cut timeline.
+
+**PHASE D: The Wiring and The "Director" (API Gateway)**
+- [x] FastAPI endpoint `POST /api/orchestrate`.
+- [x] Hybrid payload validated through `Pydantic` strict typing.
+- [x] Propagation of the `Seed` for stochastic determinism.
+- [x] Isolated execution (Speed 2) that regenerates only the text and JSONs without recalculating the video, returning `_final_edit.json`.
+
+---
+
+## 🔴 PHASE 3: Export & Native Integration (Endgame) - NEXT
+
+- [ ] Support for "Pinned Anchors": Gemma 4 respects manual reordering (Forced Order) and Global START/END coming from the HITL.
+- [ ] Detection of advanced video anomalies (micro-motion, drop frames).
+- [ ] Multi-track XML export for NLE (Premiere Pro / DaVinci / FCPX) (Phase E).
+- [ ] Refactoring the React Frontend into an Adobe CEP Extension (Manifest XML, ExtendScript) for automatic active timeline synchronization.
+- [ ] "One-Click" Installer (macOS .pkg or PyInstaller) to make the MLX server invisible and frictionless.
+- [ ] Offline local Audio-Generative Engine (MusicGen / Stable Audio).
 
 ---
 
 ## 🌌 EPIC: Versioning, Cloud Persistence & Semantic Memory
 
-**Problema Attuale:** Il sistema sovrascrive il file `_final_edit.json` ad ogni rigenerazione. Sebbene il Seed garantisca la riproducibilità a parità di prompt, la modifica del prompt (es. l'aggiunta di una nuova direttiva) altera il contesto del LLM, rendendo impossibile tornare a un montaggio precedente se non ci si ricorda l'esatto stato della UI.
-**Obiettivo:** Trasformare il workflow in un processo non distruttivo, con salvataggio in cloud e memoria semantica dell'IA.
+**Current Problem:** The system overwrites the `_final_edit.json` file on each regeneration. Although the Seed guarantees reproducibility for the same prompt, editing the prompt (e.g., adding a new directive) alters the LLM context, making it impossible to return to a previous edit unless the exact UI state is remembered.
+**Goal:** Transform the workflow into a non-destructive process, with cloud saving and AI semantic memory.
 
 ### Milestone 1: Local Versioning (File System)
-- **Logica Backend:** Logica di auto-incremento che generi `_final_edit_v1.json`, `_final_edit_v2.json`, associando a ciascun file un log del Seed e del DirectorConfig.
-- **Logica Frontend:** Menu a tendina "History" per re-idratare istantaneamente lo stato della UI (Seed, Vincoli, Prompt).
+- **Backend Logic:** Auto-increment logic that generates `_final_edit_v1.json`, `_final_edit_v2.json`, associating each file with a log of the Seed and DirectorConfig.
+- **Frontend Logic:** "History" dropdown to instantly rehydrate the UI state (Seed, Constraints, Prompt).
 
 ### Milestone 2: The Supabase Awakening (Cloud Persistence)
-- **Data Modeling:** Creazione tabelle in Postgres: `users`, `projects`, `media_assets`, ed `edit_versions`.
-- **JSONB Storage:** I payload complessi e le "Recipe" verranno salvati in colonne JSONB.
-- **Sync:** Il frontend salverà lo stato ibrido su Supabase, e FastAPI leggerà i vincoli dal DB.
+- **Data Modeling:** Creation of Postgres tables: `users`, `projects`, `media_assets`, and `edit_versions`.
+- **JSONB Storage:** Complex payloads and "Recipes" saved in JSONB columns.
+- **Sync:** The frontend saves the hybrid state to Supabase, and FastAPI reads the constraints from the DB.
 
 ### Milestone 3: Vectorized RAG (The Omniscient Director)
-- **pgvector Integration:** Abilitare l'estensione `pgvector` su Supabase.
-- **Embedding Pipeline:** I prompt testuali, i flaw aggirati e le motivazioni della "Recipe" convertiti in vettori.
-- **Semantic Search:** Search bar conversazionale per il recupero storico.
+- **pgvector Integration:** Enable `pgvector` extension on Supabase.
+- **Embedding Pipeline:** Text prompts, bypassed flaws, and "Recipe" rationales converted to vectors.
+- **Semantic Search:** Conversational search bar for historical retrieval.
 
 ### Milestone 4: Production Readiness (i18n & Refactoring)
-- **Localizzazione:** Integrazione di `react-i18next` per rendere la UI multi-lingua senza introdurre regressioni.
-- **Pulizia UI:** Componentizzazione spinta e decoupling della logica dallo strato di presentazione.
+- **Localization:** Integration of `react-i18next` to make the UI multi-language without introducing regressions.
+- **UI Cleanup:** High componentization and decoupling of logic from the presentation layer.
