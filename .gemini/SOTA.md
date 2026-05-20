@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.37 - 2026-05-20
+**Version:** v0.1.38 - 2026-05-20
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -48,7 +48,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 ## Moduli a Microservizi (Pipeline A→E)
 
 1. **`edl_parser.py`** — Ingest EDL puro. Estrae la mappa temporale (Record IN / Source IN) e il Naming Base dalla root della clip (`* FROM CLIP NAME`).
-2. **`pancake_editor.py`** — Motore semantico di Fase A. Center-Weighted Laplacian, Dual Threshold Soft Focus, Action Peak tracking, Cinematic Palette K-Means, Optical Flow Farneback, Semantic Storyboard. Tutta la logica di finalizzazione è centralizzata nell'helper privato `_finalize_block()` per eliminare duplicazioni.
+2. **`pancake_editor.py`** — Motore semantico di Fase A. Center-Weighted Laplacian, Dual Threshold Soft Focus, Action Peak tracking, Cinematic Palette K-Means, Optical Flow Farneback, Semantic Storyboard (Native VLM Extraction a 896x896). Tutta la logica di finalizzazione è centralizzata nell'helper privato `_finalize_block()` per eliminare duplicazioni.
 3. **`mlx_client.py`** — Fase B. Gateway nativo MLX locale per l'inferenza Vision LLM. Configura Gemma 4 in modalità Reasoning prepandendo il token `<|think|>` al prompt di sistema con parametri di campionamento specifici (`temperature=1.0`, `top_p=0.95`, `top_k=64`). Integra un parser regex greedy per isolare il payload JSON ignorando i tag e il testo di ragionamento (`<|channel>thought`). Inietta i 5 macro-oggetti annidati con fallback strutturato esplicito e salvataggio atomico progressivo.
 4. **`bgm_generator.py`** — Fase C. Genera la BGM (click track mock o MusicGen). Estrae keyword da `cinematography.scene_description` e `continuity.action_description` per costruire il prompt musicale.
 5. **`audio_analyzer.py`** — Fase C. Estrae i beat timestamps dalla BGM e li salva in `_audio_beats.json`.

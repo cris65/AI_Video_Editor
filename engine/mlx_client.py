@@ -7,12 +7,13 @@ import time
 
 try:
     from mlx_vlm import load, generate
+    from mlx_vlm.prompt_utils import apply_chat_template
     MLX_VLM_AVAILABLE = True
 except ImportError:
     MLX_VLM_AVAILABLE = False
 
 PROMPT_TEXT = (
-    "<|think|>You are a literal, objective, and highly observant continuity supervisor. You MUST NOT invent or hallucinate settings, lighting, or emotions. Describe exactly what is in the frame. Your observations must be literal, factual, and prop-aware. "
+    "You are a literal, objective, and highly observant continuity supervisor. You MUST NOT invent or hallucinate settings, lighting, or emotions. Describe exactly what is in the frame. Your observations must be literal, factual, and prop-aware. "
     "You are analyzing a single continuous video shot, displayed across {num_frames} sequential temporal frames. "
     "FUNDAMENTAL CONTINUITY RULE: These frames represent the chronological passage of time within a SINGLE scene. Subjects in earlier frames are the same ones continuing their action in later frames. "
     "Your task is to analyze how the scene and subjects move and evolve chronologically, providing a comprehensive assessment for editorial and commercial use. "
@@ -33,28 +34,29 @@ def check_mlx_server_health():
     return MLX_VLM_AVAILABLE
 
 def clean_json_response(raw_text):
-    """Estrae l'oggetto JSON eliminando i markdown, commenti e reasoning tags."""
-    # Prova a estrarre prima l'oggetto JSON più esterno tramite ricerca greedy
-    match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
+    """Estrae l'oggetto JSON eliminando i markdown e commenti."""
+    if not raw_text:
+        print("      [MLX Client] Errore: la risposta del modello è vuota o None.")
+        return {}
+
+    # Rimuovi markdown formatting
+    clean_text = raw_text.replace("```json", "").replace("```", "")
+
+    # Trova la prima { e l'ultima }
+    first_idx = clean_text.find('{')
+    last_idx = clean_text.rfind('}')
+
+    if first_idx == -1 or last_idx == -1 or first_idx > last_idx:
+        print("      [MLX Client] Errore: parentesi graffe '{' o '}' non trovate nell'output del modello.")
+        return {}
+
+    clean_json = clean_text[first_idx : last_idx + 1]
 
     try:
-        return json.loads(raw_text)
-    except json.JSONDecodeError:
-        pass
-        
-    json_pattern = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
-    if json_pattern:
-        try:
-            return json.loads(json_pattern.group(1))
-        except json.JSONDecodeError:
-            pass
-            
-    return None
+        return json.loads(clean_json)
+    except json.JSONDecodeError as e:
+        print(f"      [MLX Client] Errore decodifica JSON: {e}")
+        return {}
 
 def parse_quality_score(raw_score):
     """Estrae solo il primo numero intero da 1 a 10. Fallback a 5."""
@@ -74,21 +76,48 @@ def analyze_frame(model, processor, image_paths, people_count=0):
     num_frames = len(image_paths)
     dynamic_prompt = PROMPT_TEXT.format(people_count=people_count, num_frames=num_frames)
     
-    # Per modelli vision, formattiamo con apply_chat_template se disponibile
     try:
-        if hasattr(processor, "apply_chat_template") and processor.chat_template:
-            # Per evitare crash se il tokenizer richiede input stringa o list di dict
-            chat_input = [{"role": "user", "content": dynamic_prompt}]
-            prompt = processor.apply_chat_template(chat_input, tokenize=False, add_generation_prompt=True)
-        else:
-            prompt = dynamic_prompt
-            
+        # Use mlx_vlm's apply_chat_template to correctly build the multimodal
+        # message structure for Gemma 4. This injects image tokens as
+        # {"type": "image"} dict entries alongside the text content, ensuring
+        # the vision encoder receives and processes the image tensors.
+        prompt = apply_chat_template(
+            processor,
+            processor.config if hasattr(processor, "config") else model.config,
+            dynamic_prompt,
+            add_generation_prompt=True,
+            num_images=num_frames,
+        )
+
+        # For Gemma 4 reasoning model: inject <|think|> as the model-turn prefix
+        # so the model opens its reasoning channel before generating the JSON.
+        # This must appear AFTER the model turn tag, not inside the user message.
+        if isinstance(prompt, str) and "<|turn>model" in prompt:
+            prompt = prompt.replace("<|turn>model\n", "<|turn>model\n<|think|>")
+        elif isinstance(prompt, str) and prompt.strip():
+            prompt = prompt + "<|think|>"
+
+        # Dump the compiled prompt for diagnostics
+        try:
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            prompt_debug_path = os.path.join(project_root, "system_logs", "mlx_prompt_debug.txt")
+            os.makedirs(os.path.dirname(prompt_debug_path), exist_ok=True)
+            with open(prompt_debug_path, "w", encoding="utf-8") as prompt_f:
+                if isinstance(prompt, (list, dict)):
+                    json.dump(prompt, prompt_f, indent=2, ensure_ascii=False)
+                else:
+                    prompt_f.write(str(prompt))
+        except Exception as e_prompt:
+            print(f"      [MLX Client] Errore scrittura debug prompt: {e_prompt}")
+
+        print(f"      [MLX Client] DEBUG: Injecting {num_frames} image(s) into model input.")
+
         output = generate(
             model,
             processor,
             prompt=prompt,
             image=image_paths,
-            max_tokens=512,
+            max_tokens=1500,
             temperature=1.0,
             top_p=0.95,
             top_k=64,
@@ -96,6 +125,17 @@ def analyze_frame(model, processor, image_paths, people_count=0):
         )
         
         message_content = output.text
+
+        # Dump raw response for diagnostics
+        try:
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            debug_path = os.path.join(project_root, "system_logs", "mlx_raw_debug.txt")
+            os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+            with open(debug_path, "w", encoding="utf-8") as debug_f:
+                debug_f.write(message_content)
+        except Exception as e_debug:
+            print(f"      [MLX Client] Errore scrittura debug raw output: {e_debug}")
+
         parsed_json = clean_json_response(message_content)
         
         if parsed_json:
@@ -128,6 +168,18 @@ def process_stringout_batch(json_path, progress_callback=None):
     try:
         model, processor = load(vlm_model_id)
         print("✅ Model loaded successfully!")
+        
+        # 🚨 DEBUG: Extract Native Image Size
+        try:
+            if hasattr(processor, "image_processor") and hasattr(processor.image_processor, "size"):
+                print(f"DEBUG: Gemma 4 Native Image Size detected: {processor.image_processor.size}")
+            elif hasattr(model.config, "vision_config") and hasattr(model.config.vision_config, "image_size"):
+                print(f"DEBUG: Gemma 4 Native Image Size detected: {model.config.vision_config.image_size}")
+            else:
+                print(f"DEBUG: Gemma 4 Native Image Size not found in standard config attributes.")
+        except Exception as e:
+            print(f"DEBUG: Failed to extract image size: {e}")
+            
     except Exception as e:
         print(f"❌ Impossibile caricare il modello MLX: {e}")
         return

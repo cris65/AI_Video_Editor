@@ -45,7 +45,7 @@ class PancakeEditor:
         center_gray = gray[int(h*0.25):int(h*0.75), int(w*0.25):int(w*0.75)]
         lap_var = cv2.Laplacian(center_gray, cv2.CV_64F).var()
         if lap_var < self.BLUR_THRESHOLD:
-            return 'TRASH_BLUR', lap_var, 0
+            return 'TRASH_BLUR', lap_var, 0, []
             
         is_soft = (self.BLUR_THRESHOLD <= lap_var < self.SOFT_FOCUS_THRESHOLD)
             
@@ -53,19 +53,34 @@ class PancakeEditor:
         diff = cv2.absdiff(gray, prev_gray)
         motion_diff = np.mean(diff)
         if motion_diff > self.MOTION_THRESHOLD:
-            return 'TRASH_MOTION', lap_var, 0
+            return 'TRASH_MOTION', lap_var, 0, []
             
-        # Analisi YOLO (classe 0 = person)
+        # Analisi YOLO: raccoglie tutte le classi COCO (non solo person)
         results = self.yolo_model(frame, verbose=False, conf=self.CONFIDENCE_MIN)
         boxes = results[0].boxes
-        person_boxes = [box for box in boxes if int(box.cls[0]) == 0]
+        names = results[0].names  # COCO class name map
+
+        # Build full detections list for all detected objects
+        detections = []
+        person_boxes = []
+        for box in boxes:
+            cls_id = int(box.cls[0])
+            conf = float(box.conf[0])
+            x1, y1, x2, y2 = [round(float(v), 1) for v in box.xyxy[0]]
+            detections.append({
+                "class": names.get(cls_id, str(cls_id)),
+                "confidence": round(conf, 3),
+                "bbox": [x1, y1, x2, y2]
+            })
+            if cls_id == 0:
+                person_boxes.append(box)
         
         people_count = len(person_boxes)
         
         suffix = '_SOFT' if is_soft else ''
         
         if not person_boxes:
-            return 'B-ROLL' + suffix, lap_var, people_count
+            return 'B-ROLL' + suffix, lap_var, people_count, detections
             
         # Analisi Spaziale
         frame_width = frame.shape[1]
@@ -75,9 +90,9 @@ class PancakeEditor:
             norm_x = center_x / frame_width
             
             if self.SAFE_LEFT <= norm_x <= self.SAFE_RIGHT:
-                return 'MAIN_A' + suffix, lap_var, people_count
+                return 'MAIN_A' + suffix, lap_var, people_count, detections
                 
-        return 'EDGE_DANGER' + suffix, lap_var, people_count
+        return 'EDGE_DANGER' + suffix, lap_var, people_count, detections
 
     def extract_cinematic_palette(self, frames_list):
         """
@@ -98,7 +113,7 @@ class PancakeEditor:
             return []
             
         pixel_data = np.vstack(pixels)
-        pixel_data = np.float32(pixel_data)
+        pixel_data = pixel_data.astype(np.float32)
         
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
         K = 5
@@ -121,7 +136,7 @@ class PancakeEditor:
         Calcola l'Optical Flow (Farneback) su 160x90 per estrarre intensità e direzione.
         Restituisce magnitudo media e direzione stringa.
         """
-        flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)  # type: ignore
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
         
         avg_mag = np.mean(mag)
@@ -151,7 +166,7 @@ class PancakeEditor:
         """
         # 1. Attach OUT frame thumbnails
         block["_frame_out"] = cv2.resize(last_frame, (100, 100))
-        block["_sb_out"] = cv2.resize(last_frame, (480, 270))
+        block["_sb_out"] = cv2.resize(last_frame, (896, 896))
 
         # 2. Cinematic Palette
         frames_for_palette = [
@@ -190,7 +205,7 @@ class PancakeEditor:
                     temp_cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
                     ret, fr = temp_cap.read()
                     if ret:
-                        sb_frame = cv2.resize(fr, (480, 270))
+                        sb_frame = cv2.resize(fr, (896, 896))
                         sb_filename = f"{naming_base}_frame_{i+1:03d}.jpg"
                         sb_path = os.path.join(self.storyboard_dir, sb_filename)
                         cv2.imwrite(sb_path, sb_frame)
@@ -229,12 +244,12 @@ class PancakeEditor:
         }
         block["yolo_omniscient_data"] = {
             "total_objects": people_count,
-            "detections": []
+            "detections": block.get("_detections", [])
         }
 
         # 7. Remove all temporary private keys
         for key in [
-            "_max_lap", "_people_count", "_frame_in", "_frame_best",
+            "_max_lap", "_people_count", "_detections", "_frame_in", "_frame_best",
             "_frame_out", "_sb_in", "_sb_best", "_sb_out",
             "_motion_samples", "_prev_gray_flow"
         ]:
@@ -290,16 +305,17 @@ class PancakeEditor:
             return []
             
         # Inizializziamo il primo blocco (frame a 0s)
-        tag, lap_var, people_count = self.get_frame_tag(prev_frame, prev_frame)
+        tag, lap_var, people_count, detections = self.get_frame_tag(prev_frame, prev_frame)
         if not tag.startswith('TRASH'):
             small_frame = cv2.resize(prev_frame, (100, 100))
-            sb_frame = cv2.resize(prev_frame, (480, 270))
+            sb_frame = cv2.resize(prev_frame, (896, 896))
             current_block = {
                 "start": last_timestamp,
                 "end": 0.0,
                 "tag": tag,
                 "best_moment": 0.0,
                 "_people_count": people_count,
+                "_detections": detections,
                 "_max_lap": lap_var,
                 "_frame_in": small_frame,
                 "_frame_best": small_frame,
@@ -325,12 +341,12 @@ class PancakeEditor:
                 
             timestamp_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
             
-            tag, lap_var, people_count = self.get_frame_tag(frame, prev_frame)
+            tag, lap_var, people_count, detections = self.get_frame_tag(frame, prev_frame)
             
             if tag.startswith('TRASH'):
                 if current_block is not None:
                     current_block["end"] = timestamp_sec
-                    duration = current_block["end"] - current_block["start"]
+                    duration = float(current_block["end"]) - float(current_block["start"])
 
                     current_block = self._finalize_block(current_block, frame)
 
@@ -349,13 +365,14 @@ class PancakeEditor:
                     
                 if current_trash is None:
                     small_frame = cv2.resize(frame, (100, 100))
-                    sb_frame = cv2.resize(frame, (480, 270))
+                    sb_frame = cv2.resize(frame, (896, 896))
                     current_trash = {
                         "start": last_timestamp,
                         "end": timestamp_sec,
                         "tag": tag,
                         "best_moment": timestamp_sec,
                         "_people_count": people_count,
+                        "_detections": detections,
                         "_max_lap": lap_var,
                         "_frame_in": small_frame,
                         "_frame_best": small_frame,
@@ -370,18 +387,21 @@ class PancakeEditor:
                         current_trash["_max_lap"] = lap_var
                         current_trash["best_moment"] = timestamp_sec
                         current_trash["_people_count"] = people_count
+                        current_trash["_detections"] = detections
                         current_trash["_frame_best"] = cv2.resize(frame, (100, 100))
-                        current_trash["_sb_best"] = cv2.resize(frame, (480, 270))
+                        current_trash["_sb_best"] = cv2.resize(frame, (896, 896))
                         
                     curr_gray_flow = cv2.cvtColor(cv2.resize(frame, (160, 90)), cv2.COLOR_BGR2GRAY)
                     if current_trash.get("_prev_gray_flow") is not None:
                         mag, d_dir = self.extract_motion_vectors(current_trash["_prev_gray_flow"], curr_gray_flow)
-                        current_trash["_motion_samples"].append((mag, d_dir))
+                        samples = current_trash["_motion_samples"]
+                        assert isinstance(samples, list)
+                        samples.append((mag, d_dir))
                     current_trash["_prev_gray_flow"] = curr_gray_flow
             else:
                 if current_trash is not None:
                     current_trash["end"] = timestamp_sec
-                    duration = current_trash["end"] - current_trash["start"]
+                    duration = float(current_trash["end"]) - float(current_trash["start"])
 
                     current_trash = self._finalize_block(current_trash, frame)
 
@@ -397,13 +417,14 @@ class PancakeEditor:
                     
                 if current_block is None:
                     small_frame = cv2.resize(frame, (100, 100))
-                    sb_frame = cv2.resize(frame, (480, 270))
+                    sb_frame = cv2.resize(frame, (896, 896))
                     current_block = {
                         "start": last_timestamp,
                         "end": timestamp_sec,
                         "tag": tag,
                         "best_moment": timestamp_sec,
                         "_people_count": people_count,
+                        "_detections": detections,
                         "_max_lap": lap_var,
                         "_frame_in": small_frame,
                         "_frame_best": small_frame,
@@ -418,13 +439,16 @@ class PancakeEditor:
                         current_block["_max_lap"] = lap_var
                         current_block["best_moment"] = timestamp_sec
                         current_block["_people_count"] = people_count
+                        current_block["_detections"] = detections
                         current_block["_frame_best"] = cv2.resize(frame, (100, 100))
-                        current_block["_sb_best"] = cv2.resize(frame, (480, 270))
+                        current_block["_sb_best"] = cv2.resize(frame, (896, 896))
                         
                     curr_gray_flow = cv2.cvtColor(cv2.resize(frame, (160, 90)), cv2.COLOR_BGR2GRAY)
                     if current_block.get("_prev_gray_flow") is not None:
                         mag, d_dir = self.extract_motion_vectors(current_block["_prev_gray_flow"], curr_gray_flow)
-                        current_block["_motion_samples"].append((mag, d_dir))
+                        samples = current_block["_motion_samples"]
+                        assert isinstance(samples, list)
+                        samples.append((mag, d_dir))
                     current_block["_prev_gray_flow"] = curr_gray_flow
                         
                     # Transizioni interne: Upgrade a MAIN_A
@@ -441,7 +465,7 @@ class PancakeEditor:
         if current_block is not None:
             # Force end to the last available timestamp to cover the full video duration
             current_block["end"] = total_frames / self.fps
-            duration = current_block["end"] - current_block["start"]
+            duration = float(current_block["end"]) - float(current_block["start"])
 
             current_block = self._finalize_block(current_block, prev_frame)
 
@@ -457,7 +481,7 @@ class PancakeEditor:
         if current_trash is not None:
             # Force end to the last available timestamp to cover the full video duration
             current_trash["end"] = total_frames / self.fps
-            duration = current_trash["end"] - current_trash["start"]
+            duration = float(current_trash["end"]) - float(current_trash["start"])
 
             current_trash = self._finalize_block(current_trash, prev_frame)
 
