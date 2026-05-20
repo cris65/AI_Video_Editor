@@ -2,6 +2,8 @@
   "venvPath": "./engine",
   "venv": "venv",
   "extraPaths": [
-    "./engine"
-  ]
+    "./engine",
+    "./engine/venv/lib/python3.13/site-packages"
+  ],
+  "reportMissingTypeStubs": false
 }

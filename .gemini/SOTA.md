@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.32 - 2026-05-20
+**Version:** v0.1.33 - 2026-05-20
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -17,7 +17,7 @@
 
 ---
 
-## Schema JSON del Payload Clip (Struttura Annidato — v0.1.29)
+## Schema JSON del Payload Clip (Struttura Annidato — v0.1.33)
 
 Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi piatte legacy (`motion`, `people_count`, `cinematic_palette`, ecc.) sono state eliminate.
 
@@ -25,7 +25,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 ```json
 {
   "start": 0.0, "end": 3.4, "tag": "MAIN_A", "best_moment": 1.2,
-  "storyboard_path": "...", "is_usable": true,
+  "storyboard_paths": ["..."], "is_usable": true,
   "technical_quality": { "blur_score": 42.7, "is_soft_focus": false, "motion_intensity": 1.4, "camera_direction": "PAN_LEFT", "cinematic_palette": ["#1a2b3c"] },
   "spatial_configuration": { "safe_zone_tag": "MAIN_A", "focus_area": null },
   "yolo_omniscient_data": { "total_objects": 2, "detections": [] }

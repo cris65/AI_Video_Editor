@@ -35,7 +35,8 @@ export interface PancakeClip {
   end: number;
   tag: string;
   best_moment: number;
-  storyboard_path: string;
+  storyboard_path?: string;
+  storyboard_paths?: string[];
   is_usable?: boolean;
 
   // Phase 1 — Physical & Spatial Analysis (always present after pancake_editor)

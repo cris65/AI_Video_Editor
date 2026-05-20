@@ -8,6 +8,8 @@ interface VideoInfo {
   fps: number;
   duration: number;
   total_frames: number;
+  processed?: boolean;
+  sequence_name?: string;
 }
 
 interface TaskProgress {
@@ -378,16 +380,17 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
           </div>
 
           <button 
-            onClick={handleStartEngine}
-            disabled={engineStatus === 'running' || engineStatus === 'success' || clips.length === 0 || (selectedClip !== null && !selectedClip.edl_path)}
+            onClick={selectedClip?.processed ? () => onComplete?.(selectedClip.sequence_name) : handleStartEngine}
+            disabled={engineStatus === 'running' || (engineStatus === 'success' && !selectedClip?.processed) || clips.length === 0 || (selectedClip !== null && !selectedClip.processed && !selectedClip.edl_path)}
             className={`w-full py-4 rounded-xl font-bold uppercase tracking-wider transition-all duration-200 shadow-xl border mt-auto ${
               engineStatus === 'running' ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed' :
+              selectedClip?.processed ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-emerald-900/40 cursor-pointer' :
               engineStatus === 'success' ? 'bg-emerald-900/40 text-emerald-500 border-emerald-900/50 cursor-not-allowed' :
               !selectedClip?.edl_path ? 'bg-red-900/40 text-red-400 border-red-900/50 cursor-not-allowed' :
               'bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-blue-900/40'
             }`}
           >
-            {engineStatus === 'running' ? 'ENGINE RUNNING...' : engineStatus === 'success' ? 'PIPELINE COMPLETED' : 'START ENGINE'}
+            {engineStatus === 'running' ? 'ENGINE RUNNING...' : selectedClip?.processed ? 'GO TO TIMELINE / EDITOR' : engineStatus === 'success' ? 'PIPELINE COMPLETED' : 'START ENGINE'}
           </button>
           
           {engineStatus === 'running' && taskProgress && (

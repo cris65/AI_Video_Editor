@@ -47,8 +47,25 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
   };
 
   const score = clip.cinematography?.visual_quality_score ?? 0;
-  const fileName = clip.storyboard_path ? clip.storyboard_path.split('/').pop() : '';
-  const imageUrl = `/engine/output/${sequenceName}/storyboards/${fileName}`;
+  
+  // Calculate which frame in storyboard_paths corresponds to best_moment (BM)
+  let bestMomentPath = '';
+  if (clip.storyboard_paths && clip.storyboard_paths.length > 0) {
+    const durationSec = clip.end - clip.start;
+    if (durationSec > 0) {
+      const fraction = (clip.best_moment - clip.start) / durationSec;
+      const clampedFraction = Math.max(0, Math.min(1, fraction));
+      const frameIdx = Math.round(clampedFraction * (clip.storyboard_paths.length - 1));
+      bestMomentPath = clip.storyboard_paths[frameIdx] || '';
+    } else {
+      bestMomentPath = clip.storyboard_paths[0] || '';
+    }
+  } else if (clip.storyboard_path) {
+    bestMomentPath = clip.storyboard_path;
+  }
+
+  const fileName = bestMomentPath ? bestMomentPath.split('/').pop() : '';
+  const imageUrl = fileName ? `/engine/output/${sequenceName}/storyboards/${fileName}` : '';
   const clipName = fileName ? fileName.split('_')[0] : 'Unknown';
   const duration = (clip.end - clip.start).toFixed(1);
 

@@ -32,8 +32,8 @@ async def get_system_profiler():
     """
     system_os = platform.system()
     machine = platform.machine()
-    # psutil will return logical processors if physical is not found
-    physical_cores = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
+    cores = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
+    physical_cores = cores if cores is not None else 4
     
     # Calculate exact total RAM in GB
     total_ram_gb = round(psutil.virtual_memory().total / (1024**3))
@@ -351,6 +351,7 @@ async def list_videos():
     import os, glob
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DIR_INPUT = os.path.join(BASE_DIR, 'input')
+    DIR_OUTPUT = os.path.join(BASE_DIR, 'output')
     video_exts = ('*.mp4', '*.mov', '*.mxf', '*.avi', '*.mkv')
     
     vid_files = []
@@ -361,7 +362,18 @@ async def list_videos():
     edl_files = glob.glob(os.path.join(DIR_INPUT, '*.edl'))
     edl_path = edl_files[0] if edl_files else ""
     
+    # Try to parse sequence name from input EDL
+    seq_name_from_edl = ""
+    if edl_path:
+        try:
+            import edl_parser
+            seq_name_from_edl, _ = edl_parser.parse_ingest_edl(edl_path)
+        except Exception:
+            pass
+            
     results = []
+    
+    # 1. Add unprocessed files from input directory
     for vf in vid_files:
         import cv2
         cap = cv2.VideoCapture(vf)
@@ -375,6 +387,49 @@ async def list_videos():
             "edl_path": edl_path,
             "fps": fps,
             "duration": duration,
-            "total_frames": total_frames
+            "total_frames": total_frames,
+            "processed": False,
+            "sequence_name": seq_name_from_edl if seq_name_from_edl else os.path.splitext(os.path.basename(vf))[0]
         })
+        
+    # 2. Add already processed sequences from output directory
+    if os.path.exists(DIR_OUTPUT):
+        for item in os.listdir(DIR_OUTPUT):
+            item_path = os.path.join(DIR_OUTPUT, item)
+            if os.path.isdir(item_path):
+                # A valid processed sequence must contain its stringout JSON file
+                stringout_json = os.path.join(item_path, "LLM_Export_Package", f"{item}_stringout.json")
+                if os.path.exists(stringout_json):
+                    # Search for the moved video and EDL in the output sequence folder
+                    vid_search = []
+                    for ext in video_exts:
+                        vid_search.extend(glob.glob(os.path.join(item_path, ext)))
+                        vid_search.extend(glob.glob(os.path.join(item_path, ext.upper())))
+                    
+                    vid_p = vid_search[0] if vid_search else ""
+                    edl_search = glob.glob(os.path.join(item_path, '*.edl'))
+                    edl_p = edl_search[0] if edl_search else ""
+                    
+                    fps = 25.0
+                    total_frames = 0
+                    duration = 0
+                    if vid_p:
+                        import cv2
+                        cap = cv2.VideoCapture(vid_p)
+                        fps = cap.get(cv2.CAP_PROP_FPS) if cap.isOpened() else 25.0
+                        total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) if cap.isOpened() else 0
+                        duration = total_frames / fps if fps > 0 else 0
+                        cap.release()
+                        
+                    results.append({
+                        "name": f"{item} (PROCESSED)",
+                        "video_path": vid_p,
+                        "edl_path": edl_p,
+                        "fps": fps,
+                        "duration": duration,
+                        "total_frames": total_frames,
+                        "processed": True,
+                        "sequence_name": item
+                    })
+                    
     return {"clips": results}

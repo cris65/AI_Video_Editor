@@ -1,6 +1,6 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.32 - 2026-05-20
+**Version:** v0.1.33 - 2026-05-20
 
 > [!NOTE]
 > Questo documento descrive le **Feature** — ovvero il valore funzionale esposto all'utente finale,

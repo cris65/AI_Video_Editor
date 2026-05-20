@@ -169,6 +169,9 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
   ```
 - **ESLINT V9 CONFIG REQUIREMENT:** If `eslint` fails with `ESLint couldn't find an eslint.config.(js|mjs|cjs) file`, you must verify if an `eslint.config.js` exists in the root. If not, autonomously create one compatible with Vite+React and TypeScript before linting.
 
+### LAW 8 — EXPLICIT WOLF-FLOW TRIGGER ONLY (NO AUTONOMOUS COMMITS)
+- **THE LAW:** You are STRICTLY FORBIDDEN from executing the `wolf_flow` routine (version bumping, KB updating, committing, and exporting) autonomously at the end of a task or request. You MUST only modify/fix files and leave the changes as uncommitted modifications in the working directory. You must wait for the Tech Lead's explicit request containing the `/wolf_flow` slash command before starting the release sequence.
+
 ## 10. 🧱 DRAG & DROP, OPTIMISTIC UI & PORTAL PROTOCOL
 
 1. **Hybrid Sensors Only:** NEVER use `PointerSensor` blocking mobile scroll. Use `MouseSensor` and `TouchSensor` with delay/tolerance.
