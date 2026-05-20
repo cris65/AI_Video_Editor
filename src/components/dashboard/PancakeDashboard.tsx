@@ -71,22 +71,34 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
   const formatModelName = (modelId: string) => {
     if (!modelId) return "VLM";
-    if (modelId.includes("gemma-4-e4b")) return "Gemma 4 E-B";
+    if (modelId.includes("gemma-4-e4b")) return "Gemma 4 E4B it";
     return modelId.split('/').pop() || modelId;
+  };
+
+  const formatDuration = (totalSec: number) => {
+    if (totalSec <= 60) {
+      return `${Math.round(totalSec)}s`;
+    }
+    const mins = Math.floor(totalSec / 60);
+    const secs = Math.round(totalSec % 60);
+    return `${mins}m ${secs}s`;
   };
 
   useEffect(() => {
     const fetchTelemetry = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/performance/history');
+        const res = await fetch('/system_logs/performance_history.json');
         if (res.ok) {
-          const history = await res.json();
-          if (Array.isArray(history) && history.length > 0) {
-            setLastTelemetry(history[history.length - 1]);
+          const text = await res.text();
+          if (text.trim()) {
+            const history = JSON.parse(text);
+            if (Array.isArray(history) && history.length > 0) {
+              setLastTelemetry(history[history.length - 1]);
+            }
           }
         }
       } catch (err) {
-        console.warn("Failed to fetch telemetry history:", err);
+        console.warn("Failed to fetch or parse telemetry history:", err);
       }
     };
     fetchTelemetry();
@@ -473,15 +485,6 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             <h1 className="text-xl font-bold text-white tracking-tight">Pancake HITL Dashboard</h1>
             <div className="flex items-center gap-3 mt-0.5 font-mono text-xs">
               <span className="text-slate-500">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</span>
-              {lastTelemetry && (
-                <span className="text-slate-500 flex items-center gap-1.5">
-                  <span>•</span>
-                  <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[10px]">
-                    {formatModelName(lastTelemetry.vlm_model_id)}
-                  </span>
-                  <span>Analyzed {lastTelemetry.extracted_frames} frames in {Math.round(lastTelemetry.total_duration_sec)}s</span>
-                </span>
-              )}
               
               {/* Save Status Indicator */}
               <div className="flex items-center gap-1.5 min-w-[80px]">
@@ -580,11 +583,26 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         </div>
       </header>
 
-      {/* Main Split View */}
       <main className="flex-1 p-6 flex flex-col lg:flex-row gap-6 max-w-[1920px] mx-auto w-full min-h-0">
         
         {/* Left Side: Player & Timeline */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* Telemetry Display Container */}
+          <div className="flex items-center justify-between mb-4 h-[30px] shrink-0">
+            <div className="text-slate-400 text-sm font-medium flex items-center gap-2">
+              {lastTelemetry ? (
+                <>
+                  <Activity size={16} className="text-blue-400" />
+                  <span className="text-slate-300 font-semibold">{formatModelName(lastTelemetry.vlm_model_id)}</span>
+                  <span className="text-slate-600">•</span>
+                  <span>Analyzed {lastTelemetry.extracted_frames} frames in {formatDuration(lastTelemetry.total_duration_sec)}</span>
+                </>
+              ) : (
+                <span className="text-slate-500 italic text-xs">No telemetry data available</span>
+              )}
+            </div>
+          </div>
+
           <div className="flex-1 min-h-0 flex items-center justify-center relative">
             <VideoPlayerSync 
               src={videoUrl} 

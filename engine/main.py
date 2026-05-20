@@ -153,6 +153,14 @@ def run_pipeline(force: bool = False):
     preview_main_path = None
     trash_preview_path = None
 
+    import time
+    from datetime import datetime
+    import performance_tracker
+
+    session_start_dt = datetime.now()
+    cv_start = time.time()
+    cv_duration = 0.0
+
     try:
         # EDL parsing is always fast — eseguito sempre per ottenere sequence_name e clip_map
         print("⏳ Lettura Ingest EDL...")
@@ -194,6 +202,8 @@ def run_pipeline(force: bool = False):
             print("⏳ Avvio Elaborazione Pancake Editor (YOLO + OpenCV)...")
             _, preview_main_path, valid_cuts_count, trash_preview_path = \
                 pancake_editor.process_pancake_video(FILE_PROXY_IN, sequence_name, clip_map)
+
+            cv_duration = time.time() - cv_start
 
             # Override del json_main_path per puntare rigorosamente al "Director Package"
             json_main_path = os.path.join(
@@ -239,15 +249,42 @@ def run_pipeline(force: bool = False):
     # 3. FASE B: ANALISI SEMANTICA (MLX Server - Vision LLM)
     # ============================================================
     print("\n--- FASE B: Analisi Semantica Vision (MLX Server) ---")
+    mlx_start = time.time()
+    mlx_duration = 0.0
+    vlm_model_id = "mlx-community/gemma-4-e4b-it-4bit"
     if mlx_client.check_mlx_server_health():
         print("✅ Server MLX rilevato e attivo (deep-probe OK). Avvio arricchimento metadati...")
         mlx_client.process_stringout_batch(json_main_path)
+        mlx_duration = time.time() - mlx_start
     else:
         print("⚠️  Server MLX non disponibile o incompatibile. Skip Fase B (arricchimento semantico).")
         print("   👉 Per attivare la Fase B, apri un terminale separato ed esegui:")
         print("      cd engine && source venv/bin/activate")
         print("      python -m mlx_lm server --model mlx-community/gemma-4-e4b-it-4bit --port 8080")
         print("   Attendi il messaggio '[INFO] Starting server...' prima di rieseguire main.py.")
+
+    # Record telemetry
+    try:
+        import cv2
+        cap = cv2.VideoCapture(FILE_PROXY_IN)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap.isOpened() else 0
+        cap.release()
+        
+        extracted_frames = max(1, int(total_frames * 0.15))
+        
+        session_end_dt = datetime.now()
+        performance_tracker.record_run(
+            vlm_model_id=vlm_model_id,
+            session_start_time=session_start_dt.isoformat(),
+            session_end_time=session_end_dt.isoformat(),
+            total_frames=total_frames,
+            extracted_frames=extracted_frames,
+            cv_duration_sec=cv_duration,
+            mlx_duration_sec=mlx_duration
+        )
+        print("📊 Telemetry recorded successfully to performance history.")
+    except Exception as telemetry_err:
+        print(f"⚠️ Failed to record telemetry run: {telemetry_err}")
 
     # ============================================================
     # 4. FASE C: GENERAZIONE AUDIO E BEAT EXTRACTION

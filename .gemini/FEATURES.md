@@ -1,6 +1,6 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.34 - 2026-05-20
+**Version:** v0.1.35 - 2026-05-20
 
 > [!NOTE]
 > This document describes the **Features** — i.e., the functional value exposed to the end user, both as engine capabilities and UI interfaces. It does not describe how the data is structured (→ `STRUCTURE.md`) nor the temporal execution flow (→ `PIPELINE.md`).
@@ -60,3 +60,4 @@ The Director is the module that closes the loop between AI analysis and human de
 - **Anti-Lag Engine (60fps)**: Time data-binding completely detached from React State and offloaded to a direct `requestAnimationFrame` on the DOM. React re-renders are blocked via `React.memo` except when the video passes a real cut of the virtual EDL.
 - **Director Settings Panel & Advanced Modal**: The user can access an advanced panel `🎨 AI Director Creative Settings` (via createPortal to bypass z-index limits) to set *Target Product*, *Expected Subjects*, *Focus Area*, and NLP parameters, saved inside the `DirectorConfig`.
 - **Dynamic Hardware Profiler & Trinity Startup**: The entire ecosystem (React + Python) boots in parallel with a single command (`npm run wolf:dev`). The integrated hardware widget no longer uses mocked data but reads the profile from the backend (`/api/system/profiler`), which extracts the exact chip model and Unified RAM by querying the macOS kernel (`sysctl`) natively. ETA and inference batches (Chunks) are calculated mathematically in real-time.
+- **Pannello di Telemetria delle Performance**: Visualizza sopra il Video Player i dati dell'ultima elaborazione eseguita dalla pipeline Python (inclusi modello VLM compatto, frame analizzati e durata formattata in minuti/secondi) leggendo dinamicamente il file `performance_history.json`.

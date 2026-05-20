@@ -89,6 +89,17 @@ const engineAssetsPlugin = () => ({
       }
     });
 
+    server.middlewares.use('/system_logs', (req: any, res: any, next: any) => {
+      const filePath = path.join(process.cwd(), 'system_logs', req.url.split('?')[0]);
+      if (fs.existsSync(filePath)) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Type', 'application/json');
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        next();
+      }
+    });
+
     server.middlewares.use('/api/regenerate-director-cut', (req: any, res: any, next: any) => {
       if (req.method === 'POST') {
         const url = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);

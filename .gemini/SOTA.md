@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.34 - 2026-05-20
+**Version:** v0.1.35 - 2026-05-20
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -56,7 +56,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 7. **`edl_exporter.py`** — Fase E. Export Stringout grezzo in CMX3600 EDL.
 8. **`xml_exporter.py`** — Fase E. Export Director's Cut in FCP7 XML (Resolution-Agnostic, legge risoluzione da `hitl_data.json`).
 9. **`api_server.py`** — Runtime server FastAPI (:8000). Espone `/api/system/profiler` (rilevamento hardware Apple Silicon) e `/api/orchestrate` (endpoint POST che riceve il payload ibrido dalla UI e attiva la Fase D isolata).
-10. **`main.py`** — Orchestratore CLI Zero-Click. Esegue in sequenza le 5 fasi, con skip automatico della Fase B se MLX Server è offline.
+10. **`main.py`** — Orchestratore CLI Zero-Click. Esegue in sequenza le 5 fasi, con skip automatico della Fase B se MLX Server è offline. Registra le telemetrie prestazionali dell'esecuzione (tempi di OpenCV/YOLO, MLX e frame elaborati) scrivendole in `system_logs/performance_history.json` tramite `performance_tracker.py`.
 
 ---
 
@@ -88,6 +88,7 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 - **Override Non-Distruttivi (KEEP/TRASH/BROLL):** Shortcut `K`, `T`, `B`. Stato visualizzato istantaneamente con glow e badge. Salvati su sidecar `_hitl_data.json`.
 - **Director Settings Panel & Orchestrazione:** Sidebar rapida che invia l'intero stato ibrido (Seed, Constraints, Overrides, Analysis FPS) all'endpoint FastAPI `/api/orchestrate`. Creative Settings Portal full-screen per prompt e parametri NLP.
 - **Interfaccia TypeScript `PancakeClip`:** Rispecchia fedelmente lo schema JSON annidato v0.1.34 con 7 sotto-interfacce typed (`technical_quality`, `spatial_configuration`, `yolo_omniscient_data`, `cinematography?`, `continuity?`, `commercial?`, `story?`). Zero chiavi piatte legacy.
+- **Integrazione Telemetrica del Dashboard:** Middleware in Vite per servire staticamente `/system_logs/performance_history.json`. Visualizzazione delle performance dell'ultimo run (nome del modello VLM formattato, frame estratti e durata in minuti/secondi) posizionato simmetricamente sopra il Video Player principale tramite icona di attività di `lucide-react`.
 
 ---
 
