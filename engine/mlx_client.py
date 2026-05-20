@@ -12,7 +12,7 @@ except ImportError:
     MLX_VLM_AVAILABLE = False
 
 PROMPT_TEXT = (
-    "You are a literal, objective, and highly observant continuity supervisor. You MUST NOT invent or hallucinate settings, lighting, or emotions. Describe exactly what is in the frame. Your observations must be literal, factual, and prop-aware. "
+    "<|think|>You are a literal, objective, and highly observant continuity supervisor. You MUST NOT invent or hallucinate settings, lighting, or emotions. Describe exactly what is in the frame. Your observations must be literal, factual, and prop-aware. "
     "You are analyzing a single continuous video shot, displayed across {num_frames} sequential temporal frames. "
     "FUNDAMENTAL CONTINUITY RULE: These frames represent the chronological passage of time within a SINGLE scene. Subjects in earlier frames are the same ones continuing their action in later frames. "
     "Your task is to analyze how the scene and subjects move and evolve chronologically, providing a comprehensive assessment for editorial and commercial use. "
@@ -33,7 +33,15 @@ def check_mlx_server_health():
     return MLX_VLM_AVAILABLE
 
 def clean_json_response(raw_text):
-    """Estrae l'oggetto JSON eliminando i markdown e commenti."""
+    """Estrae l'oggetto JSON eliminando i markdown, commenti e reasoning tags."""
+    # Prova a estrarre prima l'oggetto JSON più esterno tramite ricerca greedy
+    match = re.search(r'(\{.*\})', raw_text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
     try:
         return json.loads(raw_text)
     except json.JSONDecodeError:
@@ -43,13 +51,6 @@ def clean_json_response(raw_text):
     if json_pattern:
         try:
             return json.loads(json_pattern.group(1))
-        except json.JSONDecodeError:
-            pass
-            
-    root_pattern = re.search(r'(\{.*?\})', raw_text, re.DOTALL)
-    if root_pattern:
-        try:
-            return json.loads(root_pattern.group(1))
         except json.JSONDecodeError:
             pass
             
@@ -88,7 +89,9 @@ def analyze_frame(model, processor, image_paths, people_count=0):
             prompt=prompt,
             image=image_paths,
             max_tokens=512,
-            temperature=0.0,
+            temperature=1.0,
+            top_p=0.95,
+            top_k=64,
             verbose=False
         )
         

@@ -1,6 +1,6 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.36 - 2026-05-20
+**Version:** v0.1.37 - 2026-05-20
 
 > [!NOTE]
 > This document describes the **Features** — i.e., the functional value exposed to the end user, both as engine capabilities and UI interfaces. It does not describe how the data is structured (→ `STRUCTURE.md`) nor the temporal execution flow (→ `PIPELINE.md`).
@@ -25,8 +25,10 @@ The system extrapolates a single optimized timeline to maximize offline post-pro
 ### 3. PHASE B - Vision LLM Inference (MLX Server)
 The Engine is no longer "blind". Integrating the local MLX ecosystem via an OpenAI-compatible standard (`http://127.0.0.1:8080/v1/chat/completions`), the system analyzes the Stringout timeline:
 - Converting the Semantic Storyboard to `base64` on the fly and sending the technical YOLO context (number of subjects detected in the scene).
-- Injecting a specific Context Prompt on Chronological Continuity and commercial analysis.
-- Receiving a structured JSON payload from Gemma 4 nested in **5 macro-objects** that enriches each clip:
+- Iniezione della modalità Reasoning di Gemma 4 tramite token `<|think|>` inserito a inizio prompt di sistema per abilitare il motore di pensiero nativo.
+- Parametri di sampling dedicati: `temperature=1.0`, `top_p=0.95`, `top_k=64`.
+- Parsing robusto dei dati: estrazione greedy regex del blocco JSON esterno che ignora i tag di pensiero `<|channel>thought`.
+- Ricezione di un payload JSON strutturato nidificato in **5 macro-oggetti** che arricchisce ciascuna clip:
   - `cinematography` → `scene_description`, `lighting_type`, `visual_quality_score`, `technical_flaws`, `shot_size`
   - `semantic_analysis` → `subject_action`, `gaze_direction`, `emotional_tone`, `narrative_energy_score`, `subject_screen_position`, `subject_count`, `setting_location`, `key_props`
   - `continuity` → `action_description`, `emotion_arc`, `match_cut_potential`, `match_cut_vector`

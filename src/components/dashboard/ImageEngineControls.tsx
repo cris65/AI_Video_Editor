@@ -120,6 +120,30 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
 
   const totalFrames = selectedClip ? selectedClip.total_frames : 0;
   const extractedFrames = selectedClip ? Math.max(1, Math.floor(totalFrames * density)) : 0;
+
+  const getGlobalProgress = (): number => {
+    if (!taskProgress) return 0;
+    if (taskProgress.phase === 'A_OPENCV') {
+      return Math.min(50, Math.round(taskProgress.percent / 2));
+    }
+    if (taskProgress.phase === 'B_MLX') {
+      return Math.min(100, 50 + Math.round(taskProgress.percent / 2));
+    }
+    return taskProgress.percent;
+  };
+  const globalPercent = getGlobalProgress();
+
+  const getPhaseMessage = (): string => {
+    if (!taskProgress) return '';
+    if (taskProgress.phase === 'A_OPENCV') {
+      return `Fase 1/2: Analisi Computer Vision... (${taskProgress.message})`;
+    }
+    if (taskProgress.phase === 'B_MLX') {
+      return `Fase 2/2: Analisi Semantica MLX... (${taskProgress.message})`;
+    }
+    return taskProgress.message;
+  };
+  const phaseMessage = getPhaseMessage();
   
   const [estimatedSeconds, setEstimatedSeconds] = useState<number>(0);
 
@@ -396,17 +420,19 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
           {engineStatus === 'running' && taskProgress && (
             <div className="w-full mt-4 bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-inner">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">{taskProgress.phase || 'INITIALIZING'}</span>
-                <span className="text-xs font-mono text-slate-400">{taskProgress.percent}%</span>
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                  {taskProgress.phase === 'A_OPENCV' ? 'FASE 1/2: COMPUTER VISION' : taskProgress.phase === 'B_MLX' ? 'FASE 2/2: SEMANTIC ANALYSIS' : (taskProgress.phase || 'INITIALIZING')}
+                </span>
+                <span className="text-xs font-mono text-slate-400">{globalPercent}%</span>
               </div>
               <div className="w-full bg-slate-800 rounded-full h-2 mb-2 overflow-hidden">
                 <div 
                   className="bg-emerald-500 h-2 transition-all duration-500" 
-                  style={{ width: `${taskProgress.percent}%` }}
+                  style={{ width: `${globalPercent}%` }}
                 ></div>
               </div>
               <div className="flex justify-between items-center mb-3">
-                <p className="text-[10px] text-slate-500 font-mono truncate max-w-[70%]">{taskProgress.message}</p>
+                <p className="text-[10px] text-slate-500 font-mono truncate max-w-[70%]" title={phaseMessage}>{phaseMessage}</p>
                 {taskProgress.elapsed_seconds !== undefined && (
                   <span className="text-[10px] text-orange-400 font-bold font-mono">
                     ELAPSED: {Math.floor(taskProgress.elapsed_seconds / 60)}m {taskProgress.elapsed_seconds % 60}s
