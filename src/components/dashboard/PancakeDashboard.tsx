@@ -66,7 +66,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [userConstraints, setUserConstraints] = useState<Record<string, UserConstraint[]>>({});
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [clipOverrides, setClipOverrides] = useState<Record<string, 'KEEP' | 'TRASH' | 'BROLL'>>({});
+  const [clipOverrides, setClipOverrides] = useState<Record<string, any>>({});
   const [filterMode, setFilterMode] = useState<'ALL' | 'VALID' | 'BROLL' | 'TRASH'>('ALL');
   const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
   const [isDirectorSettingsOpen, setIsDirectorSettingsOpen] = useState(false);
@@ -232,6 +232,58 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     });
   }, [clipOverrides, directorConfig]);
 
+  const handleGlobalBookend = useCallback((type: 'START' | 'END', time: number) => {
+    const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
+    console.log(`[handleGlobalBookend] type=${type}, time=${time}, clipIndex=${clipIndex}`);
+    if (clipIndex !== -1) {
+      const clipKey = combinedTimeline[clipIndex].start.toString();
+      console.log(`[handleGlobalBookend] target clipKey=${clipKey}`);
+      
+      setClipOverrides(prev => {
+        const next = { ...prev };
+        const targetKey = type === 'START' ? 'is_global_start' : 'is_global_end';
+        
+        const wasAlreadySet = typeof next[clipKey] === 'object' && next[clipKey] !== null && (next[clipKey] as any)[targetKey];
+        console.log(`[handleGlobalBookend] wasAlreadySet=${wasAlreadySet} for ${clipKey}`);
+
+        // SINGLETON RULE: Remove the flag from all other clips first
+        for (const k in next) {
+          const val = next[k];
+          if (typeof val === 'object' && val !== null) {
+            if ((val as any)[targetKey]) {
+              const obj = { ...(val as any) };
+              delete obj[targetKey];
+              next[k] = obj;
+            }
+          }
+        }
+        
+        // Toggle logic: Apply only if it wasn't already set
+        if (!wasAlreadySet) {
+          const currentOverride = next[clipKey];
+          const timeKey = type === 'START' ? 'bookend_start_time' : 'bookend_end_time';
+          const newObj: any = { [targetKey]: true, [timeKey]: time };
+          
+          if (typeof currentOverride === 'string') {
+            newObj.force_status = currentOverride;
+          } else if (typeof currentOverride === 'object' && currentOverride !== null) {
+            Object.assign(newObj, currentOverride);
+            newObj[targetKey] = true;
+            newObj[timeKey] = time;
+          }
+          
+          next[clipKey] = newObj;
+        }
+        
+        console.log(`[handleGlobalBookend] next clipOverrides:`, next);
+        triggerSave(userConstraints, next, directorConfig);
+        return next;
+      });
+    } else {
+      console.log(`[handleGlobalBookend] No clip found at time ${time}`);
+    }
+  }, [combinedTimeline, userConstraints, directorConfig]);
+
   const handleOverride = useCallback((type: 'KEEP' | 'TRASH' | 'BROLL' | 'CLEAR', time: number) => {
     const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
     if (clipIndex !== -1) {
@@ -257,7 +309,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
   async function triggerSave(
     constraintsToSave: Record<string, UserConstraint[]>, 
-    overridesToSave: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>,
+    overridesToSave: Record<string, any>,
     configToSave: DirectorConfig
   ) {
     setSaveStatus('saving');
@@ -403,24 +455,37 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     ? Math.max(...combinedTimeline.map(c => c.end)) 
     : 0;
 
-  const filteredTimeline = combinedTimeline.filter(clip => {
-    if (filterMode === 'ALL') return true;
-    const clipKey = clip.start.toString();
-    const override = clipOverrides[clipKey];
-    
-    let isUsable = clip.is_usable !== false;
-    let isBroll = clip.tag.includes('B-ROLL');
-    
-    if (override === 'KEEP') { isUsable = true; isBroll = false; }
-    if (override === 'TRASH') { isUsable = false; }
-    if (override === 'BROLL') { isUsable = true; isBroll = true; }
-    
-    if (filterMode === 'VALID') return isUsable && !isBroll;
-    if (filterMode === 'BROLL') return isUsable && isBroll;
-    if (filterMode === 'TRASH') return !isUsable;
-    
-    return true;
-  });
+  const filteredTimeline = useMemo(() => {
+    let result = combinedTimeline;
+
+    if (filterMode === 'VALID') {
+      result = result.filter(clip => {
+        const override = clipOverrides[clip.start.toString()];
+        const forceStatus = typeof override === 'string' ? override : override?.force_status;
+        const isUsable = forceStatus === 'TRASH' ? false : (forceStatus === 'KEEP' || forceStatus === 'BROLL' ? true : clip.is_usable !== false);
+        const isBroll = forceStatus === 'BROLL' ? true : (forceStatus === 'KEEP' ? false : clip.tag.includes('B-ROLL'));
+        return isUsable && !isBroll;
+      });
+    } else if (filterMode === 'BROLL') {
+      result = result.filter(clip => {
+        const override = clipOverrides[clip.start.toString()];
+        const forceStatus = typeof override === 'string' ? override : override?.force_status;
+        const isUsable = forceStatus === 'TRASH' ? false : (forceStatus === 'KEEP' || forceStatus === 'BROLL' ? true : clip.is_usable !== false);
+        const isBroll = forceStatus === 'BROLL' ? true : (forceStatus === 'KEEP' ? false : clip.tag.includes('B-ROLL'));
+        return isUsable && isBroll;
+      });
+    } else if (filterMode === 'TRASH') {
+      result = result.filter(clip => {
+        const override = clipOverrides[clip.start.toString()];
+        const forceStatus = typeof override === 'string' ? override : override?.force_status;
+        const isUsable = forceStatus === 'TRASH' ? false : (forceStatus === 'KEEP' || forceStatus === 'BROLL' ? true : clip.is_usable !== false);
+        return !isUsable;
+      });
+    }
+
+    // Sort chronologically only — no teleportation (bookends are metadata for LLM, not UI reordering)
+    return [...result].sort((a, b) => a.start - b.start);
+  }, [combinedTimeline, filterMode, clipOverrides]);
 
   useEffect(() => {
     if (isPreviewMode) return; // Disabilita check standard in preview mode
@@ -627,19 +692,20 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             {/* Global IN/OUT Constraints */}
             {!isPreviewMode && (
               <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1">Bookends</span>
                 <button
-                  onClick={() => handleConstraint('IN', currentTimelineTime)}
-                  title="Imposta Marker IN (I)"
-                  className="flex items-center gap-1.5 px-4 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg transition-all text-xs font-bold tracking-wider shadow-sm hover:scale-[1.02]"
+                  onClick={() => handleGlobalBookend('START', isPreviewMode ? currentTimelineTime : (videoRef.current?.currentTime ?? 0))}
+                  title="Global Sequence IN (Bookend)"
+                  className="flex items-center gap-1 px-3 py-1 bg-blue-500/10 hover:bg-blue-500/25 border border-blue-500/40 text-blue-400 rounded-lg transition-all text-xs font-black tracking-wider shadow-sm hover:scale-[1.02] hover:shadow-blue-500/20 hover:shadow-md"
                 >
-                  <span className="text-blue-300">[</span> IN
+                  <span className="text-blue-300 font-black">[</span> IN
                 </button>
                 <button
-                  onClick={() => handleConstraint('OUT', currentTimelineTime)}
-                  title="Imposta Marker OUT (O)"
-                  className="flex items-center gap-1.5 px-4 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-lg transition-all text-xs font-bold tracking-wider shadow-sm hover:scale-[1.02]"
+                  onClick={() => handleGlobalBookend('END', isPreviewMode ? currentTimelineTime : (videoRef.current?.currentTime ?? 0))}
+                  title="Global Sequence OUT (Bookend)"
+                  className="flex items-center gap-1 px-3 py-1 bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/40 text-purple-400 rounded-lg transition-all text-xs font-black tracking-wider shadow-sm hover:scale-[1.02] hover:shadow-purple-500/20 hover:shadow-md"
                 >
-                  OUT <span className="text-purple-300">]</span>
+                  OUT <span className="text-purple-300 font-black">]</span>
                 </button>
               </div>
             )}
@@ -1011,8 +1077,17 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                   constraints={userConstraints[clip.start.toString()]}
                   onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
                   onSeekToMarker={(time) => handleSeek(time)}
-                  overrideMode={clipOverrides[clip.start.toString()]}
+                  overrideMode={
+                    typeof clipOverrides[clip.start.toString()] === 'string'
+                      ? (clipOverrides[clip.start.toString()] as any)
+                      : clipOverrides[clip.start.toString()]?.force_status
+                  }
+                  isGlobalStart={clipOverrides[clip.start.toString()]?.is_global_start}
+                  isGlobalEnd={clipOverrides[clip.start.toString()]?.is_global_end}
+                  bookendStartTime={clipOverrides[clip.start.toString()]?.bookend_start_time}
+                  bookendEndTime={clipOverrides[clip.start.toString()]?.bookend_end_time}
                   onClearOverride={() => handleOverride('CLEAR', clip.start)}
+                  onClearBookend={(type) => handleGlobalBookend(type, clip.start)}
                   markerNumbers={globalMarkerNumbers}
                 />
               ))

@@ -7,7 +7,7 @@ interface InteractiveTimelineProps {
   videoRef: React.RefObject<HTMLVideoElement>;
   duration: number;
   userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM' | 'AUDIO'; time: number }>>;
-  clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
+  clipOverrides?: Record<string, any>;
   audioWaveform?: number[];
   audioDuration?: number;
   markerNumbers?: Map<string, number>; // Global M# namespace from PancakeDashboard (Stringout-first)
@@ -15,10 +15,10 @@ interface InteractiveTimelineProps {
 
 // Per-type marker color palette
 const MARKER_COLORS: Record<string, string> = {
-  IN:    '#3b82f6', // blue-500
-  OUT:   '#a855f7', // purple-500
-  BM:    '#f97316', // orange-500 (user bookmark, distinct from native yellow BM)
-  AUDIO: '#22c55e', // green-500
+  IN:    '#4CAF50', // Premiere green  — IN marker
+  OUT:   '#E53935', // Premiere red    — OUT marker
+  BM:    '#FF6D00', // Premiere orange — user BM bookmark
+  AUDIO: '#FFC107', // Premiere gold   — audio cue
 };
 
 const MIN_ZOOM_WINDOW = 0.04; // minimum 4% of total duration visible
@@ -337,9 +337,10 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                 <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
                 <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
                 <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span>Marker IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">I / O</kbd></div>
-                <div className="flex justify-between items-center"><span>Marker Bookmark (M#)</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">M</kbd></div>
-                <div className="flex justify-between items-center"><span className="text-green-400">Marker Audio (♪)</span><kbd className="bg-green-900/50 px-1.5 py-0.5 rounded text-green-400 font-mono border border-green-800/50">A</kbd></div>
+                <div className="flex justify-between items-center"><span style={{color:'#4CAF50'}}>Marker IN</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#4CAF5020',color:'#4CAF50',borderColor:'#4CAF5055'}}>I</kbd></div>
+                <div className="flex justify-between items-center"><span style={{color:'#E53935'}}>Marker OUT</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#E5393520',color:'#E53935',borderColor:'#E5393555'}}>O</kbd></div>
+                <div className="flex justify-between items-center"><span style={{color:'#FF6D00'}}>Marker BM (M#)</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#FF6D0020',color:'#FF6D00',borderColor:'#FF6D0055'}}>M</kbd></div>
+                <div className="flex justify-between items-center"><span style={{color:'#FFC107'}}>Marker Audio (♪)</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#FFC10720',color:'#FFC107',borderColor:'#FFC10755'}}>A</kbd></div>
                 <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X / Backspace</kbd></div>
                 <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
                 <div className="w-full h-px bg-slate-800 my-1" />
@@ -422,9 +423,9 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                       className="absolute bottom-1 -translate-x-1/2 flex items-center justify-center gap-[2px] px-1 py-0.5 rounded text-[7px] font-black font-mono cursor-pointer hover:brightness-125 transition-all"
                       style={{
                         left: `${leftPct}%`,
-                        backgroundColor: '#eab30830',
-                        color: '#eab308',
-                        border: '1px solid #eab30866',
+                        backgroundColor: '#FF6D0030',
+                        color: '#FF6D00',
+                        border: '1px solid #FF6D0066',
                       }}
                       title={`BM — ${formatTime(clip.best_moment as number)} — click to seek`}
                     >
@@ -432,7 +433,6 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                     </button>
                   );
                 })() : null;
-
                 return [constraintPills, bmPill];
               })}
             </div>
@@ -444,6 +444,8 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
             const width = ((clip.end - clip.start) / duration) * 100;
             const override = clipOverrides[clip.start.toString()];
             const clipName = clip.clip_name ?? '';
+            const isGlobalStart = override?.is_global_start === true;
+            const isGlobalEnd = override?.is_global_end === true;
 
             return (
               <div
@@ -458,6 +460,36 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                     {clipName}
                   </span>
                 )}
+
+                {/* Global Bookend Marker — vertical line at exact playhead position */}
+                {(isGlobalStart || isGlobalEnd) && (() => {
+                  const clipLen = clip.end - clip.start;
+                  const bookendTime: number = isGlobalStart
+                    ? (override?.bookend_start_time ?? clip.start)
+                    : (override?.bookend_end_time ?? clip.end);
+                  // Position within the clip block (0%=left edge, 100%=right edge)
+                  const innerPct = Math.min(100, Math.max(0, ((bookendTime - clip.start) / clipLen) * 100));
+                  return (
+                    <>
+                      {/* Vertical line at exact position */}
+                      <div
+                        className={`absolute top-0 bottom-0 w-[2px] z-20 pointer-events-none ${isGlobalStart ? 'bg-blue-500' : 'bg-purple-500'}`}
+                        style={{ left: `${innerPct}%` }}
+                      />
+                      {/* Flag label next to the line */}
+                      <div
+                        className="absolute top-[3px] z-20 pointer-events-none"
+                        style={{ left: `calc(${innerPct}% + 3px)` }}
+                      >
+                        <span className={`text-[7px] font-black px-0.5 py-px leading-none
+                          ${isGlobalStart ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'}
+                        `}>
+                          {isGlobalStart ? '[ IN' : 'OUT ]'}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Best Moment (BM) Native Indicator — clickable, seeks to best_moment */}
                 {clip.best_moment && clip.best_moment > clip.start && clip.best_moment < clip.end && override !== 'TRASH' && (
@@ -624,10 +656,17 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
       </div>
 
       {/* ── Legend ────────────────────────────────────────────────────────── */}
-      <div className="flex gap-4 items-center justify-center text-[10px] uppercase font-bold tracking-wider text-slate-500">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 items-center justify-center text-[10px] uppercase font-bold tracking-wider text-slate-500">
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500/80"></span> Valid (MAIN)</div>
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500/80"></span> B-ROLL</div>
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500/80"></span> Trash (Rejected)</div>
+        <span className="text-slate-700">|</span>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#4CAF50'}}></span> Marker IN</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#E53935'}}></span> Marker OUT</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#FF6D00'}}></span> Marker BM</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#FFC107'}}></span> Marker Audio</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Bookend [ IN</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Bookend OUT ]</div>
         {zoomSpan < 0.99 && (
           <button
             onClick={() => setZoomWindow([0, 1])}

@@ -19,13 +19,18 @@ interface ClipCardProps {
   onRemoveConstraint?: (time: number) => void;
   onSeekToMarker?: (time: number) => void;
   overrideMode?: 'KEEP' | 'TRASH' | 'BROLL';
+  isGlobalStart?: boolean;
+  isGlobalEnd?: boolean;
+  bookendStartTime?: number;
+  bookendEndTime?: number;
   markerNumbers?: Map<string, number>;
   onClearOverride?: () => void;
+  onClearBookend?: (type: 'START' | 'END') => void;
 }
 
 
 
-export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, onSeekToMarker, overrideMode, markerNumbers, onClearOverride }: ClipCardProps) {
+export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, onSeekToMarker, overrideMode, isGlobalStart, isGlobalEnd, bookendStartTime, bookendEndTime, markerNumbers, onClearOverride, onClearBookend }: ClipCardProps) {
   let finalUsable = clip.is_usable !== false;
   let isBroll = clip.tag.includes('B-ROLL');
   
@@ -102,7 +107,14 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           : "ring-2 ring-emerald-500 ring-offset-2 ring-offset-slate-950 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] z-10")
     : "";
 
-  const cardWrapperClass = `cursor-pointer border rounded-xl overflow-hidden shadow-lg transition-all group flex flex-col ${baseWrapperClass} ${activeGlow}`;
+  // Bookend takes visual priority over everything else for the border/glow
+  const bookendGlow = isGlobalStart
+    ? "border-blue-500/70 shadow-[0_0_18px_rgba(59,130,246,0.35)] ring-1 ring-blue-500/40 ring-offset-0"
+    : isGlobalEnd
+      ? "border-purple-500/70 shadow-[0_0_18px_rgba(168,85,247,0.35)] ring-1 ring-purple-500/40 ring-offset-0"
+      : "";
+
+  const cardWrapperClass = `cursor-pointer border rounded-xl overflow-hidden shadow-lg transition-all group flex flex-col ${baseWrapperClass} ${activeGlow} ${bookendGlow}`;
 
   return (
     <div className={cardWrapperClass} ref={cardRef} onClick={onClick}>
@@ -141,40 +153,34 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           </div>
         ) : null}
 
-        {/* Constraints Badge */}
-        {constraints && constraints.length > 0 && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center justify-center z-30">
-            {constraints.length === 1 ? (
-              <span className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md shadow-lg
-                ${constraints[0].type === 'IN' ? 'bg-blue-500/90 text-white border-blue-400' : ''}
-                ${constraints[0].type === 'OUT' ? 'bg-purple-500/90 text-white border-purple-400' : ''}
-                ${constraints[0].type === 'BM' ? 'bg-yellow-500/90 text-yellow-950 border-yellow-400' : ''}
+        {/* Global Bookend Badge — thin top stripe + corner label */}
+        {(isGlobalStart || isGlobalEnd) && (
+          <>
+            <div className={`absolute top-0 left-0 right-0 h-[3px] z-40 pointer-events-none ${isGlobalStart ? 'bg-blue-500' : 'bg-purple-500'}`} />
+            {/* Centered badge — prominent, doesn't cover the clip name */}
+            <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+              <span className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-black tracking-widest border-2 backdrop-blur-md shadow-2xl
+                ${isGlobalStart ? 'bg-blue-600/85 text-white border-blue-400/80' : 'bg-purple-600/85 text-white border-purple-400/80'}
               `}>
-                {constraints[0].type === 'IN' && 'FORCED IN'}
-                {constraints[0].type === 'OUT' && 'FORCED OUT'}
-                {constraints[0].type === 'BM' && '🔥 BEST MOMENT'}
-                <span className="opacity-80 ml-1">[{constraints[0].time.toFixed(2)}s]</span>
+                {isGlobalStart ? '[ IN' : 'OUT ]'}
               </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md shadow-lg bg-slate-900/90 text-emerald-400 border-emerald-500/50">
-                🔥 {constraints.length} MARKERS SET
-              </span>
-            )}
-          </div>
+            </div>
+          </>
         )}
-        
-        {/* Top Badges */}
-        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-20 pointer-events-none">
-          <div className="flex flex-col gap-1.5">
-            <span className="px-2 py-1 rounded bg-slate-950/80 text-white text-xs font-bold font-mono border border-slate-800 backdrop-blur-md shadow-sm w-fit">
-              {clipName}
-            </span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border backdrop-blur-md w-fit ${getBadgeColor(clip.tag)}`}>
-              {clip.tag}
-            </span>
-          </div>
-          
-          <div className="flex gap-2">
+
+
+        {/* Area A — Top bar: clip name (left) | MAIN_A tag (center) | Actors (right) */}
+        <div className="absolute top-2 left-2 right-2 flex justify-between items-center z-20 pointer-events-none">
+          {/* Left: clip name */}
+          <span className="px-2 py-1 rounded bg-slate-950/80 text-white text-xs font-bold font-mono border border-slate-800 backdrop-blur-md shadow-sm shrink-0">
+            {clipName}
+          </span>
+          {/* Center: tag (MAIN_A / B-ROLL etc.) */}
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border backdrop-blur-md ${getBadgeColor(clip.tag)}`}>
+            {clip.tag}
+          </span>
+          {/* Right: Actors */}
+          <div className="flex gap-2 shrink-0">
             {!isRejected && (
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-slate-950/80 text-slate-300 backdrop-blur-md border border-slate-800/50">
                 <Users size={12} />
@@ -184,24 +190,39 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           </div>
         </div>
         
-        {/* Bottom Bar: Palette & Score */}
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-slate-950/90 to-transparent flex justify-between items-end z-20">
-          <div className="flex gap-1">
-            {clip.technical_quality?.cinematic_palette?.map((color, idx) => (
-              <div key={idx} className="w-3 h-3 rounded-full border border-slate-800 shadow-sm" style={{ backgroundColor: color }} title={color} />
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'text-slate-300 bg-slate-950/80 border-slate-800'}`}>
-               {clip.start.toFixed(1)}s - {clip.end.toFixed(1)}s <span className="ml-1 opacity-70">({duration}s)</span>
-             </span>
-
-          </div>
+        {/* Bottom Bar — Area C (Marker badge LEFT) + duration (RIGHT) */}
+        <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-slate-950/90 to-transparent flex justify-between items-end z-20">
+          {/* Marker badge — counts all visible markers (constraints + bookends + native BM) */}
+          {(() => {
+            const nativeBMCount = (clip.best_moment && clip.best_moment > clip.start && clip.best_moment < clip.end) ? 1 : 0;
+            const markerCount = (constraints?.length ?? 0) + (isGlobalStart ? 1 : 0) + (isGlobalEnd ? 1 : 0) + nativeBMCount;
+            if (markerCount === 0) return <span />;
+            return (
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold border backdrop-blur-sm shadow bg-slate-900/80 text-emerald-400 border-emerald-500/40">
+                🔥 {markerCount} MARKERS SET
+              </span>
+            );
+          })()}
+          {/* Duration timer */}
+          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'text-slate-300 bg-slate-950/80 border-slate-800'}`}>
+            {clip.start.toFixed(1)}s – {clip.end.toFixed(1)}s <span className="ml-1 opacity-70">({duration}s)</span>
+          </span>
         </div>
       </div>
 
       {/* Content */}
       <div className="p-4 flex-1 flex flex-col z-20">
+
+        {/* Area D — Color palette dots where the marker badge was */}
+        {clip.technical_quality?.cinematic_palette && clip.technical_quality.cinematic_palette.length > 0 && (
+          <div className="flex gap-1 mb-3">
+            {clip.technical_quality.cinematic_palette.map((color, idx) => (
+              <div key={idx} className="w-3 h-3 rounded-full border border-slate-700 shadow-sm" style={{ backgroundColor: color }} title={color} />
+            ))}
+          </div>
+        )}
+
+        {/* Score MLX row */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <span className={`text-sm font-semibold ${isRejected ? 'text-red-300' : 'text-slate-200'}`}>Score MLX</span>
@@ -252,23 +273,81 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
             });
           }
 
-          if (items.length === 0 && !overrideMode) return null;
+          if (items.length === 0 && !overrideMode && !isGlobalStart && !isGlobalEnd) return null;
 
           // Sort chronologically by time
           items.sort((a, b) => a.time - b.time);
 
+          // Prepend bookend rows (they anchor the sequence, show first regardless of time)
+          const bookendRows: Array<{ type: 'BOOKEND_IN' | 'BOOKEND_END'; time: number }> = [];
+          if (isGlobalStart) bookendRows.push({ type: 'BOOKEND_IN', time: bookendStartTime ?? clip.start });
+          if (isGlobalEnd) bookendRows.push({ type: 'BOOKEND_END', time: bookendEndTime ?? clip.end });
+
           const BORDER_COLOR: Record<string, string> = {
-            IN: '#3b82f6',
-            OUT: '#a855f7',
-            BM: '#f97316', // User-added BM is orange
-            AUDIO: '#22c55e',
+            IN:    '#4CAF50', // Premiere green  — IN marker
+            OUT:   '#E53935', // Premiere red    — OUT marker
+            BM:    '#FF6D00', // Premiere orange — user BM bookmark
+            AUDIO: '#FFC107', // Premiere gold   — audio cue
           };
 
           return (
             <div className="mb-4 flex flex-col border border-slate-800 rounded-lg overflow-hidden">
+              {/* Bookend rows — singleton anchors, always first */}
+              {bookendRows.map((be) => {
+                const isIN = be.type === 'BOOKEND_IN';
+                const color = isIN ? '#3b82f6' : '#a855f7';
+                return (
+                  <div
+                    key={be.type}
+                    role="button"
+                    tabIndex={-1}
+                    className="w-full flex items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-slate-800/60 border-b border-slate-800/60 group/row cursor-pointer"
+                    style={{ borderLeft: `3px solid ${color}` }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onSeekToMarker) onSeekToMarker(be.time);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation();
+                        if (onSeekToMarker) onSeekToMarker(be.time);
+                      }
+                    }}
+                  >
+                    {/* Col 1: type symbol — w-8 matches regular rows */}
+                    <span className="text-[10px] font-black font-mono w-8 shrink-0 flex items-center" style={{ color }}>
+                      {isIN ? '[' : ']'}
+                    </span>
+                    {/* Col 2: badge — min-w fixed so timecodes align */}
+                    <span
+                      className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0 min-w-[40px] text-center"
+                      style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}55` }}
+                    >
+                      {isIN ? '[ IN' : 'OUT ]'}
+                    </span>
+                    {/* Col 3: timecode */}
+                    <span className="text-[10px] font-mono text-slate-400 flex-1 ml-1">
+                      [{formatTime(be.time)}]
+                    </span>
+                    {/* Col 4: X to remove */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onClearBookend) onClearBookend(isIN ? 'START' : 'END');
+                      }}
+                      className="opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-700/50 shrink-0"
+                      style={{ color }}
+                      title={`Remove ${isIN ? 'IN' : 'OUT'} Bookend`}
+                    >
+                      <X size={11} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                );
+              })}
               {overrideMode && (
                 <div
-                  className="w-full flex items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-slate-800/60 border-b border-slate-800/60 last:border-b-0 group/row"
+                  className="w-full flex items-center gap-2 px-3 py-1 text-left border-b border-slate-800/60 last:border-b-0 group/row"
                   style={{ borderLeft: `3px solid ${overrideMode === 'KEEP' ? '#10b981' : overrideMode === 'BROLL' ? '#3b82f6' : '#ef4444'}` }}
                 >
                   <span
@@ -307,17 +386,24 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
               )}
               {items.map((item, idx) => {
                 // Native BM gets yellow theme, user BM gets orange theme
-                const borderColor = item.isNativeBM ? '#eab308' : (BORDER_COLOR[item.type] ?? '#94a3b8');
+                const borderColor = item.isNativeBM ? '#FF6D00' : (BORDER_COLOR[item.type] ?? '#94a3b8');
                 const typeLabel = item.type === 'BM' ? 'BM' : item.type;
                 return (
-                  <button
+                  <div
                     key={`${item.time}-${idx}`}
-                    type="button"
+                    role="button"
+                    tabIndex={-1}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (onSeekToMarker) onSeekToMarker(item.time);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-slate-800/60 border-b border-slate-800/60 last:border-b-0 group/row"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation();
+                        if (onSeekToMarker) onSeekToMarker(item.time);
+                      }
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-slate-800/60 border-b border-slate-800/60 last:border-b-0 group/row cursor-pointer"
                     style={{ borderLeft: `3px solid ${borderColor}` }}
                   >
                     {/* Type icon */}
@@ -334,10 +420,10 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
                       {(item.type === 'IN' || item.type === 'OUT') && typeLabel}
                     </span>
 
-                    {/* M# or BM label */}
+                    {/* M# or BM label — min-w-[40px] keeps timecodes aligned */}
                     {item.isNativeBM ? (
                       <span
-                        className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0"
+                        className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0 min-w-[40px] text-center"
                         style={{
                           backgroundColor: '#eab30822',
                           color: '#eab308',
@@ -346,19 +432,19 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
                       >
                         BM
                       </span>
+                    ) : item.markerNum !== undefined ? (
+                      <span
+                        className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0 min-w-[40px] text-center"
+                        style={{
+                          backgroundColor: `${borderColor}22`,
+                          color: borderColor,
+                          border: `1px solid ${borderColor}55`,
+                        }}
+                      >
+                        {item.type === 'IN' ? 'IN' : item.type === 'OUT' ? 'OUT' : item.type === 'BM' ? 'M' : 'A'}{item.markerNum}
+                      </span>
                     ) : (
-                      item.markerNum !== undefined && (
-                        <span
-                          className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0"
-                          style={{
-                            backgroundColor: `${borderColor}22`,
-                            color: borderColor,
-                            border: `1px solid ${borderColor}55`,
-                          }}
-                        >
-                          {item.type === 'IN' ? 'IN' : item.type === 'OUT' ? 'OUT' : item.type === 'BM' ? 'M' : 'A'}{item.markerNum}
-                        </span>
-                      )
+                      <span className="shrink-0 min-w-[40px]" /> /* spacer — keeps timecode aligned when no badge */
                     )}
 
                     {/* Timecode */}
@@ -381,9 +467,9 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
                         <X size={11} strokeWidth={2.5} />
                       </button>
                     ) : (
-                      <span className="w-[16px] h-[16px]" /> // Placeholder spacing so layout matches
+                      <span className="w-[16px] h-[16px]" /> 
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>

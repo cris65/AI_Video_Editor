@@ -25,6 +25,7 @@ export function useVideoShortcuts(
 
       switch (e.code) {
         case 'Space':
+          if (e.repeat) break;
           e.preventDefault();
           if (video.paused) {
             video.play();

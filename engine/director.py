@@ -61,6 +61,11 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
     clip_list_str = []
     for c in usable_clips:
         role = "MUST INCLUDE (PILLAR)" if c.get('_has_bm') else "OPTIONAL (FILLER)"
+        if c.get('_is_global_in'):
+            role += " - ABSOLUTE FIRST CLIP OF SEQUENCE"
+        if c.get('_is_global_out'):
+            role += " - ABSOLUTE LAST CLIP OF SEQUENCE"
+            
         action = c.get('continuity', {}).get('action_description', 'Azione')
         scene = c.get('cinematography', {}).get('scene_description', 'Scena')
         score = c.get('cinematography', {}).get('visual_quality_score', 5)
@@ -156,23 +161,34 @@ def build_locked_grid(locked_clips, beats):
         pos_sec = clip.get('_locked_timeline_pos')
         if pos_sec is None:
             pos_sec = 0.0
-        anchor_idx = find_beat_index(pos_sec, beats)
-        anchor_idx = max(0, min(anchor_idx, len(beats) - 1))  # Clamp — no index error
-        clip_dur = clip['end'] - clip['start']
+            
         src_in = clip.get('absolute_in', clip['start'])
         src_out = clip.get('absolute_out', clip['end'])
-        end_idx = anchor_idx
-        while end_idx < len(beats) - 1 and (beats[end_idx] - beats[anchor_idx]) < clip_dur:
-            end_idx += 1
-        end_idx = min(end_idx, len(beats) - 1)
+        clip_dur = src_out - src_in
+        
+        is_global_out = clip.get('_is_global_out', False)
+        
+        if is_global_out:
+            end_idx = len(beats) - 1
+            anchor_idx = end_idx
+            while anchor_idx > 0 and (beats[end_idx] - beats[anchor_idx]) < clip_dur:
+                anchor_idx -= 1
+        else:
+            anchor_idx = find_beat_index(pos_sec, beats)
+            anchor_idx = max(0, min(anchor_idx, len(beats) - 1))  # Clamp
+            end_idx = anchor_idx
+            while end_idx < len(beats) - 1 and (beats[end_idx] - beats[anchor_idx]) < clip_dur:
+                end_idx += 1
+                
         for b in range(anchor_idx, end_idx):
             occupied[b] = True
+            
         entries.append({
             "clip_ref": clip,
             "source_in": src_in,
             "source_out": src_out,
             "timeline_in": beats[anchor_idx],
-            "timeline_out": beats[end_idx],
+            "timeline_out": beats[anchor_idx] + clip_dur,
             "role": "PILLAR" if clip.get('_has_bm') else "FILLER",
             "tag": clip.get('_final_tag', 'MAIN'),
             "_bm_time": clip.get('_bm_time'),
@@ -229,12 +245,17 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         is_usable = clip.get('is_usable', True)
         is_broll = 'B-ROLL' in clip.get('tag', '')
         
-        if override == 'KEEP':
+        # Allow force_status from an object override
+        force_status = override
+        if isinstance(override, dict):
+            force_status = override.get('force_status')
+
+        if force_status == 'KEEP':
             is_usable = True
             is_broll = False
-        elif override == 'TRASH':
+        elif force_status == 'TRASH':
             is_usable = False
-        elif override == 'BROLL':
+        elif force_status == 'BROLL':
             is_usable = True
             is_broll = True
             
@@ -244,22 +265,54 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         clip['_final_tag'] = 'B-ROLL' if is_broll else 'MAIN'
         clip['_has_bm'] = False
         clip['_bm_time'] = None
+        clip['_has_in'] = False
+        clip['_in_time'] = None
+        clip['_has_out'] = False
+        clip['_out_time'] = None
 
         c_list = constraints.get(clip_key, [])
         for c in c_list:
             if c['type'] == 'BM':
                 clip['_has_bm'] = True
                 clip['_bm_time'] = c['time']
-                break
+            elif c['type'] == 'IN':
+                clip['_has_in'] = True
+                clip['_in_time'] = c['time']
+            elif c['type'] == 'OUT':
+                clip['_has_out'] = True
+                clip['_out_time'] = c['time']
 
         # --- HITL Lock detection ---
         is_locked = False
         locked_pos = None
-        if isinstance(override, dict) and override.get('locked', False):
-            is_locked = True
-            locked_pos = override.get('timeline_position')
-            clip['absolute_in'] = override.get('absolute_in', clip['start'])
-            clip['absolute_out'] = override.get('absolute_out', clip['end'])
+        clip['_is_global_in'] = False
+        clip['_is_global_out'] = False
+        
+        if isinstance(override, dict):
+            if override.get('locked', False):
+                is_locked = True
+                locked_pos = override.get('timeline_position')
+                clip['absolute_in'] = override.get('absolute_in', clip['start'])
+                clip['absolute_out'] = override.get('absolute_out', clip['end'])
+
+            if override.get('is_global_start'):
+                is_locked = True
+                locked_pos = 0.0  # GLOBAL START
+                clip['_is_global_in'] = True
+                if not clip.get('absolute_in'):
+                    clip['absolute_in'] = clip.get('_in_time', clip['start'])
+                if not clip.get('absolute_out'):
+                    clip['absolute_out'] = clip.get('_out_time', clip['end'])
+
+            if override.get('is_global_end'):
+                is_locked = True
+                locked_pos = target_duration  # GLOBAL END
+                clip['_is_global_out'] = True
+                if not clip.get('absolute_in'):
+                    clip['absolute_in'] = clip.get('_in_time', clip['start'])
+                if not clip.get('absolute_out'):
+                    clip['absolute_out'] = clip.get('_out_time', clip['end'])
+
         clip['_locked'] = is_locked
         clip['_locked_timeline_pos'] = locked_pos
 
@@ -275,7 +328,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     # --- Estrazione Modello LLM dalla configurazione ---
     llm_model_id = stringout.get("metadata", {}).get("llm_model_id", "meta-llama/Meta-Llama-3-70B-Instruct")
 
-    recipe_dict = call_director_llm(free_clips, target_duration, target_beats_count, style_prompt, seed, locked_clips=locked_clips, llm_model_id=llm_model_id)
+    # We pass ALL usable_clips to LLM so it sees the Global IN/OUT narrative anchors
+    recipe_dict = call_director_llm(usable_clips, target_duration, target_beats_count, style_prompt, seed, locked_clips=locked_clips, llm_model_id=llm_model_id)
     
     if recipe_dict:
         os.makedirs(output_dir, exist_ok=True)
