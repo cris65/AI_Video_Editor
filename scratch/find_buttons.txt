@@ -1,0 +1,295 @@
+-                                     M{markerNum}
+-                                   </span>
+-                                 )}
+-                                 <span className="text-[11px] font-mono font-bold text-slate-100 shrink-0">
+-                                   {isOrphan ? '⚠️' : `${globalTime.toFixed(2)}s`}
+-                                 </span>
+-                                 <span className="text-[9px] font-mono text-slate-500 truncate">
+-                                   src {c.time.toFixed(2)}s
+-                                 </span>
+-                               </div>
+-                               <button
+-                                 onClick={(e) => {
+-                                   e.stopPropagation();
+-                                   handleRemoveSpecificConstraint(matchedKey, c.time);
+-                                 }}
+-                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 shrink-0"
+-                                 title="Rimuovi"
+-                               >
+-                                 <X size={12} />
+-                               </button>
++                      
++                     {/* Semantic Analysis Panel */}
++                     {(matchedSemantic || matchedCine || matchedStory) && (
++                       <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
++                         <div className="flex flex-wrap items-center gap-1.5">
++                           {matchedSemantic?.narrative_energy_score !== undefined && (
++                             <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 text-[10px] text-amber-400 font-medium">
++                               <Activity size={10} className="shrink-0" />
++                               <span>Energy: {matchedSemantic.narrative_energy_score}/10</span>
++                             </div>
+--
+               </>
+             )}
+@@ -544,93 +580,103 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+           </div>
+           
+             <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
+-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-sm">
+-                <h3 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
+-                  <div className="flex items-center gap-2">
++              <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-sm overflow-hidden">
++                <button 
++                  onClick={() => setIsDirectorSettingsOpen(!isDirectorSettingsOpen)}
++                  className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
++                >
++                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                     <Wand2 size={14} className="text-amber-400" />
+                     AI Director Settings
++                  </h3>
++                  <div className="flex items-center gap-3">
++                    {audioBpm && (
++                      <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
+--
+-                </h3>
+-                <div className="space-y-3">
+-                  <div>
+-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
+-                     <input type="number" 
+-                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                            value={directorConfig.target_duration}
+-                            onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
+-                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                     />
++                </button>
++                
++                {isDirectorSettingsOpen && (
++                  <div className="p-4 pt-0 space-y-3 border-t border-slate-800 mt-1">
++                    <div>
++                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
++                       <input type="number" 
++                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
++                              value={directorConfig.target_duration}
++                              onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
++                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+--
++                                   </span>
+                                  )}
++                                 <span className="text-[11px] font-mono font-bold text-slate-100 shrink-0">
++                                   {isOrphan ? '⚠️' : `${globalTime.toFixed(2)}s`}
++                                 </span>
++                                 <span className="text-[9px] font-mono text-slate-500 truncate">
++                                   src {c.time.toFixed(2)}s
++                                 </span>
+                                </div>
+-                               <span className="text-[10px] font-mono text-slate-400">{c.time.toFixed(2)}s</span>
++                               <button
++                                 onClick={(e) => {
++                                   e.stopPropagation();
++                                   handleRemoveSpecificConstraint(matchedKey, c.time);
++                                 }}
++                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 shrink-0"
++                                 title="Rimuovi"
++                               >
++                                 <X size={12} />
++                               </button>
+                              </div>
+-                             <button
+-                               onClick={(e) => {
+-                                 e.stopPropagation();
+-                                 handleRemoveSpecificConstraint(matchedKey, c.time);
+-                               }}
+-                               className="text-slate-500 hover:text-red-400 transition-colors p-1"
+-                               title="Rimuovi"
+-                             >
+-                               <X size={12} />
+-                             </button>
+-                           </div>
+                            );
+                          })}
+                        </div>
+@@ -721,6 +792,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                   constraints={userConstraints[clip.start.toString()]}
+                   onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
+                   overrideMode={clipOverrides[clip.start.toString()]}
++                  markerNumbers={globalMarkerNumbers}
+                 />
+--
++                                 {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
++                                 {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
++                                 {c.type === 'BM' && (
++                                   <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
++                                     <path d="M0 0H10V10L5 14L0 10V0Z" />
++                                   </svg>
++                                 )}
++                               </div>
++                               <span className="text-[10px] font-mono text-slate-400">{c.time.toFixed(2)}s</span>
++                             </div>
++                             <button
++                               onClick={(e) => {
++                                 e.stopPropagation();
++                                 handleRemoveSpecificConstraint(matchedKey, c.time);
++                               }}
++                               className="text-slate-500 hover:text-red-400 transition-colors p-1"
++                               title="Rimuovi"
++                             >
++                               <X size={12} />
++                             </button>
++                           </div>
++                         ))}
++                       </div>
++                     )}
++                  </div>
++                );
++              })
+             ) : (
+               filteredTimeline.map((clip) => (
+                 <ClipCard 
+--
+ 
+   return (
+     <div className="h-screen bg-slate-950 text-slate-200 flex flex-col overflow-hidden">
+@@ -259,6 +332,61 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+             </div>
+           </div>
+         </div>
++        
++        {/* Master Toggle */}
++        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mx-4">
++          <button 
++            onClick={() => setIsPreviewMode(false)}
++            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-md transition-colors ${!isPreviewMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
++          >
++            <Film size={14} />
++            Stringout
++          </button>
++          <button 
++            onClick={() => setIsPreviewMode(true)}
++            disabled={finalCutTimeline.length === 0}
++            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
++            title={finalCutTimeline.length === 0 ? "Final Cut non ancora generato" : "Preview Director's Cut"}
++          >
++            <PlaySquare size={14} />
++            Director's Cut
++          </button>
++          
++          <button
++            onClick={() => setIsRecipeModalOpen(true)}
++            disabled={!gemmaRecipe || gemmaRecipe.length === 0}
++            className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 text-xs font-bold rounded-md transition-all ${
++              !gemmaRecipe || gemmaRecipe.length === 0 
++                ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' 
++                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
++            }`}
++            title={!gemmaRecipe ? "Recipe non disponibile" : "View AI Recipe"}
++          >
++            <Eye size={14} />
++          </button>
++          
++          <button
++            onClick={handleRegenerateCut}
++            disabled={isRegenerating || saveStatus === 'saving'}
++            className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 text-xs font-bold rounded-md transition-all ${
++              isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
++              : finalCutTimeline.length === 0 
++                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
++                : 'bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700'
++            }`}
++            title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
++          >
++            {isRegenerating ? (
++              <RefreshCw size={14} className="animate-spin" />
++            ) : finalCutTimeline.length === 0 ? (
++              <Wand2 size={14} className="animate-pulse" />
++            ) : (
++              <RefreshCw size={14} />
++            )}
++            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Update Cut')}
++          </button>
++        </div>
++        
+         <div className="flex items-center gap-3">
+            <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mr-2">
+              <button 
+@@ -298,20 +426,37 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+         
+         {/* Left Side: Player & Timeline */}
+         <div className="flex-1 flex flex-col min-w-0 min-h-0">
+-          <div className="flex-1 min-h-0 flex items-center justify-center">
++          <div className="flex-1 min-h-0 flex items-center justify-center relative">
+             <VideoPlayerSync 
+               src={videoUrl} 
+               ref={videoRef} 
++              hideControls={isPreviewMode}
+--
++
++      {/* QA Feature: AI Recipe Modal */}
++      {isRecipeModalOpen && gemmaRecipe && (
++        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsRecipeModalOpen(false)}>
++          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
++            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/50">
++              <h3 className="text-sm font-bold text-slate-300 flex items-center gap-2">
++                <Eye className="w-4 h-4 text-emerald-400" />
++                Gemma 4 Raw Recipe
++              </h3>
++              <button 
++                onClick={() => setIsRecipeModalOpen(false)}
++                className="text-slate-500 hover:text-slate-300 transition-colors"
++              >
++                <X size={18} />
++              </button>
++            </div>
++            <div className="p-4 overflow-auto flex-1">
++              <pre className="text-xs text-emerald-400 font-mono bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-inner overflow-x-auto whitespace-pre-wrap">
++                {JSON.stringify(gemmaRecipe, null, 2)}
++              </pre>
++            </div>
++          </div>
++        </div>
++      )}
+     </div>
+--
++              {/* Save Status Indicator */}
++              <div className="flex items-center gap-1.5 min-w-[80px]">
++                {saveStatus === 'saving' && <span className="text-[10px] text-emerald-400 animate-pulse flex items-center gap-1"><CloudUpload size={12} /> Salvataggio...</span>}
++                {saveStatus === 'saved' && <span className="text-[10px] text-slate-500 flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-500" /> Salvato</span>}
++              </div>
++            </div>
+           </div>
+         </div>
+         <div className="flex items-center gap-3">
++           <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mr-2">
++             <button 
++               onClick={() => setFilterMode('ALL')}
++               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
++             >
++               ALL
++             </button>
++             <button 
++               onClick={() => setFilterMode('VALID')}
++               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
++             >
++               VALID
++             </button>
++             <button 
++               onClick={() => setFilterMode('BROLL')}
++               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
++             >
++               B-ROLL
++             </button>
++             <button 
++               onClick={() => setFilterMode('TRASH')}
++               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
++             >
++               TRASH
++             </button>
++           </div>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 rounded-full text-xs font-medium text-slate-300 border border-slate-700 shadow-sm">
+-             <CheckCircle2 size={14} className="text-blue-400" />
+-             Timeline Mode
++             <Filter size={14} className="text-blue-400" />
++             {filteredTimeline.length} Clips
+            </span>
+         </div>
+       </header>
+@@ -128,9 +306,11 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {

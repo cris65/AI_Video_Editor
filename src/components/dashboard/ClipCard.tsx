@@ -2,18 +2,30 @@ import { useState, useEffect, useRef, memo } from 'react';
 import { Users, Info, Activity, X, MapPin, Tag, AlertCircle } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
+function formatTime(seconds: number): string {
+  if (isNaN(seconds) || seconds < 0) return '00:00.00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 100);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+}
+
 interface ClipCardProps {
   clip: PancakeClip;
   sequenceName: string;
   isActive?: boolean;
   onClick?: () => void;
-  constraints?: Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>;
+  constraints?: Array<{ type: 'IN' | 'OUT' | 'BM' | 'AUDIO'; time: number }>;
   onRemoveConstraint?: (time: number) => void;
+  onSeekToMarker?: (time: number) => void;
   overrideMode?: 'KEEP' | 'TRASH' | 'BROLL';
   markerNumbers?: Map<string, number>;
+  onClearOverride?: () => void;
 }
 
-export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, overrideMode, markerNumbers }: ClipCardProps) {
+
+
+export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, onClick, constraints, onRemoveConstraint, onSeekToMarker, overrideMode, markerNumbers, onClearOverride }: ClipCardProps) {
   let finalUsable = clip.is_usable !== false;
   let isBroll = clip.tag.includes('B-ROLL');
   
@@ -183,6 +195,7 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'text-slate-300 bg-slate-950/80 border-slate-800'}`}>
                {clip.start.toFixed(1)}s - {clip.end.toFixed(1)}s <span className="ml-1 opacity-70">({duration}s)</span>
              </span>
+
           </div>
         </div>
       </div>
@@ -207,54 +220,176 @@ export const ClipCard = memo(function ClipCard({ clip, sequenceName, isActive, o
           </div>
         </div>
 
-        {/* Actionable Constraints List */}
-        {constraints && constraints.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {constraints.map((c, idx) => {
+        {/* Marker List — DB-style full-width rows including native BM + user constraints, click-to-seek */}
+        {(() => {
+          interface MarkerRowItem {
+            isNativeBM: boolean;
+            type: 'IN' | 'OUT' | 'BM' | 'AUDIO';
+            time: number;
+            markerNum?: number;
+          }
+          const items: MarkerRowItem[] = [];
+
+          // Add native BM if defined and within range
+          if (clip.best_moment && clip.best_moment > clip.start && clip.best_moment < clip.end) {
+            items.push({
+              isNativeBM: true,
+              type: 'BM',
+              time: clip.best_moment,
+            });
+          }
+
+          // Add user constraints
+          if (constraints) {
+            constraints.forEach((c, idx) => {
               const markerNum = markerNumbers ? markerNumbers.get(`${clip.start.toFixed(3)}_${idx}`) : undefined;
-              return (
-              <div 
-                key={`${c.time}-${idx}`}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold shadow-sm transition-colors group/badge
-                  ${c.type === 'IN' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : ''}
-                  ${c.type === 'OUT' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : ''}
-                  ${c.type === 'BM' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' : ''}
-                `}
-              >
-                <span className="flex items-center gap-1">
-                  {c.type === 'IN' && 'IN'}
-                  {c.type === 'OUT' && 'OUT'}
-                  {c.type === 'BM' && (
-                    <svg width="7" height="9.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="inline-block">
-                      <path d="M0 0H10V10L5 14L0 10V0Z" />
-                    </svg>
-                  )}
-                  {markerNum !== undefined && (
-                    <span className="text-[9px] font-bold font-mono bg-slate-700/50 px-1 rounded ml-0.5">
-                      M{markerNum}
-                    </span>
-                  )}
-                  <span className="opacity-80 ml-0.5">[{c.time.toFixed(2)}s]</span>
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onRemoveConstraint) onRemoveConstraint(c.time);
-                  }}
-                  className={`opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded
-                    ${c.type === 'IN' ? 'hover:bg-blue-500/20 text-blue-400' : ''}
-                    ${c.type === 'OUT' ? 'hover:bg-purple-500/20 text-purple-400' : ''}
-                    ${c.type === 'BM' ? 'hover:bg-yellow-500/20 text-yellow-500' : ''}
-                  `}
-                  title="Remove Marker"
+              items.push({
+                isNativeBM: false,
+                type: c.type,
+                time: c.time,
+                markerNum,
+              });
+            });
+          }
+
+          if (items.length === 0 && !overrideMode) return null;
+
+          // Sort chronologically by time
+          items.sort((a, b) => a.time - b.time);
+
+          const BORDER_COLOR: Record<string, string> = {
+            IN: '#3b82f6',
+            OUT: '#a855f7',
+            BM: '#f97316', // User-added BM is orange
+            AUDIO: '#22c55e',
+          };
+
+          return (
+            <div className="mb-4 flex flex-col border border-slate-800 rounded-lg overflow-hidden">
+              {overrideMode && (
+                <div
+                  className="w-full flex items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-slate-800/60 border-b border-slate-800/60 last:border-b-0 group/row"
+                  style={{ borderLeft: `3px solid ${overrideMode === 'KEEP' ? '#10b981' : overrideMode === 'BROLL' ? '#3b82f6' : '#ef4444'}` }}
                 >
-                  <X size={12} strokeWidth={3} />
-                </button>
-              </div>
-            );
-          })}
-          </div>
-        )}
+                  <span
+                    className="text-[10px] font-black font-mono w-8 shrink-0 flex items-center"
+                    style={{ color: overrideMode === 'KEEP' ? '#10b981' : overrideMode === 'BROLL' ? '#3b82f6' : '#ef4444' }}
+                  >
+                    {overrideMode === 'KEEP' ? 'K' : overrideMode === 'BROLL' ? 'B' : 'T'}
+                  </span>
+                  
+                  <span
+                    className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0"
+                    style={{
+                      backgroundColor: overrideMode === 'KEEP' ? '#10b98122' : overrideMode === 'BROLL' ? '#3b82f622' : '#ef444422',
+                      color: overrideMode === 'KEEP' ? '#10b981' : overrideMode === 'BROLL' ? '#3b82f6' : '#ef4444',
+                      border: `1px solid ${overrideMode === 'KEEP' ? '#10b98155' : overrideMode === 'BROLL' ? '#3b82f655' : '#ef444455'}`,
+                    }}
+                  >
+                    FORCED {overrideMode}
+                  </span>
+                  
+                  <span className="text-[10px] font-mono text-slate-400 flex-1 ml-1" />
+                  
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onClearOverride) onClearOverride();
+                    }}
+                    className="opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-700/50 shrink-0"
+                    style={{ color: overrideMode === 'KEEP' ? '#10b981' : overrideMode === 'BROLL' ? '#3b82f6' : '#ef4444' }}
+                    title="Clear Forced Status"
+                  >
+                    <X size={12} strokeWidth={2.5} />
+                  </button>
+                </div>
+              )}
+              {items.map((item, idx) => {
+                // Native BM gets yellow theme, user BM gets orange theme
+                const borderColor = item.isNativeBM ? '#eab308' : (BORDER_COLOR[item.type] ?? '#94a3b8');
+                const typeLabel = item.type === 'BM' ? 'BM' : item.type;
+                return (
+                  <button
+                    key={`${item.time}-${idx}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onSeekToMarker) onSeekToMarker(item.time);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-slate-800/60 border-b border-slate-800/60 last:border-b-0 group/row"
+                    style={{ borderLeft: `3px solid ${borderColor}` }}
+                  >
+                    {/* Type icon */}
+                    <span
+                      className="text-[10px] font-black font-mono w-8 shrink-0 flex items-center"
+                      style={{ color: borderColor }}
+                    >
+                      {item.type === 'BM' && (
+                        <svg width="7.5" height="10" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="inline-block mr-1">
+                          <path d="M0 0H10V10L5 14L0 10V0Z" />
+                        </svg>
+                      )}
+                      {item.type === 'AUDIO' && '♪ '}
+                      {(item.type === 'IN' || item.type === 'OUT') && typeLabel}
+                    </span>
+
+                    {/* M# or BM label */}
+                    {item.isNativeBM ? (
+                      <span
+                        className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0"
+                        style={{
+                          backgroundColor: '#eab30822',
+                          color: '#eab308',
+                          border: '1px solid #eab30855',
+                        }}
+                      >
+                        BM
+                      </span>
+                    ) : (
+                      item.markerNum !== undefined && (
+                        <span
+                          className="text-[9px] font-bold font-mono px-1.5 py-0 rounded shrink-0"
+                          style={{
+                            backgroundColor: `${borderColor}22`,
+                            color: borderColor,
+                            border: `1px solid ${borderColor}55`,
+                          }}
+                        >
+                          {item.type === 'IN' ? 'IN' : item.type === 'OUT' ? 'OUT' : item.type === 'BM' ? 'M' : 'A'}{item.markerNum}
+                        </span>
+                      )
+                    )}
+
+                    {/* Timecode */}
+                    <span className="text-[10px] font-mono text-slate-400 flex-1 ml-1">
+                      [{formatTime(item.time)}]
+                    </span>
+
+                    {/* Delete button (only for non-native items) */}
+                    {!item.isNativeBM ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onRemoveConstraint) onRemoveConstraint(item.time);
+                        }}
+                        className="opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-700/50 shrink-0"
+                        style={{ color: borderColor }}
+                        title="Remove Marker"
+                      >
+                        <X size={11} strokeWidth={2.5} />
+                      </button>
+                    ) : (
+                      <span className="w-[16px] h-[16px]" /> // Placeholder spacing so layout matches
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
 
         <div className="relative w-full">
           {showRejectPopup && (

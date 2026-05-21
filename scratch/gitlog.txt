@@ -1,0 +1,1170 @@
+commit 1c0084edfa7b125913071f126ba1be54d82baf1a
+Author: cris65 <criseclipse@gmail.com>
+Date:   Wed May 20 22:46:42 2026 +0200
+
+    [v0.1.39] refactor(ui): premiere dense layout, inline tooltip, strict pylance typing
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index d165e5fa..439cac59 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -8,6 +8,7 @@ import { FinalCutTimeline } from './FinalCutTimeline';
+ import { DirectorSettingsPanel } from './DirectorSettingsPanel';
+ import { useSequencePlayer } from '../../hooks/useSequencePlayer';
+ import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag } from 'lucide-react';
++import { Toaster } from 'react-hot-toast';
+ 
+ // Pure function: recalculates timeline_in/timeline_out after manual reorder.
+ // Durations are invariant (source_out - source_in). Returns a new immutable array.
+@@ -475,6 +476,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+ 
+   return (
+     <div className="h-screen bg-slate-950 text-slate-200 flex flex-col overflow-hidden">
++      <Toaster position="top-right" />
+       {/* Header */}
+       <header className="shrink-0 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-md z-50">
+         <div className="flex items-center gap-3">
+@@ -549,36 +551,41 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+           </button>
+         </div>
+         
+-        <div className="flex items-center gap-3">
+-           <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mr-2">
++        <div className="flex items-center gap-1.5">
++           <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-700 shadow-inner">
+              <button 
+                onClick={() => setFilterMode('ALL')}
+-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
++               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                ALL
+              </button>
+              <button 
+                onClick={() => setFilterMode('VALID')}
+-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
++               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                VALID
+              </button>
+              <button 
+                onClick={() => setFilterMode('BROLL')}
+-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
++               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                B-ROLL
+              </button>
+              <button 
+                onClick={() => setFilterMode('TRASH')}
+-               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
++               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                TRASH
+              </button>
+            </div>
+-           <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 rounded-full text-xs font-medium text-slate-300 border border-slate-700 shadow-sm">
+-             <Filter size={14} className="text-blue-400" />
+-             {filteredTimeline.length} Clips
++           <span className={`flex items-center gap-1 px-2 py-0.5 bg-slate-900/80 rounded-md text-[10px] font-bold border shadow-sm whitespace-nowrap transition-colors ${
++             filterMode === 'VALID' ? 'text-emerald-400 border-emerald-500/30' :
++             filterMode === 'BROLL' ? 'text-blue-400 border-blue-500/30' :
++             filterMode === 'TRASH' ? 'text-red-400 border-red-500/30' :
++             'text-slate-300 border-slate-700'
++           }`}>
++             <Filter size={10} className="opacity-80" />
++             {filterMode === 'BROLL' ? 'B-ROLL' : filterMode}: {filteredTimeline.length} Clips
+            </span>
+         </div>
+       </header>
+
+commit bf99e912820c7a19e4e01377e5642adfe4cb6beb
+Author: cris65 <criseclipse@gmail.com>
+Date:   Wed May 20 18:30:59 2026 +0200
+
+    [v0.1.35] feat(telemetry): add performance logging and dashboard panel
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index 3615bef4..d165e5fa 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -71,22 +71,34 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+ 
+   const formatModelName = (modelId: string) => {
+     if (!modelId) return "VLM";
+-    if (modelId.includes("gemma-4-e4b")) return "Gemma 4 E-B";
++    if (modelId.includes("gemma-4-e4b")) return "Gemma 4 E4B it";
+     return modelId.split('/').pop() || modelId;
+   };
+ 
++  const formatDuration = (totalSec: number) => {
++    if (totalSec <= 60) {
++      return `${Math.round(totalSec)}s`;
++    }
++    const mins = Math.floor(totalSec / 60);
++    const secs = Math.round(totalSec % 60);
++    return `${mins}m ${secs}s`;
++  };
++
+   useEffect(() => {
+     const fetchTelemetry = async () => {
+       try {
+-        const res = await fetch('http://localhost:8000/api/performance/history');
++        const res = await fetch('/system_logs/performance_history.json');
+         if (res.ok) {
+-          const history = await res.json();
+-          if (Array.isArray(history) && history.length > 0) {
+-            setLastTelemetry(history[history.length - 1]);
++          const text = await res.text();
++          if (text.trim()) {
++            const history = JSON.parse(text);
++            if (Array.isArray(history) && history.length > 0) {
++              setLastTelemetry(history[history.length - 1]);
++            }
+           }
+         }
+       } catch (err) {
+-        console.warn("Failed to fetch telemetry history:", err);
++        console.warn("Failed to fetch or parse telemetry history:", err);
+       }
+     };
+     fetchTelemetry();
+@@ -473,15 +485,6 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+             <h1 className="text-xl font-bold text-white tracking-tight">Pancake HITL Dashboard</h1>
+             <div className="flex items-center gap-3 mt-0.5 font-mono text-xs">
+               <span className="text-slate-500">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</span>
+-              {lastTelemetry && (
+-                <span className="text-slate-500 flex items-center gap-1.5">
+-                  <span>•</span>
+-                  <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[10px]">
+-                    {formatModelName(lastTelemetry.vlm_model_id)}
+-                  </span>
+-                  <span>Analyzed {lastTelemetry.extracted_frames} frames in {Math.round(lastTelemetry.total_duration_sec)}s</span>
+-                </span>
+-              )}
+               
+               {/* Save Status Indicator */}
+               <div className="flex items-center gap-1.5 min-w-[80px]">
+@@ -580,11 +583,26 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+         </div>
+       </header>
+ 
+-      {/* Main Split View */}
+       <main className="flex-1 p-6 flex flex-col lg:flex-row gap-6 max-w-[1920px] mx-auto w-full min-h-0">
+         
+         {/* Left Side: Player & Timeline */}
+         <div className="flex-1 flex flex-col min-w-0 min-h-0">
++          {/* Telemetry Display Container */}
++          <div className="flex items-center justify-between mb-4 h-[30px] shrink-0">
++            <div className="text-slate-400 text-sm font-medium flex items-center gap-2">
++              {lastTelemetry ? (
++                <>
++                  <Activity size={16} className="text-blue-400" />
++                  <span className="text-slate-300 font-semibold">{formatModelName(lastTelemetry.vlm_model_id)}</span>
++                  <span className="text-slate-600">•</span>
++                  <span>Analyzed {lastTelemetry.extracted_frames} frames in {formatDuration(lastTelemetry.total_duration_sec)}</span>
++                </>
++              ) : (
++                <span className="text-slate-500 italic text-xs">No telemetry data available</span>
++              )}
++            </div>
++          </div>
++
+           <div className="flex-1 min-h-0 flex items-center justify-center relative">
+             <VideoPlayerSync 
+               src={videoUrl} 
+
+commit 2dc63b58e71e3f421bb1f4d327cfa36bdfd8c265
+Author: cris65 <criseclipse@gmail.com>
+Date:   Wed May 20 17:59:55 2026 +0200
+
+    [v0.1.34] feat(vlm): clamp temperature to 0 and add setting_location/key_props metadata
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index e0c6fd1f..3615bef4 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -7,7 +7,7 @@ import { InteractiveTimeline } from './InteractiveTimeline';
+ import { FinalCutTimeline } from './FinalCutTimeline';
+ import { DirectorSettingsPanel } from './DirectorSettingsPanel';
+ import { useSequencePlayer } from '../../hooks/useSequencePlayer';
+-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity } from 'lucide-react';
++import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag } from 'lucide-react';
+ 
+ // Pure function: recalculates timeline_in/timeline_out after manual reorder.
+ // Durations are invariant (source_out - source_in). Returns a new immutable array.
+@@ -25,6 +25,17 @@ function recalcTimeline(clips: FinalCutClip[]): FinalCutClip[] {
+   });
+ }
+ 
++interface TelemetryRecord {
++  vlm_model_id: string;
++  session_start_time: string;
++  session_end_time: string;
++  total_frames: number;
++  extracted_frames: number;
++  cv_duration_sec: number;
++  mlx_duration_sec: number;
++  total_duration_sec: number;
++}
++
+ interface PancakeDashboardProps {
+   sequenceName: string;
+ }
+@@ -56,6 +67,30 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
+   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
+   const hasAutoSuggested = useRef(false);
++  const [lastTelemetry, setLastTelemetry] = useState<TelemetryRecord | null>(null);
++
++  const formatModelName = (modelId: string) => {
++    if (!modelId) return "VLM";
++    if (modelId.includes("gemma-4-e4b")) return "Gemma 4 E-B";
++    return modelId.split('/').pop() || modelId;
++  };
++
++  useEffect(() => {
++    const fetchTelemetry = async () => {
++      try {
++        const res = await fetch('http://localhost:8000/api/performance/history');
++        if (res.ok) {
++          const history = await res.json();
++          if (Array.isArray(history) && history.length > 0) {
++            setLastTelemetry(history[history.length - 1]);
++          }
++        }
++      } catch (err) {
++        console.warn("Failed to fetch telemetry history:", err);
++      }
++    };
++    fetchTelemetry();
++  }, []);
+ 
+   useEffect(() => {
+     if (hitlData && Object.keys(hitlData.hitl_constraints || {}).length > 0 && Object.keys(userConstraints).length === 0) {
+@@ -436,8 +471,17 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+           </div>
+           <div>
+             <h1 className="text-xl font-bold text-white tracking-tight">Pancake HITL Dashboard</h1>
+-            <div className="flex items-center gap-3 mt-0.5">
+-              <p className="text-xs text-slate-500 font-mono">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</p>
++            <div className="flex items-center gap-3 mt-0.5 font-mono text-xs">
++              <span className="text-slate-500">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</span>
++              {lastTelemetry && (
++                <span className="text-slate-500 flex items-center gap-1.5">
++                  <span>•</span>
++                  <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[10px]">
++                    {formatModelName(lastTelemetry.vlm_model_id)}
++                  </span>
++                  <span>Analyzed {lastTelemetry.extracted_frames} frames in {Math.round(lastTelemetry.total_duration_sec)}s</span>
++                </span>
++              )}
+               
+               {/* Save Status Indicator */}
+               <div className="flex items-center gap-1.5 min-w-[80px]">
+@@ -677,9 +721,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
+                        Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                      </div>
+-                      
+-                     {/* Semantic Analysis Panel */}
+-                     {(matchedSemantic || matchedCine || matchedStory) && (
++                            {/* Semantic Analysis Panel */}
++                     {(matchingPancakeClip) && (
+                        <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {matchedSemantic?.narrative_energy_score !== undefined && (
+@@ -693,8 +736,53 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                                <span>Tone: {matchedSemantic.emotional_tone}</span>
+                              </div>
+                            )}
++                           {matchedCine?.shot_size && (
++                             <div className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-300 font-bold">
++                               <span>Size: {matchedCine.shot_size}</span>
++                             </div>
++                           )}
+                          </div>
+ 
++                         {matchedSemantic && (
++                           <>
++                             <div className="flex flex-wrap gap-1 mt-1">
++                               {matchedSemantic.subject_count !== undefined && (
++                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
++                                   Subjects: {matchedSemantic.subject_count}
++                                 </span>
++                               )}
++                               {matchedSemantic.gaze_direction && matchedSemantic.gaze_direction !== 'NONE' && (
++                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
++                                   Gaze: {matchedSemantic.gaze_direction}
++                                 </span>
++                               )}
++                               {matchedSemantic.subject_screen_position && matchedSemantic.subject_screen_position !== 'NONE' && (
++                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
++                                   Pos: {matchedSemantic.subject_screen_position.replace('_', ' ')}
++                                 </span>
++                               )}
++                             </div>
++
++                             {/* Location and Props */}
++                             {matchedSemantic.setting_location && matchedSemantic.setting_location !== 'ANALYSIS_FAILED' && (
++                               <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-slate-300 bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800/80 w-fit">
++                                 <MapPin size={9} className="text-rose-400 shrink-0" />
++                                 <span className="font-semibold text-slate-300">{matchedSemantic.setting_location}</span>
++                               </div>
++                             )}
++                             {matchedSemantic.key_props && matchedSemantic.key_props.length > 0 && (
++                               <div className="mt-1 flex flex-wrap gap-1 items-center">
++                                 <Tag size={9} className="text-sky-400 shrink-0 mr-0.5" />
++                                 {matchedSemantic.key_props.map((prop, pidx) => (
++                                   <span key={pidx} className="bg-sky-950/40 border border-sky-900/50 text-sky-400 px-1 py-0.5 rounded text-[8px] font-medium">
++                                     {prop}
++                                   </span>
++                                 ))}
++                               </div>
++                             )}
++                           </>
++                         )}
++
+                          {matchedCine?.scene_description && matchedCine.scene_description !== 'ANALYSIS_FAILED' && (
+                            <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-900/60">
+                              <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-0.5">Scene Description</span>
+@@ -702,6 +790,19 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                            </div>
+                          )}
+ 
++                         {matchingPancakeClip.continuity?.match_cut_potential && (
++                           <div className="flex items-center gap-1.5 mt-1">
++                             <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] font-bold">
++                               MATCH CUT
++                             </span>
++                             {matchingPancakeClip.continuity.match_cut_vector && matchingPancakeClip.continuity.match_cut_vector !== 'NONE' && (
++                               <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider">
++                                 {matchingPancakeClip.continuity.match_cut_vector}
++                               </span>
++                             )}
++                           </div>
++                         )}
++
+                          {matchedStory?.director_note && matchedStory.director_note !== 'ANALYSIS_FAILED' && (
+                            <div className="text-[11px] text-slate-400 italic leading-relaxed border-l-2 border-slate-700 pl-2 py-0.5">
+                              <span className="text-[9px] text-slate-500 font-bold not-italic block uppercase tracking-wider mb-0.5">Director's Note</span>
+
+commit a4f1665102bf327880e0653f4cd45ccadd2535c0
+Author: cris65 <criseclipse@gmail.com>
+Date:   Wed May 20 01:13:17 2026 +0200
+
+    [v0.1.29] feat(frontend): align timeline inspector and controls with v2 semantic analysis
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index 32d02bc4..e0c6fd1f 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -7,7 +7,7 @@ import { InteractiveTimeline } from './InteractiveTimeline';
+ import { FinalCutTimeline } from './FinalCutTimeline';
+ import { DirectorSettingsPanel } from './DirectorSettingsPanel';
+ import { useSequencePlayer } from '../../hooks/useSequencePlayer';
+-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X } from 'lucide-react';
++import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity } from 'lucide-react';
+ 
+ // Pure function: recalculates timeline_in/timeline_out after manual reorder.
+ // Durations are invariant (source_out - source_in). Returns a new immutable array.
+@@ -635,19 +635,15 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+           <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+             
+             {isPreviewMode ? (
+-              // In Preview Mode, mostriamo le clip nell'ordine CORRENTE (orderedFinalCut)
+-              // CRITICAL: finalCutTimeline (immutabile) NON va usato qui — avrebbe timeline_in obsoleti post-DnD.
+               orderedFinalCut.map((clip, idx) => {
+-                // Find constraints for this clip
+-                let constraints: UserConstraint[] = [];
+-                let matchedKey = clip.source_clip_start.toString();
+-                for (const key of Object.keys(userConstraints)) {
+-                  if (Math.abs(parseFloat(key) - clip.source_clip_start) < 0.1) {
+-                    constraints = userConstraints[key];
+-                    matchedKey = key;
+-                    break;
+-                  }
+-                }
++                const matchingPancakeClip = combinedTimeline.find(
++                  pc => Math.abs(pc.start - clip.source_clip_start) < 0.1
++                );
++                const matchedSemantic = matchingPancakeClip?.semantic_analysis;
++                const matchedCine = matchingPancakeClip?.cinematography;
++                const matchedStory = matchingPancakeClip?.story;
++
++
+                 // Original Gemma index: position in the immutable source (for reference numbering)
+                 const originalIdx = finalCutTimeline.findIndex(
+                   c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1 && Math.abs(c.source_in - clip.source_in) < 0.01
+@@ -679,64 +675,39 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                        <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
+                      </div>
+                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
+-             Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
++                       Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                      </div>
+-                     
+-                     {/* Constraints List */}
+-                     {constraints && constraints.length > 0 && (
+-                       <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-800">
+-                         {constraints.map((c, cIdx) => {
+-                           const isOrphan = c.time < clip.source_in || c.time > clip.source_out;
+-                           const globalTime = clip.timeline_in + (c.time - clip.source_in);
+-                           const isMarkerActive = !isOrphan && isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
+-                           const markerKey = `${clip.source_clip_start.toFixed(3)}_${cIdx}`;
+-                           const markerNum = globalMarkerNumbers.get(markerKey);
+-                           return (
+-                              <div
+-                                key={cIdx}
+-                                className={`flex items-center justify-between px-2 py-1.5 rounded border transition-all ${isOrphan ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'} ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
+-                                onClick={(e) => {
+-                                  e.stopPropagation();
+-                                  if (isOrphan) return;
+-                                  seekToTimelineTime(globalTime);
+-                                }}
+-                                title={isOrphan ? `⚠️ Marker fuori range clip (${c.time.toFixed(2)}s non è in ${clip.source_in.toFixed(1)}–${clip.source_out.toFixed(1)})` : undefined}
+-                              >
+-                               <div className="flex items-center gap-2 flex-1 min-w-0">
+-                                 <div className="w-4 flex justify-center shrink-0">
+-                                   {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
+-                                   {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
+-                                   {c.type === 'BM' && (
+-                                     <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
+-                                       <path d="M0 0H10V10L5 14L0 10V0Z" />
+-                                     </svg>
+-                                   )}
+-                                 </div>
+-                                 {markerNum !== undefined && (
+-                                   <span className="text-[9px] font-bold font-mono bg-slate-700 text-slate-300 px-1 py-0.5 rounded shrink-0">
+-                                     M{markerNum}
+-                                   </span>
+-                                 )}
+-                                 <span className="text-[11px] font-mono font-bold text-slate-100 shrink-0">
+-                                   {isOrphan ? '⚠️' : `${globalTime.toFixed(2)}s`}
+-                                 </span>
+-                                 <span className="text-[9px] font-mono text-slate-500 truncate">
+-                                   src {c.time.toFixed(2)}s
+-                                 </span>
+-                               </div>
+-                               <button
+-                                 onClick={(e) => {
+-                                   e.stopPropagation();
+-                                   handleRemoveSpecificConstraint(matchedKey, c.time);
+-                                 }}
+-                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 shrink-0"
+-                                 title="Rimuovi"
+-                               >
+-                                 <X size={12} />
+-                               </button>
++                      
++                     {/* Semantic Analysis Panel */}
++                     {(matchedSemantic || matchedCine || matchedStory) && (
++                       <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
++                         <div className="flex flex-wrap items-center gap-1.5">
++                           {matchedSemantic?.narrative_energy_score !== undefined && (
++                             <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 text-[10px] text-amber-400 font-medium">
++                               <Activity size={10} className="shrink-0" />
++                               <span>Energy: {matchedSemantic.narrative_energy_score}/10</span>
++                             </div>
++                           )}
++                           {matchedSemantic?.emotional_tone && matchedSemantic.emotional_tone !== 'ANALYSIS_FAILED' && (
++                             <div className="bg-blue-500/10 border border-blue-500/25 rounded px-1.5 py-0.5 text-[10px] text-blue-400 font-medium">
++                               <span>Tone: {matchedSemantic.emotional_tone}</span>
+                              </div>
+-                           );
+-                         })}
++                           )}
++                         </div>
++
++                         {matchedCine?.scene_description && matchedCine.scene_description !== 'ANALYSIS_FAILED' && (
++                           <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-900/60">
++                             <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-0.5">Scene Description</span>
++                             {matchedCine.scene_description}
++                           </div>
++                         )}
++
++                         {matchedStory?.director_note && matchedStory.director_note !== 'ANALYSIS_FAILED' && (
++                           <div className="text-[11px] text-slate-400 italic leading-relaxed border-l-2 border-slate-700 pl-2 py-0.5">
++                             <span className="text-[9px] text-slate-500 font-bold not-italic block uppercase tracking-wider mb-0.5">Director's Note</span>
++                             "{matchedStory.director_note}"
++                           </div>
++                         )}
+                        </div>
+                      )}
+                   </div>
+
+commit 231d4c49c49899ba8d571f8f1e5d4c062aebbbae
+Author: cris65 <criseclipse@gmail.com>
+Date:   Tue May 19 12:01:20 2026 +0200
+
+    [v0.1.27] feat(orchestration): implement symmetrical pipeline and UI seed deterministic injection
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index 7e1c5c31..32d02bc4 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -224,8 +224,20 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+   const handleRegenerateCut = async () => {
+     setIsRegenerating(true);
+     try {
+-      const res = await fetch(`/api/regenerate-director-cut?sequence=${sequenceName}`, { method: 'POST' });
+-      if (!res.ok) throw new Error('Regeneration failed');
++      const orchestratePayload = {
++        sequence_name: sequenceName,
++        hitl_constraints: userConstraints,
++        clip_overrides: clipOverrides,
++        director_config: directorConfig,
++      };
++      const res = await fetch('http://localhost:8000/api/orchestrate', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify(orchestratePayload),
++      });
++      if (!res.ok) throw new Error('Orchestration failed');
++      const result = await res.json();
++      if (!result.ok) throw new Error(result.error ?? 'Director error');
+       await refetchFinalCut();
+       setIsPreviewMode(true);
+     } catch (err) {
+
+commit 4aa0023760b9d051a585a9137fc848eea6b7439f
+Author: cris65 <criseclipse@gmail.com>
+Date:   Tue May 19 00:59:54 2026 +0200
+
+    [v0.1.24] feat(ui): implement advanced director modal and api-ready hardware profiler
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index 8d74f51f..7e1c5c31 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -5,6 +5,7 @@ import { ClipCard } from './ClipCard';
+ import { VideoPlayerSync } from './VideoPlayerSync';
+ import { InteractiveTimeline } from './InteractiveTimeline';
+ import { FinalCutTimeline } from './FinalCutTimeline';
++import { DirectorSettingsPanel } from './DirectorSettingsPanel';
+ import { useSequencePlayer } from '../../hooks/useSequencePlayer';
+ import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X } from 'lucide-react';
+ 
+@@ -605,101 +606,21 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                 </button>
+                 
+                 {isDirectorSettingsOpen && (
+-                  <div className="p-4 pt-0 space-y-3 border-t border-slate-800 mt-1">
+-                    <div>
+-                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
+-                       <input type="number" 
+-                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                              value={directorConfig.target_duration}
+-                              onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
+-                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                       />
+-                    </div>
+-                    <div>
+-                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
+-                       <select
+-                          className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
+-                          value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
+-                          onChange={(e) => {
+-                            const val = e.target.value;
+-                            const newRes = val === "custom" ? "1000x1000" : val;
+-                            const newConfig = { ...directorConfig, export_resolution: newRes };
+-                            setDirectorConfig(newConfig);
+-                            triggerSave(userConstraints, clipOverrides, newConfig);
+-                          }}
+-                       >
+-                         <option value="3840x2160">4K UHD (3840x2160)</option>
+-                         <option value="1920x1080">Full HD (1920x1080)</option>
+-                         <option value="1080x1920">Vertical (1080x1920)</option>
+-                         <option value="custom">Custom...</option>
+-                       </select>
+-                       
+-                       {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
+-                         <div className="flex gap-2 mb-3">
+-                           <input 
+-                             type="number" 
+-                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                             placeholder="W"
+-                             value={directorConfig.export_resolution?.split('x')[0] || ""}
+-                             onChange={(e) => {
+-                                const h = directorConfig.export_resolution?.split('x')[1] || "1080";
+-                                setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
+-                             }}
+-                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                           />
+-                           <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
+-                           <input 
+-                             type="number" 
+-                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                             placeholder="H"
+-                             value={directorConfig.export_resolution?.split('x')[1] || ""}
+-                             onChange={(e) => {
+-                                const w = directorConfig.export_resolution?.split('x')[0] || "1920";
+-                                setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
+-                             }}
+-                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                           />
+-                         </div>
+-                       )}
+-                    </div>
+-                    <div>
+-                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
+-                       <textarea 
+-                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
+-                              placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
+-                              value={directorConfig.style_prompt}
+-                              onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
+-                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                       />
+-                    </div>
+-                    
+-                    <div className="mt-4 pt-4 border-t border-slate-800">
+-                      <button
+-                        onClick={handleRegenerateCut}
+-                        disabled={isRegenerating || saveStatus === 'saving'}
+-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all ${
+-                          isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
+-                          : finalCutTimeline.length === 0 
+-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+-                            : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30'
+-                        }`}
+-                        title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
+-                      >
+-                        {isRegenerating ? (
+-                          <RefreshCw size={14} className="animate-spin" />
+-                        ) : finalCutTimeline.length === 0 ? (
+-                          <Wand2 size={14} className="animate-pulse" />
+-                        ) : (
+-                          <RefreshCw size={14} />
+-                        )}
+-                        {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Initial Cut' : 'Regenerate Cut')}
+-                      </button>
+-                    </div>
+-                  </div>
++                  <DirectorSettingsPanel
++                    config={directorConfig}
++                    onSave={(newConfig) => {
++                      setDirectorConfig(newConfig);
++                      triggerSave(userConstraints, clipOverrides, newConfig);
++                    }}
++                    onRegenerate={handleRegenerateCut}
++                    isRegenerating={isRegenerating}
++                    saveStatus={saveStatus}
++                    sequenceFps={fps}
++                  />
+                 )}
+               </div>
+             </div>
+-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
++          <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+             
+             {isPreviewMode ? (
+               // In Preview Mode, mostriamo le clip nell'ordine CORRENTE (orderedFinalCut)
+
+commit 58b88615cf4322d1f5d08f73c5a863f99aa46015
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 20:02:05 2026 +0200
+
+    [v0.1.24] fix(timeline): resolve save order UI reversion and ghosting bug
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index 4bdc407c..8d74f51f 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -79,8 +79,12 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+ 
+   // Sync orderedFinalCut from source whenever finalCutTimeline is refreshed (e.g. after Update Cut)
+   useEffect(() => {
+-    setOrderedFinalCut(finalCutTimeline);
+-  }, [finalCutTimeline]);
++    if (hitlData && hitlData.clip_order_override && hitlData.clip_order_override.length === finalCutTimeline.length) {
++      setOrderedFinalCut(hitlData.clip_order_override);
++    } else {
++      setOrderedFinalCut(finalCutTimeline);
++    }
++  }, [finalCutTimeline, hitlData]);
+ 
+   useEffect(() => {
+     if (audioBpm && !hasAutoSuggested.current) {
+@@ -255,7 +259,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+       .then(res => {
+         if (!res.ok) throw new Error('Save failed');
+         setSaveStatus('saved');
+-        refetchFinalCut();
++        // Do NOT call refetchFinalCut() here, otherwise the Python's raw timeline will overwrite our sorted local state.
+         setTimeout(() => setSaveStatus('idle'), 2000);
+       })
+       .catch(err => {
+
+commit 634deee1a66f2dbba729b322dc910c166e103d76
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 19:13:38 2026 +0200
+
+    [v0.1.22] feat(timeline): finalize zoom engine and clip ghosting UI
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index f63952bf..4bdc407c 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -255,13 +255,14 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+       .then(res => {
+         if (!res.ok) throw new Error('Save failed');
+         setSaveStatus('saved');
++        refetchFinalCut();
+         setTimeout(() => setSaveStatus('idle'), 2000);
+       })
+       .catch(err => {
+         console.error('Failed to save order:', err);
+         setSaveStatus('idle');
+       });
+-  }, [userConstraints, clipOverrides, directorConfig, orderedFinalCut, sequenceName]);
++  }, [userConstraints, clipOverrides, directorConfig, orderedFinalCut, sequenceName, refetchFinalCut]);
+ 
+   // useSequencePlayer now consumes orderedFinalCut so playback respects manual reorder.
+   const { currentTimelineTime, activeClipIndex, seekToTimelineTime } = useSequencePlayer(
+
+commit 8d4e53a92d4b3a9829f950ec0c202c841589f1be
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 16:54:34 2026 +0200
+
+    [v0.1.21] feat(ui): add Regenerate Cut button to accordion and rename
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index b2a3d19c..f63952bf 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -480,7 +480,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+             ) : (
+               <RefreshCw size={14} />
+             )}
+-            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Update Cut')}
++            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
+           </button>
+         </div>
+         
+@@ -667,6 +667,29 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                               onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+                        />
+                     </div>
++                    
++                    <div className="mt-4 pt-4 border-t border-slate-800">
++                      <button
++                        onClick={handleRegenerateCut}
++                        disabled={isRegenerating || saveStatus === 'saving'}
++                        className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all ${
++                          isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
++                          : finalCutTimeline.length === 0 
++                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
++                            : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30'
++                        }`}
++                        title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
++                      >
++                        {isRegenerating ? (
++                          <RefreshCw size={14} className="animate-spin" />
++                        ) : finalCutTimeline.length === 0 ? (
++                          <Wand2 size={14} className="animate-pulse" />
++                        ) : (
++                          <RefreshCw size={14} />
++                        )}
++                        {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Initial Cut' : 'Regenerate Cut')}
++                      </button>
++                    </div>
+                   </div>
+                 )}
+               </div>
+
+commit aab1f84e243263e55d82f04bb93d8fe98111272d
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 16:46:41 2026 +0200
+
+    [v0.1.20] feat(ui): split keyboard shortcuts and add 30 frames skip
+
+diff --git a/src/components/dashboard/PancakeDashboard.tsx b/src/components/dashboard/PancakeDashboard.tsx
+index a329e201..b2a3d19c 100644
+--- a/src/components/dashboard/PancakeDashboard.tsx
++++ b/src/components/dashboard/PancakeDashboard.tsx
+@@ -1,4 +1,4 @@
+-import { useState, useEffect, useRef, useCallback } from 'react';
++import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+ import { usePancakeData, DirectorConfig, FinalCutClip } from '../../hooks/usePancakeData';
+ import { useVideoShortcuts } from '../../hooks/useVideoShortcuts';
+ import { ClipCard } from './ClipCard';
+@@ -48,10 +48,12 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+   const [clipOverrides, setClipOverrides] = useState<Record<string, 'KEEP' | 'TRASH' | 'BROLL'>>({});
+   const [filterMode, setFilterMode] = useState<'ALL' | 'VALID' | 'BROLL' | 'TRASH'>('ALL');
+   const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
++  const [isDirectorSettingsOpen, setIsDirectorSettingsOpen] = useState(false);
+   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
+   // Local mutable order — derived from immutable finalCutTimeline source.
+   // Re-synced whenever the Director re-generates the cut.
+   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
++  const [pendingSeek, setPendingSeek] = useState<number | null>(null);
+   const hasAutoSuggested = useRef(false);
+ 
+   useEffect(() => {
+@@ -229,8 +231,11 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+   };
+ 
+   // Receives the arrayMove'd array from FinalCutTimeline and recalculates timeline positions.
+-  const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[]) => {
++  const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[], seekToTimelineIn?: number) => {
+     setOrderedFinalCut(recalcTimeline(newTimeline));
++    if (seekToTimelineIn !== undefined) {
++      setPendingSeek(seekToTimelineIn);
++    }
+   }, []);
+ 
+   // Persists the current clip order into _hitl_data.json under clip_order_override.
+@@ -266,6 +271,34 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+     isPreviewMode
+   );
+ 
++  // Execute pending seek ONLY after orderedFinalCut has been updated in state
++  useEffect(() => {
++    if (pendingSeek !== null) {
++      seekToTimelineTime(pendingSeek);
++      setPendingSeek(null);
++    }
++  }, [orderedFinalCut, pendingSeek, seekToTimelineTime]);
++
++  // Global marker numbers: PRIMARY namespace is the STRINGOUT (combinedTimeline).
++  // The user adds markers during Stringout review → those get M1, M2, M3...
++  // DC is a later refinement — DC clips inherit the SAME M# from the Stringout namespace.
++  // Key format: `${clip.start.toFixed(3)}_${mIdx}` (source time = unified anchor for both timelines).
++  const globalMarkerNumbers = useMemo(() => {
++    const map = new Map<string, number>();
++    let counter = 0;
++    combinedTimeline.forEach((clip) => {
++      const clipConstraints = userConstraints[clip.start.toString()] || [];
++      clipConstraints.forEach((c, mIdx) => {
++        const isOrphan = c.time < clip.start || c.time > clip.end;
++        if (!isOrphan) {
++          counter++;
++          map.set(`${clip.start.toFixed(3)}_${mIdx}`, counter);
++        }
++      });
++    });
++    return map;
++  }, [combinedTimeline, userConstraints]);
++
+   useEffect(() => {
+     if (isPreviewMode && activeClipIndex !== null) {
+       const el = document.getElementById(`fc-card-${activeClipIndex}`);
+@@ -509,6 +542,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+               <>
+                 <FinalCutTimeline
+                   timeline={orderedFinalCut}
++                  originalTimeline={finalCutTimeline}
++                  markerNumbers={globalMarkerNumbers}
+                   currentTime={currentTimelineTime}
+                   onSeek={seekToTimelineTime}
+                   onReorder={handleFinalCutReorder}
+@@ -528,6 +563,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                   clipOverrides={clipOverrides}
+                   audioWaveform={audioWaveform}
+                   audioDuration={audioDuration}
++                  markerNumbers={globalMarkerNumbers}
+                 />
+               </>
+             )}
+@@ -544,93 +580,103 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+           </div>
+           
+             <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
+-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-sm">
+-                <h3 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
+-                  <div className="flex items-center gap-2">
++              <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-sm overflow-hidden">
++                <button 
++                  onClick={() => setIsDirectorSettingsOpen(!isDirectorSettingsOpen)}
++                  className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
++                >
++                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                     <Wand2 size={14} className="text-amber-400" />
+                     AI Director Settings
++                  </h3>
++                  <div className="flex items-center gap-3">
++                    {audioBpm && (
++                      <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
++                        🎵 {audioBpm} BPM
++                      </span>
++                    )}
++                    <span className="text-slate-500 font-mono text-sm">{isDirectorSettingsOpen ? '-' : '+'}</span>
+                   </div>
+-                  {audioBpm && (
+-                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
+-                      🎵 Audio Tempo: {audioBpm} BPM
+-                    </span>
+-                  )}
+-                </h3>
+-                <div className="space-y-3">
+-                  <div>
+-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
+-                     <input type="number" 
+-                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                            value={directorConfig.target_duration}
+-                            onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
+-                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                     />
++                </button>
++                
++                {isDirectorSettingsOpen && (
++                  <div className="p-4 pt-0 space-y-3 border-t border-slate-800 mt-1">
++                    <div>
++                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
++                       <input type="number" 
++                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
++                              value={directorConfig.target_duration}
++                              onChange={(e) => setDirectorConfig({...directorConfig, target_duration: Number(e.target.value)})}
++                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
++                       />
++                    </div>
++                    <div>
++                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
++                       <select
++                          className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
++                          value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
++                          onChange={(e) => {
++                            const val = e.target.value;
++                            const newRes = val === "custom" ? "1000x1000" : val;
++                            const newConfig = { ...directorConfig, export_resolution: newRes };
++                            setDirectorConfig(newConfig);
++                            triggerSave(userConstraints, clipOverrides, newConfig);
++                          }}
++                       >
++                         <option value="3840x2160">4K UHD (3840x2160)</option>
++                         <option value="1920x1080">Full HD (1920x1080)</option>
++                         <option value="1080x1920">Vertical (1080x1920)</option>
++                         <option value="custom">Custom...</option>
++                       </select>
++                       
++                       {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
++                         <div className="flex gap-2 mb-3">
++                           <input 
++                             type="number" 
++                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
++                             placeholder="W"
++                             value={directorConfig.export_resolution?.split('x')[0] || ""}
++                             onChange={(e) => {
++                                const h = directorConfig.export_resolution?.split('x')[1] || "1080";
++                                setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
++                             }}
++                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
++                           />
++                           <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
++                           <input 
++                             type="number" 
++                             className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
++                             placeholder="H"
++                             value={directorConfig.export_resolution?.split('x')[1] || ""}
++                             onChange={(e) => {
++                                const w = directorConfig.export_resolution?.split('x')[0] || "1920";
++                                setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
++                             }}
++                             onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
++                           />
++                         </div>
++                       )}
++                    </div>
++                    <div>
++                       <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
++                       <textarea 
++                              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
++                              placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
++                              value={directorConfig.style_prompt}
++                              onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
++                              onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
++                       />
++                    </div>
+                   </div>
+-                  <div>
+-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
+-                     <select
+-                        className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
+-                        value={!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") ? "custom" : (directorConfig.export_resolution || "1920x1080")}
+-                        onChange={(e) => {
+-                          const val = e.target.value;
+-                          const newRes = val === "custom" ? "1000x1000" : val;
+-                          const newConfig = { ...directorConfig, export_resolution: newRes };
+-                          setDirectorConfig(newConfig);
+-                          triggerSave(userConstraints, clipOverrides, newConfig);
+-                        }}
+-                     >
+-                       <option value="3840x2160">4K UHD (3840x2160)</option>
+-                       <option value="1920x1080">Full HD (1920x1080)</option>
+-                       <option value="1080x1920">Vertical (1080x1920)</option>
+-                       <option value="custom">Custom...</option>
+-                     </select>
+-                     
+-                     {!["3840x2160", "1920x1080", "1080x1920"].includes(directorConfig.export_resolution || "1920x1080") && (
+-                       <div className="flex gap-2 mb-3">
+-                         <input 
+-                           type="number" 
+-                           className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                           placeholder="W"
+-                           value={directorConfig.export_resolution?.split('x')[0] || ""}
+-                           onChange={(e) => {
+-                              const h = directorConfig.export_resolution?.split('x')[1] || "1080";
+-                              setDirectorConfig({ ...directorConfig, export_resolution: `${e.target.value}x${h}` });
+-                           }}
+-                           onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                         />
+-                         <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
+-                         <input 
+-                           type="number" 
+-                           className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
+-                           placeholder="H"
+-                           value={directorConfig.export_resolution?.split('x')[1] || ""}
+-                           onChange={(e) => {
+-                              const w = directorConfig.export_resolution?.split('x')[0] || "1920";
+-                              setDirectorConfig({ ...directorConfig, export_resolution: `${w}x${e.target.value}` });
+-                           }}
+-                           onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                         />
+-                       </div>
+-                     )}
+-                  </div>
+-                  <div>
+-                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Director's Prompt</label>
+-                     <textarea 
+-                            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none h-20 resize-none" 
+-                            placeholder="Es. Stile frenetico, molti tagli rapidi, alta energia..."
+-                            value={directorConfig.style_prompt}
+-                            onChange={(e) => setDirectorConfig({...directorConfig, style_prompt: e.target.value})}
+-                            onBlur={() => triggerSave(userConstraints, clipOverrides, directorConfig)}
+-                     />
+-                  </div>
+-                </div>
++                )}
+               </div>
+             </div>
+           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+             
+             {isPreviewMode ? (
+-              // In Preview Mode, mostriamo le clip del Final Cut
+-              finalCutTimeline.map((clip, idx) => {
++              // In Preview Mode, mostriamo le clip nell'ordine CORRENTE (orderedFinalCut)
++              // CRITICAL: finalCutTimeline (immutabile) NON va usato qui — avrebbe timeline_in obsoleti post-DnD.
++              orderedFinalCut.map((clip, idx) => {
+                 // Find constraints for this clip
+                 let constraints: UserConstraint[] = [];
+                 let matchedKey = clip.source_clip_start.toString();
+@@ -641,6 +687,16 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                     break;
+                   }
+                 }
++                // Original Gemma index: position in the immutable source (for reference numbering)
++                const originalIdx = finalCutTimeline.findIndex(
++                  c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1 && Math.abs(c.source_in - clip.source_in) < 0.01
++                );
++                let pillarCount = 0; let fillerCount = 0;
++                for (let k = 0; k <= originalIdx && k < finalCutTimeline.length; k++) {
++                  if (finalCutTimeline[k].role === 'PILLAR') pillarCount++;
++                  else fillerCount++;
++                }
++                const seqLabel = clip.role === 'PILLAR' ? `P${pillarCount}` : `F${fillerCount}`;
+ 
+                 return (
+                   <div 
+@@ -655,54 +711,69 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                     title="Clicca per spostare la playhead su questa clip nel Director's Cut"
+                   >
+                      <div className="flex justify-between items-center mb-2 pointer-events-none">
+-                       <span className={`text-xs font-bold px-2 py-0.5 rounded ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
++                       <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1.5 ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
++                         <span className="text-[9px] opacity-60 font-mono">{seqLabel}</span>
+                          {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
+                      </div>
+                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
+-                       Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
++             Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                      </div>
+                      
+                      {/* Constraints List */}
+                      {constraints && constraints.length > 0 && (
+                        <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-800">
+                          {constraints.map((c, cIdx) => {
++                           const isOrphan = c.time < clip.source_in || c.time > clip.source_out;
+                            const globalTime = clip.timeline_in + (c.time - clip.source_in);
+-                           const isMarkerActive = isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
+-                           
++                           const isMarkerActive = !isOrphan && isPreviewMode && Math.abs(globalTime - currentTimelineTime) < 0.5;
++                           const markerKey = `${clip.source_clip_start.toFixed(3)}_${cIdx}`;
++                           const markerNum = globalMarkerNumbers.get(markerKey);
+                            return (
+-                              <div 
+-                                key={cIdx} 
+-                                className={`flex items-center justify-between px-2 py-1 rounded border transition-all cursor-pointer hover:scale-[1.02] ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
++                              <div
++                                key={cIdx}
++                                className={`flex items-center justify-between px-2 py-1.5 rounded border transition-all ${isOrphan ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'} ${isMarkerActive ? 'bg-amber-500/20 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-900/80'}`}
+                                 onClick={(e) => {
+                                   e.stopPropagation();
++                                  if (isOrphan) return;
+                                   seekToTimelineTime(globalTime);
+                                 }}
++                                title={isOrphan ? `⚠️ Marker fuori range clip (${c.time.toFixed(2)}s non è in ${clip.source_in.toFixed(1)}–${clip.source_out.toFixed(1)})` : undefined}
+                               >
+-                               <div className="flex items-center gap-2">
+-                                 <div className="w-4 flex justify-center">
+-                                 {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
+-                                 {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
+-                                 {c.type === 'BM' && (
+-                                   <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
+-                                     <path d="M0 0H10V10L5 14L0 10V0Z" />
+-                                   </svg>
++                               <div className="flex items-center gap-2 flex-1 min-w-0">
++                                 <div className="w-4 flex justify-center shrink-0">
++                                   {c.type === 'IN' && <span className="text-blue-400 font-bold text-xs">[</span>}
++                                   {c.type === 'OUT' && <span className="text-purple-400 font-bold text-xs">]</span>}
++                                   {c.type === 'BM' && (
++                                     <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" className="text-white">
++                                       <path d="M0 0H10V10L5 14L0 10V0Z" />
++                                     </svg>
++                                   )}
++                                 </div>
++                                 {markerNum !== undefined && (
++                                   <span className="text-[9px] font-bold font-mono bg-slate-700 text-slate-300 px-1 py-0.5 rounded shrink-0">
++                                     M{markerNum}
++                                   </span>
+                                  )}
++                                 <span className="text-[11px] font-mono font-bold text-slate-100 shrink-0">
++                                   {isOrphan ? '⚠️' : `${globalTime.toFixed(2)}s`}
++                                 </span>
++                                 <span className="text-[9px] font-mono text-slate-500 truncate">
++                                   src {c.time.toFixed(2)}s
++                                 </span>
+                                </div>
+-                               <span className="text-[10px] font-mono text-slate-400">{c.time.toFixed(2)}s</span>
++                               <button
++                                 onClick={(e) => {
++                                   e.stopPropagation();
++                                   handleRemoveSpecificConstraint(matchedKey, c.time);
++                                 }}
++                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 shrink-0"
++                                 title="Rimuovi"
++                               >
++                                 <X size={12} />
++                               </button>
+                              </div>
+-                             <button
+-                               onClick={(e) => {
+-                                 e.stopPropagation();
+-                                 handleRemoveSpecificConstraint(matchedKey, c.time);
+-                               }}
+-                               className="text-slate-500 hover:text-red-400 transition-colors p-1"
+-                               title="Rimuovi"
+-                             >
+-                               <X size={12} />
+-                             </button>
+-                           </div>
+                            );
+                          })}
+                        </div>
+@@ -721,6 +792,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+                   constraints={userConstraints[clip.start.toString()]}
+                   onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
+                   overrideMode={clipOverrides[clip.start.toString()]}
++                  markerNumbers={globalMarkerNumbers}
+                 />
+               ))
+             )}

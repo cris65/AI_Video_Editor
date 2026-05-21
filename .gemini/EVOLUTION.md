@@ -1,6 +1,6 @@
 # 🚀 EVOLUTION (Roadmap & Phases)
 
-**Version:** v0.1.34 - 2026-05-20
+**Version:** v0.1.41 - 2026-05-21
 
 > [!NOTE]
 > This document tracks the product direction and the current phase of development for the AI Video Editor. It keeps the development progress strictly aligned with the Offline-First architecture (Python/MLX/YOLO) and the HITL interface (React).

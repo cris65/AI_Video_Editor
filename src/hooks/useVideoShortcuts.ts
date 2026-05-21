@@ -5,7 +5,7 @@ export function useVideoShortcuts(
   videoRef: React.RefObject<HTMLVideoElement>,
   timeline: PancakeClip[],
   fps: number,
-  onConstraint: (type: 'IN' | 'OUT' | 'BM' | 'CLEAR' | 'CLEAR_ALL', time: number) => void,
+  onConstraint: (type: 'IN' | 'OUT' | 'BM' | 'AUDIO' | 'CLEAR' | 'CLEAR_ALL', time: number) => void,
   onOverride: (type: 'KEEP' | 'TRASH' | 'BROLL' | 'CLEAR', time: number) => void,
   isPreviewMode: boolean = false,
   currentTimelineTime: number = 0,
@@ -118,6 +118,10 @@ export function useVideoShortcuts(
         case 'KeyB':
           e.preventDefault();
           onOverride('BROLL', video.currentTime);
+          break;
+        case 'KeyA':
+          e.preventDefault();
+          onConstraint('AUDIO', video.currentTime);
           break;
       }
     };

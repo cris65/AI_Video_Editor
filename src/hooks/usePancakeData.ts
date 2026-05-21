@@ -35,6 +35,7 @@ export interface PancakeClip {
   end: number;
   tag: string;
   best_moment: number;
+  clip_name?: string;
   storyboard_path?: string;
   storyboard_paths?: string[];
   is_usable?: boolean;

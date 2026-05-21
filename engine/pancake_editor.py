@@ -202,7 +202,15 @@ class PancakeEditor:
                     frame_indices[-1] = min(frame_indices[-1], start_frame + int(total_frames_in_block) - 1)
                 
                 naming_base = self.get_clip_naming(block['start'])
-                
+
+                # Inject clip_name as a first-class field (source of truth from EDL clip_map)
+                clip_name_base = self.sequence_name
+                for edl_clip in self.clip_map:
+                    if edl_clip["timeline_start_sec"] <= block["start"] < edl_clip["timeline_end_sec"]:
+                        clip_name_base = edl_clip.get("clip_name_base", clip_name_base)
+                        break
+                block["clip_name"] = clip_name_base
+
                 for i, f_idx in enumerate(frame_indices):
                     temp_cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
                     ret, fr = temp_cap.read()

@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.40 - 2026-05-20
+**Version:** v0.1.41 - 2026-05-21
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -82,10 +82,10 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 ## Frontend HITL (React/Vite)
 
 - **Interfaccia Split-View NLE-style:** Video Player sincronizzato + Timeline Interattiva (Stringout & Director's Cut). Anti-Lag Engine 60fps via `requestAnimationFrame` sul DOM, scavalcando il React state globale. `React.memo` su tutte le clip card.
-- **Timeline Orizzontale Interattiva (DnD & Zoom Engine):** `FinalCutTimeline` con blocchi flex proporzionali alla durata. Drag via `@dnd-kit/core` + `horizontalListSortingStrategy` + custom `snapToCursorModifier`. Zoom Engine `1x-50x` via slider o `Ctrl+Scroll`.
+- **Timeline Orizzontale Interattiva (Auto-Pan & Zoom Engine):** `FinalCutTimeline` con blocchi flex. Zoom Engine `1x-50x` via slider o `Ctrl+Scroll`. Auto-pan intelligente al `seeked` event per mantenere la playhead centrata durante la navigazione da tastiera. Rendering matematico isolato per separare area marker (ruler) dalle tracce clip.
 - **Clip Ghosting & Save Order:** Clip riposizionate assumono stato "Dirty" (trasparenza + alone scuro + bordo bianco). Il salvataggio è ottimistico: persiste l'ordine in `_hitl_data.json` sotto `clip_order_override` senza trigger re-fetch dell'engine.
-- **Sistema Multi-Anchor (BM/IN/OUT):** Vincoli multipli per clip via shortcut (`M`, `I`, `O`), rimovibili chirurgicamente via `X`. Visualizzati come lista interattiva nella ClipCard.
-- **Override Non-Distruttivi (KEEP/TRASH/BROLL):** Shortcut `K`, `T`, `B`. Stato visualizzato istantaneamente con glow e badge. Salvati su sidecar `_hitl_data.json`.
+- **Sistema Multi-Anchor (BM/IN/OUT/AUDIO):** Vincoli multipli per clip via shortcut (`M`, `I`, `O`, `A`), rimovibili chirurgicamente via `X`. Visualizzati come lista interattiva nella ClipCard con nomenclatura identica alla timeline. Timecode decimale assoluto (`MM:SS.ms`).
+- **Override Non-Distruttivi (KEEP/TRASH/BROLL):** Shortcut `K`, `T`, `B`. Stato visualizzato istantaneamente con glow e badge nella UI. La ClipCard espone una row dedicata con tasto `X` per annullare rapidamente il `FORCED` status e resettare la clip al calcolo MLX originale. Salvati su sidecar `_hitl_data.json`.
 - **Director Settings Panel & Orchestrazione:** Sidebar rapida che invia l'intero stato ibrido (Seed, Constraints, Overrides, Analysis FPS) all'endpoint FastAPI `/api/orchestrate`. Creative Settings Portal full-screen per prompt e parametri NLP.
 - **Interfaccia TypeScript `PancakeClip`:** Rispecchia fedelmente lo schema JSON annidato v0.1.34 con 7 sotto-interfacce typed (`technical_quality`, `spatial_configuration`, `yolo_omniscient_data`, `cinematography?`, `continuity?`, `commercial?`, `story?`). Zero chiavi piatte legacy.
 - **Integrazione Telemetrica del Dashboard:** Middleware in Vite per servire staticamente `/system_logs/performance_history.json`. Visualizzazione delle performance dell'ultimo run (nome del modello VLM formattato, frame estratti e durata in minuti/secondi) posizionato simmetricamente sopra il Video Player principale tramite icona di attività di `lucide-react`.

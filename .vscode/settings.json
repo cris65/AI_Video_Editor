@@ -1,9 +1,9 @@
 {
-  "python.defaultInterpreterPath": "python3",
-  "python.interpreterPath": "python3",
+  "python.defaultInterpreterPath": "/Users/macbookm4cdv/Development/AI_Video_Editor/engine/venv/bin/python",
+  "python.interpreterPath": "/Users/macbookm4cdv/Development/AI_Video_Editor/engine/venv/bin/python",
   "python.analysis.venvPath": "${workspaceFolder}/engine",
   "python.analysis.venv": "venv",
-  "python.languageServer": "Jedi",
+  "python.languageServer": "Default",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/engine/venv/lib/python3.13/site-packages",
     "${workspaceFolder}/engine"

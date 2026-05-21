@@ -23,6 +23,7 @@ As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. 
 2. The Tech Lead passes the prompt to AG.
 3. **AG surgically modifies the files and then HALTS. AG must NOT commit and MUST NOT push.**
 4. *If DB modifications are required:* The Tech Lead creates and applies the local migration (`sb:mig:new` + `sb:up`), supported by the Senior Dev.
+5. **ZERO-DELETION UI MANDATE:** AG is STRICTLY FORBIDDEN from deleting, omitting, or pruning any existing UI components (buttons, markers, controls, SVGs) when performing visual refactoring or CSS density optimizations. The functional surface area MUST remain 100% intact unless explicitly authorized by the Tech Lead.
 
 ### 👁️ PHASE 3: Human Validation & Prep (The Tech Lead)
 1. **Human QA (Manual Testing):** The Tech Lead opens the browser (`localhost:5173`) and physically tests the feature. Verifies UI, UX, console, and network. **Nothing proceeds if this test fails.**

@@ -8,15 +8,6 @@ import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag } from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
-
-function formatTime(seconds: number): string {
-  if (isNaN(seconds) || seconds < 0) return '00:00.00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 100);
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-}
 
 // Pure function: recalculates timeline_in/timeline_out after manual reorder.
 // Durations are invariant (source_out - source_in). Returns a new immutable array.
@@ -49,7 +40,7 @@ interface PancakeDashboardProps {
   sequenceName: string;
 }
 
-export type ConstraintType = 'IN' | 'OUT' | 'BM' | 'AUDIO';
+export type ConstraintType = 'IN' | 'OUT' | 'BM';
 
 export interface UserConstraint {
   type: ConstraintType;
@@ -359,22 +350,16 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   // Key format: `${clip.start.toFixed(3)}_${mIdx}` (source time = unified anchor for both timelines).
   const globalMarkerNumbers = useMemo(() => {
     const map = new Map<string, number>();
-    // 1. Flatten all constraints with their absolute time position
-    const flat: { key: string; mIdx: number; time: number }[] = [];
+    let counter = 0;
     combinedTimeline.forEach((clip) => {
       const clipConstraints = userConstraints[clip.start.toString()] || [];
       clipConstraints.forEach((c, mIdx) => {
         const isOrphan = c.time < clip.start || c.time > clip.end;
         if (!isOrphan) {
-          flat.push({ key: clip.start.toFixed(3), mIdx, time: c.time });
+          counter++;
+          map.set(`${clip.start.toFixed(3)}_${mIdx}`, counter);
         }
       });
-    });
-    // 2. Sort by absolute time (leftmost = M1)
-    flat.sort((a, b) => a.time - b.time);
-    // 3. Assign sequential M# in chronological order
-    flat.forEach((entry, i) => {
-      map.set(`${entry.key}_${entry.mIdx}`, i + 1);
     });
     return map;
   }, [combinedTimeline, userConstraints]);
@@ -490,18 +475,16 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
   return (
     <div className="h-screen bg-slate-950 text-slate-200 flex flex-col overflow-hidden">
-      <Toaster position="top-right" />
       {/* Header */}
-      <header className="shrink-0 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-4 py-2 flex items-center justify-between shadow-md z-50">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 shadow-inner shrink-0">
-            <LayoutGrid className="w-4 h-4 text-emerald-400" />
+      <header className="shrink-0 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-md z-50">
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20 shadow-inner">
+            <LayoutGrid className="w-5 h-5 text-emerald-400" />
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-bold text-white tracking-tight shrink-0">Pancake HITL Dashboard</h1>
-            <div className="flex items-center gap-3 mt-0.5 font-mono text-[10px] min-w-0">
-              <span className="text-slate-500 truncate min-w-0">{sequenceName}</span>
-              <span className="text-slate-500 whitespace-nowrap shrink-0">• {combinedTimeline.length} segmenti • {fps.toFixed(2)} fps</span>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Pancake HITL Dashboard</h1>
+            <div className="flex items-center gap-3 mt-0.5 font-mono text-xs">
+              <span className="text-slate-500">{sequenceName} • {combinedTimeline.length} segmenti sincronizzati • {fps.toFixed(2)} fps</span>
               
               {/* Save Status Indicator */}
               <div className="flex items-center gap-1.5 min-w-[80px]">
@@ -513,41 +496,41 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         </div>
         
         {/* Master Toggle */}
-        <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700 shadow-inner mx-2">
+        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mx-4">
           <button 
             onClick={() => setIsPreviewMode(false)}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${!isPreviewMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-md transition-colors ${!isPreviewMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            <Film size={12} />
+            <Film size={14} />
             Stringout
           </button>
           <button 
             onClick={() => setIsPreviewMode(true)}
             disabled={finalCutTimeline.length === 0}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={finalCutTimeline.length === 0 ? "Final Cut non ancora generato" : "Preview Director's Cut"}
           >
-            <PlaySquare size={12} />
+            <PlaySquare size={14} />
             Director's Cut
           </button>
           
           <button
             onClick={() => setIsRecipeModalOpen(true)}
             disabled={!gemmaRecipe || gemmaRecipe.length === 0}
-            className={`flex items-center gap-1.5 px-2.5 py-1 ml-1 text-[10px] font-bold rounded-md transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 text-xs font-bold rounded-md transition-all ${
               !gemmaRecipe || gemmaRecipe.length === 0 
                 ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' 
                 : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
             }`}
             title={!gemmaRecipe ? "Recipe non disponibile" : "View AI Recipe"}
           >
-            <Eye size={12} />
+            <Eye size={14} />
           </button>
           
           <button
             onClick={handleRegenerateCut}
             disabled={isRegenerating || saveStatus === 'saving'}
-            className={`flex items-center gap-1 px-2.5 py-1 ml-1 text-[10px] font-bold rounded-md transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 text-xs font-bold rounded-md transition-all ${
               isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
               : finalCutTimeline.length === 0 
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
@@ -556,62 +539,57 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
           >
             {isRegenerating ? (
-              <RefreshCw size={12} className="animate-spin" />
+              <RefreshCw size={14} className="animate-spin" />
             ) : finalCutTimeline.length === 0 ? (
-              <Wand2 size={12} className="animate-pulse" />
+              <Wand2 size={14} className="animate-pulse" />
             ) : (
-              <RefreshCw size={12} />
+              <RefreshCw size={14} />
             )}
             {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
           </button>
         </div>
         
-        <div className="flex items-center gap-1.5">
-           <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-700 shadow-inner">
+        <div className="flex items-center gap-3">
+           <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 shadow-inner mr-2">
              <button 
                onClick={() => setFilterMode('ALL')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
              >
                ALL
              </button>
              <button 
                onClick={() => setFilterMode('VALID')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
              >
                VALID
              </button>
              <button 
                onClick={() => setFilterMode('BROLL')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
              >
                B-ROLL
              </button>
              <button 
                onClick={() => setFilterMode('TRASH')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+               className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
              >
                TRASH
              </button>
            </div>
-           <span className={`flex items-center gap-1 px-2 py-0.5 bg-slate-900/80 rounded-md text-[10px] font-bold border shadow-sm whitespace-nowrap transition-colors ${
-             filterMode === 'VALID' ? 'text-emerald-400 border-emerald-500/30' :
-             filterMode === 'BROLL' ? 'text-blue-400 border-blue-500/30' :
-             filterMode === 'TRASH' ? 'text-red-400 border-red-500/30' :
-             'text-slate-300 border-slate-700'
-           }`}>
-             <Filter size={10} className="opacity-80" />
-             {filterMode === 'BROLL' ? 'B-ROLL' : filterMode}: {filteredTimeline.length} Clips
+           <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 rounded-full text-xs font-medium text-slate-300 border border-slate-700 shadow-sm">
+             <Filter size={14} className="text-blue-400" />
+             {filteredTimeline.length} Clips
            </span>
         </div>
       </header>
 
-      <main className="flex-1 p-2 flex flex-col lg:flex-row gap-2 max-w-[1920px] mx-auto w-full min-h-0">
+      <main className="flex-1 p-6 flex flex-col lg:flex-row gap-6 max-w-[1920px] mx-auto w-full min-h-0">
         
         {/* Left Side: Player & Timeline */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Telemetry Display Container */}
-          <div className="flex items-center justify-between mb-1 h-[24px] shrink-0">
-            <div className="text-slate-400 text-[10px] font-medium flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4 h-[30px] shrink-0">
+            <div className="text-slate-400 text-sm font-medium flex items-center gap-2">
               {lastTelemetry ? (
                 <>
                   <Activity size={16} className="text-blue-400" />
@@ -623,26 +601,6 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 <span className="text-slate-500 italic text-xs">No telemetry data available</span>
               )}
             </div>
-            
-            {/* Global IN/OUT Constraints */}
-            {!isPreviewMode && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleConstraint('IN', currentTimelineTime)}
-                  title="Imposta Marker IN (I)"
-                  className="flex items-center gap-1.5 px-4 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg transition-all text-xs font-bold tracking-wider shadow-sm hover:scale-[1.02]"
-                >
-                  <span className="text-blue-300">[</span> IN
-                </button>
-                <button
-                  onClick={() => handleConstraint('OUT', currentTimelineTime)}
-                  title="Imposta Marker OUT (O)"
-                  className="flex items-center gap-1.5 px-4 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-lg transition-all text-xs font-bold tracking-wider shadow-sm hover:scale-[1.02]"
-                >
-                  OUT <span className="text-purple-300">]</span>
-                </button>
-              </div>
-            )}
           </div>
 
           <div className="flex-1 min-h-0 flex items-center justify-center relative">
@@ -781,133 +739,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                      <div className="text-xs text-slate-300 pointer-events-none mb-2">
                        Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
                      </div>
-
-                     {/* Marker Rows — DB-style, click-to-seek */}
-                      {(() => {
-                        // Match constraints by source_clip_start key
-                        const constraintKey = Object.keys(userConstraints).find(
-                          k => Math.abs(parseFloat(k) - clip.source_clip_start) < 0.1
-                        );
-                        const markerList = constraintKey ? userConstraints[constraintKey] : [];
-
-                        interface DCMarkerItem {
-                          isNativeBM: boolean;
-                          type: 'IN' | 'OUT' | 'BM' | 'AUDIO';
-                          time: number;
-                          markerNum?: number;
-                        }
-                        const items: DCMarkerItem[] = [];
-
-                        // Add native BM if defined and within range
-                        if (matchingPancakeClip && matchingPancakeClip.best_moment && matchingPancakeClip.best_moment > matchingPancakeClip.start && matchingPancakeClip.best_moment < matchingPancakeClip.end) {
-                          items.push({
-                            isNativeBM: true,
-                            type: 'BM',
-                            time: matchingPancakeClip.best_moment,
-                          });
-                        }
-
-                        // Add user constraints
-                        markerList.forEach((c, mIdx) => {
-                          const markerNum = globalMarkerNumbers.get(`${clip.source_clip_start.toFixed(3)}_${mIdx}`);
-                          items.push({
-                            isNativeBM: false,
-                            type: c.type,
-                            time: c.time,
-                            markerNum,
-                          });
-                        });
-
-                        if (items.length === 0) return null;
-
-                        // Sort chronologically
-                        items.sort((a, b) => a.time - b.time);
-
-                        const BORDER_COLOR: Record<string, string> = {
-                          IN: '#3b82f6',
-                          OUT: '#a855f7',
-                          BM: '#f97316', // User BM is orange
-                          AUDIO: '#22c55e',
-                        };
-
-                        return (
-                          <div className="mb-2 flex flex-col border border-slate-800 rounded-lg overflow-hidden">
-                            {items.map((item, mIdx) => {
-                              const borderColor = item.isNativeBM ? '#eab308' : (BORDER_COLOR[item.type] ?? '#94a3b8');
-                              const typeIcon = item.type === 'BM'
-                                ? <svg width="7.5" height="10" viewBox="0 0 10 14" fill="currentColor" className="inline-block"><path d="M0 0H10V10L5 14L0 10V0Z" /></svg>
-                                : item.type === 'AUDIO' ? <span>&#9834;</span>
-                                : <span className="text-[9px] font-black">{item.type}</span>;
-                              return (
-                                <button
-                                  key={`dc-marker-${mIdx}`}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSeek(item.time);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-slate-800/40 border-b border-slate-800/40 last:border-b-0 cursor-pointer group"
-                                  style={{ borderLeft: `3px solid ${borderColor}` }}
-                                >
-                                  <span className="text-[10px] shrink-0" style={{ color: borderColor }}>
-                                    {typeIcon}
-                                  </span>
-
-                                  {item.isNativeBM ? (
-                                    <span
-                                      className="text-[9px] font-bold font-mono px-1 py-0 rounded shrink-0"
-                                      style={{
-                                        backgroundColor: '#eab30822',
-                                        color: '#eab308',
-                                        border: '1px solid #eab30855',
-                                      }}
-                                    >
-                                      BM
-                                    </span>
-                                  ) : (
-                                    item.markerNum !== undefined && (
-                                        <span
-                                          className="text-[9px] font-bold font-mono px-1 py-0 rounded shrink-0"
-                                          style={{
-                                            backgroundColor: `${borderColor}22`,
-                                            color: borderColor,
-                                            border: `1px solid ${borderColor}55`,
-                                          }}
-                                        >
-                                          {item.type === 'IN' ? 'IN' : item.type === 'OUT' ? 'OUT' : item.type === 'BM' ? 'M' : 'A'}{item.markerNum}
-                                        </span>
-                                    )
-                                  )}
-
-                                  <span className="text-[10px] font-mono text-slate-300 shrink-0">[{formatTime(item.time)}]</span>
-                                  <span className="text-[9px] font-mono text-slate-500 flex-1">
-                                    SRT {(clip.timeline_in + (item.time - clip.source_in)).toFixed(2)}s
-                                  </span>
-
-                                  {!item.isNativeBM ? (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (constraintKey) handleRemoveSpecificConstraint(constraintKey, item.time);
-                                      }}
-                                      className="opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-700/50 shrink-0"
-                                      style={{ color: borderColor }}
-                                      title="Remove Marker"
-                                    >
-                                      <X size={10} strokeWidth={2} />
-                                    </button>
-                                  ) : (
-                                    <span className="w-[14px] h-[14px]" /> // Spacer
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-
-                     {/* Semantic Analysis Panel */}
+                            {/* Semantic Analysis Panel */}
                      {(matchingPancakeClip) && (
                        <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
                          <div className="flex flex-wrap items-center gap-1.5">
@@ -1010,9 +842,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                   onClick={() => handleSeek(clip.start)}
                   constraints={userConstraints[clip.start.toString()]}
                   onRemoveConstraint={(time) => handleRemoveSpecificConstraint(clip.start.toString(), time)}
-                  onSeekToMarker={(time) => handleSeek(time)}
                   overrideMode={clipOverrides[clip.start.toString()]}
-                  onClearOverride={() => handleOverride('CLEAR', clip.start)}
                   markerNumbers={globalMarkerNumbers}
                 />
               ))

@@ -8,7 +8,7 @@ interface VideoPlayerSyncProps {
 export const VideoPlayerSync = forwardRef<HTMLVideoElement, VideoPlayerSyncProps>(
   ({ src, hideControls }, ref) => {
     return (
-      <div className="w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl aspect-video relative">
+      <div className="w-full h-full max-h-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center relative">
         <video
           ref={ref}
           src={src}

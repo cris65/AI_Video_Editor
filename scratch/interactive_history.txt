@@ -1,0 +1,484 @@
+commit 1c0084edfa7b125913071f126ba1be54d82baf1a
+Author: cris65 <criseclipse@gmail.com>
+Date:   Wed May 20 22:46:42 2026 +0200
+
+    [v0.1.39] refactor(ui): premiere dense layout, inline tooltip, strict pylance typing
+
+diff --git a/src/components/dashboard/InteractiveTimeline.tsx b/src/components/dashboard/InteractiveTimeline.tsx
+index bca702e5..6322a156 100644
+--- a/src/components/dashboard/InteractiveTimeline.tsx
++++ b/src/components/dashboard/InteractiveTimeline.tsx
+@@ -36,7 +36,7 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+     return () => cancelAnimationFrame(animationFrameId);
+   }, [videoRef, duration]);
+ 
+-  if (!timeline || timeline.length === 0 || duration <= 0) return null;
++  if (!timeline || duration <= 0) return null;
+ 
+   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+     const rect = e.currentTarget.getBoundingClientRect();
+
+commit aab1f84e243263e55d82f04bb93d8fe98111272d
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 16:46:41 2026 +0200
+
+    [v0.1.20] feat(ui): split keyboard shortcuts and add 30 frames skip
+
+diff --git a/src/components/dashboard/InteractiveTimeline.tsx b/src/components/dashboard/InteractiveTimeline.tsx
+index 92e6ce14..bca702e5 100644
+--- a/src/components/dashboard/InteractiveTimeline.tsx
++++ b/src/components/dashboard/InteractiveTimeline.tsx
+@@ -1,4 +1,5 @@
+-import { useEffect, useRef } from 'react';
++import { useEffect, useRef, useState } from 'react';
++import { Info } from 'lucide-react';
+ import type { PancakeClip } from '../../hooks/usePancakeData';
+ 
+ interface InteractiveTimelineProps {
+@@ -9,11 +10,13 @@ interface InteractiveTimelineProps {
+   clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
+   audioWaveform?: number[];
+   audioDuration?: number;
++  markerNumbers?: Map<string, number>; // Global M# namespace from PancakeDashboard (Stringout-first)
+ }
+ 
+-export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0 }: InteractiveTimelineProps) {
++export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0, markerNumbers = new Map() }: InteractiveTimelineProps) {
+   const playheadRef = useRef<HTMLDivElement>(null);
+   const timeTextRef = useRef<HTMLSpanElement>(null);
++  const [isPopupOpen, setIsPopupOpen] = useState(false);
+ 
+   useEffect(() => {
+     let animationFrameId: number;
+@@ -67,8 +70,47 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+ 
+   return (
+     <div className="w-full flex flex-col gap-2">
+-      <div className="flex justify-between items-center text-xs text-slate-400 font-mono">
+-        <span ref={timeTextRef}>00:00</span>
++      <div className="flex justify-between items-center text-xs text-slate-400 font-mono relative z-[100]">
++        <span ref={timeTextRef} className="text-blue-400 font-bold">00:00</span>
++        
++        {/* Info Popup - Cliccabile e posizionato in alto */}
++        <div className="relative flex items-center justify-center">
++          <button 
++            onClick={() => setIsPopupOpen(!isPopupOpen)}
++            className="text-slate-400 flex items-center gap-2 hover:text-slate-300 transition-colors focus:outline-none"
++          >
++            STRINGOUT PREVIEW
++            <Info size={14} className="opacity-70" />
++          </button>
++          
++          {isPopupOpen && (
++            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[280px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
++              <div className="flex justify-between items-center mb-3">
++                <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
++                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Keyboard Shortcuts
++                </h4>
++                <button onClick={() => setIsPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
++              </div>
++              <div className="space-y-2 text-slate-400 text-[10px] font-sans">
++                <div className="flex justify-between items-center"><span>Play / Pause</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Space</kbd></div>
++                <div className="flex justify-between items-center"><span>10 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">← / →</kbd></div>
++                <div className="flex justify-between items-center"><span>1 Frame</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + ← / →</kbd></div>
++                <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
++                <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
++                <div className="w-full h-px bg-slate-800 my-1" />
++                <div className="flex justify-between items-center"><span>Marker IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">I / O</kbd></div>
++                <div className="flex justify-between items-center"><span>Marker Bookmark (M#)</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">M</kbd></div>
++                <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X / Backspace</kbd></div>
++                <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
++                <div className="w-full h-px bg-slate-800 my-1" />
++                <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
++                <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
++                <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
++              </div>
++            </div>
++          )}
++        </div>
++
+         <span>{formatTime(duration)}</span>
+       </div>
+ 
+@@ -91,26 +133,42 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+               style={{ left: `${left}%`, width: `${width}%` }}
+               title={`[${clip.tag}] ${formatTime(clip.start)} - ${formatTime(clip.end)}`}
+             >
+-              {/* Constraint Markers */}
+-              {constraints.map((constraint, cIdx) => (
+-                <div 
+-                  key={cIdx}
+-                  className="absolute top-1/2 text-[12px] font-black drop-shadow-md z-20 pointer-events-none transition-transform"
+-                  style={{ 
+-                    left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`, 
+-                    transform: 'translate(-50%, -50%)',
+-                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#ffffff')
+-                  }}
+-                >
+-                  {constraint.type === 'IN' && '['}
+-                  {constraint.type === 'OUT' && ']'}
+-                  {constraint.type === 'BM' && (
+-                    <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+-                      <path d="M0 0H10V10L5 14L0 10V0Z" />
+-                    </svg>
+-                  )}
+-                </div>
+-              ))}
++              {/* Constraint Markers with global M# label */}
++              {constraints.map((constraint, cIdx) => {
++                const markerNum = markerNumbers.get(`${clip.start.toFixed(3)}_${cIdx}`);
++                return (
++                  <div
++                    key={cIdx}
++                    className="absolute flex flex-col items-center z-20 pointer-events-none"
++                    style={{
++                      left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`,
++                      top: '50%',
++                      transform: 'translate(-50%, -50%)',
++                    }}
++                  >
++                    <div
++                      className="text-[12px] font-black drop-shadow-md"
++                      style={{ color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#ffffff') }}
++                    >
++                      {constraint.type === 'IN' && '['}
++                      {constraint.type === 'OUT' && ']'}
++                      {constraint.type === 'BM' && (
++                        <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
++                          <path d="M0 0H10V10L5 14L0 10V0Z" />
++                        </svg>
++                      )}
++                    </div>
++                    {markerNum !== undefined && (
++                      <span
++                        className="text-[9px] font-bold font-mono leading-none mt-[2px]"
++                        style={{ color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
++                      >
++                        M{markerNum}
++                      </span>
++                    )}
++                  </div>
++                );
++              })}
+             </div>
+           );
+         })}
+@@ -151,11 +209,11 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+         {/* Playhead controlled by requestAnimationFrame */}
+         <div 
+           ref={playheadRef}
+-          className="absolute top-0 bottom-0 w-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] z-10 pointer-events-none"
++          className="absolute top-0 bottom-0 w-[2px] bg-red-500 z-[30] pointer-events-none drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]"
+           style={{ left: '0%' }}
+         >
+           {/* Playhead handle (triangle) */}
+-          <div className="absolute top-0 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white drop-shadow-md" />
++          <div className="absolute top-0 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-red-500 drop-shadow-md" />
+         </div>
+         
+       </div>
+
+commit 6b67bf51ec37c55fe39f0ad4801d19c33e3adaf9
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 11:16:16 2026 +0200
+
+    [v0.1.17] feat(ui): implement PRO premiere-style SVG audio waveform and marker icons
+
+diff --git a/src/components/dashboard/InteractiveTimeline.tsx b/src/components/dashboard/InteractiveTimeline.tsx
+index 5209a282..92e6ce14 100644
+--- a/src/components/dashboard/InteractiveTimeline.tsx
++++ b/src/components/dashboard/InteractiveTimeline.tsx
+@@ -7,9 +7,11 @@ interface InteractiveTimelineProps {
+   duration: number;
+   userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>>;
+   clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
++  audioWaveform?: number[];
++  audioDuration?: number;
+ }
+ 
+-export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {} }: InteractiveTimelineProps) {
++export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0 }: InteractiveTimelineProps) {
+   const playheadRef = useRef<HTMLDivElement>(null);
+   const timeTextRef = useRef<HTMLSpanElement>(null);
+ 
+@@ -102,7 +104,11 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+                 >
+                   {constraint.type === 'IN' && '['}
+                   {constraint.type === 'OUT' && ']'}
+-                  {constraint.type === 'BM' && '★'}
++                  {constraint.type === 'BM' && (
++                    <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
++                      <path d="M0 0H10V10L5 14L0 10V0Z" />
++                    </svg>
++                  )}
+                 </div>
+               ))}
+             </div>
+@@ -112,6 +118,36 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+         {/* Hover overlay for entire timeline */}
+         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+ 
++        {/* Audio Waveform Overlay */}
++        {audioWaveform.length > 0 && audioDuration > 0 && (() => {
++          const pointsPerSecond = audioWaveform.length / audioDuration;
++          const pointsToShow = Math.ceil(duration * pointsPerSecond);
++          const visibleWaveform = audioWaveform.slice(0, pointsToShow);
++          
++          if (visibleWaveform.length === 0) return null;
++          
++          // Generate SVG Path for Premiere-like dense waveform
++          const width = 1000;
++          const height = 100;
++          const step = width / visibleWaveform.length;
++          
++          let pathD = `M 0,${height}`;
++          visibleWaveform.forEach((val, idx) => {
++            const x = (idx * step).toFixed(2);
++            const y = (height - (val * height)).toFixed(2);
++            pathD += ` L ${x},${y}`;
++          });
++          pathD += ` L ${width},${height} Z`;
++          
++          return (
++            <div className="absolute inset-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
++              <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full fill-emerald-400">
++                <path d={pathD} />
++              </svg>
++            </div>
++          );
++        })()}
++
+         {/* Playhead controlled by requestAnimationFrame */}
+         <div 
+           ref={playheadRef}
+
+commit ebe2be305ff866eb36627de4e48b1a1af2882028
+Author: cris65 <criseclipse@gmail.com>
+Date:   Mon May 18 03:05:29 2026 +0200
+
+    [v0.1.16] feat(ai): semantic CoT and precise UI BM marker matching
+
+diff --git a/src/components/dashboard/InteractiveTimeline.tsx b/src/components/dashboard/InteractiveTimeline.tsx
+index 5eab9315..5209a282 100644
+--- a/src/components/dashboard/InteractiveTimeline.tsx
++++ b/src/components/dashboard/InteractiveTimeline.tsx
+@@ -97,7 +97,7 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
+                   style={{ 
+                     left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`, 
+                     transform: 'translate(-50%, -50%)',
+-                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#eab308')
++                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#ffffff')
+                   }}
+                 >
+                   {constraint.type === 'IN' && '['}
+
+commit fac6cac6f0ca2f87f1dc8c79ad83ec062256c755
+Author: cris65 <criseclipse@gmail.com>
+Date:   Sun May 17 23:42:06 2026 +0200
+
+    [v0.1.15] feat(hitl): add BROLL override and semantic UI colors
+
+diff --git a/src/components/dashboard/InteractiveTimeline.tsx b/src/components/dashboard/InteractiveTimeline.tsx
+index 70796597..5eab9315 100644
+--- a/src/components/dashboard/InteractiveTimeline.tsx
++++ b/src/components/dashboard/InteractiveTimeline.tsx
+@@ -5,9 +5,11 @@ interface InteractiveTimelineProps {
+   timeline: PancakeClip[];
+   videoRef: React.RefObject<HTMLVideoElement>;
+   duration: number;
++  userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM'; time: number }>>;
++  clipOverrides?: Record<string, 'KEEP' | 'TRASH' | 'BROLL'>;
+ }
+ 
+-export function InteractiveTimeline({ timeline, videoRef, duration }: InteractiveTimelineProps) {
++export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {} }: InteractiveTimelineProps) {
+   const playheadRef = useRef<HTMLDivElement>(null);
+   const timeTextRef = useRef<HTMLSpanElement>(null);
+ 
+@@ -41,11 +43,24 @@ export function InteractiveTimeline({ timeline, videoRef, duration }: Interactiv
+     }
+   };
+ 
+-  const getSegmentColor = (tag: string, isUsable?: boolean) => {
+-    if (isUsable === false) return 'bg-red-500/80 hover:bg-red-400';
+-    if (tag.includes('MAIN_A')) return 'bg-emerald-500/80 hover:bg-emerald-400';
+-    if (tag.includes('B-ROLL')) return 'bg-blue-500/80 hover:bg-blue-400';
+-    return 'bg-slate-500/80 hover:bg-slate-400';
++  const getSegmentColor = (tag: string, isUsable?: boolean, override?: 'KEEP' | 'TRASH' | 'BROLL') => {
++    let finalUsable = isUsable !== false;
++    let isBroll = tag.includes('B-ROLL');
++
++    if (override === 'KEEP') { finalUsable = true; isBroll = false; }
++    if (override === 'TRASH') { finalUsable = false; }
++    if (override === 'BROLL') { finalUsable = true; isBroll = true; }
++    
++    if (!finalUsable) {
++      if (override === 'TRASH') return 'bg-red-600 border-2 border-red-400 hover:bg-red-500 z-10'; // Forced trash
++      return 'bg-red-500/80 hover:bg-red-400'; // Native trash
++    }
++    
++    if (override === 'KEEP') return 'bg-emerald-400 border-2 border-emerald-300 hover:bg-emerald-300 z-10'; // Forced keep
++    if (override === 'BROLL') return 'bg-blue-400 border-2 border-blue-300 hover:bg-blue-300 z-10'; // Forced B-Roll
++
++    if (isBroll) return 'bg-blue-500/80 hover:bg-blue-400';
++    return 'bg-emerald-500/80 hover:bg-emerald-400'; // MAIN_A or default Valid
+   };
+ 
+   return (
+@@ -63,14 +78,34 @@ export function InteractiveTimeline({ timeline, videoRef, duration }: Interactiv
+         {timeline.map((clip, idx) => {
+           const left = (clip.start / duration) * 100;
+           const width = ((clip.end - clip.start) / duration) * 100;
++          const constraints = userConstraints[clip.start.toString()] || [];
++
++          const override = clipOverrides[clip.start.toString()];
+ 
+           return (
+             <div
+               key={idx}
+-              className={`absolute top-0 bottom-0 border-r border-slate-950 transition-colors ${getSegmentColor(clip.tag, clip.is_usable)}`}
++              className={`absolute top-0 bottom-0 border-r border-slate-950 transition-colors ${getSegmentColor(clip.tag, clip.is_usable, override)}`}
+               style={{ left: `${left}%`, width: `${width}%` }}
+               title={`[${clip.tag}] ${formatTime(clip.start)} - ${formatTime(clip.end)}`}
+-            />
++            >
++              {/* Constraint Markers */}
++              {constraints.map((constraint, cIdx) => (
++                <div 
++                  key={cIdx}
++                  className="absolute top-1/2 text-[12px] font-black drop-shadow-md z-20 pointer-events-none transition-transform"
++                  style={{ 
++                    left: `${((constraint.time - clip.start) / (clip.end - clip.start)) * 100}%`, 
++                    transform: 'translate(-50%, -50%)',
++                    color: constraint.type === 'IN' ? '#3b82f6' : (constraint.type === 'OUT' ? '#a855f7' : '#eab308')
++                  }}
++                >
++                  {constraint.type === 'IN' && '['}
++                  {constraint.type === 'OUT' && ']'}
++                  {constraint.type === 'BM' && '★'}
++                </div>
++              ))}
++            </div>
+           );
+         })}
+ 
+
+commit b6e0cd829282b863ff3270aef459fbbd98c31cd8
+Author: cris65 <criseclipse@gmail.com>
+Date:   Sun May 17 18:58:04 2026 +0200
+
+    [v0.1.14] feat(hitl): UI Split-View NLE with 60fps Anti-Lag and Vertical Playlist
+
+diff --git a/src/components/dashboard/InteractiveTimeline.tsx b/src/components/dashboard/InteractiveTimeline.tsx
+new file mode 100644
+index 00000000..70796597
+--- /dev/null
++++ b/src/components/dashboard/InteractiveTimeline.tsx
+@@ -0,0 +1,107 @@
++import { useEffect, useRef } from 'react';
++import type { PancakeClip } from '../../hooks/usePancakeData';
++
++interface InteractiveTimelineProps {
++  timeline: PancakeClip[];
++  videoRef: React.RefObject<HTMLVideoElement>;
++  duration: number;
++}
++
++export function InteractiveTimeline({ timeline, videoRef, duration }: InteractiveTimelineProps) {
++  const playheadRef = useRef<HTMLDivElement>(null);
++  const timeTextRef = useRef<HTMLSpanElement>(null);
++
++  useEffect(() => {
++    let animationFrameId: number;
++    const updatePlayhead = () => {
++      if (videoRef.current && playheadRef.current && duration > 0) {
++        const currentTime = videoRef.current.currentTime;
++        const percentage = (currentTime / duration) * 100;
++        playheadRef.current.style.left = `${percentage}%`;
++        if (timeTextRef.current) {
++          timeTextRef.current.innerText = formatTime(currentTime);
++        }
++      }
++      animationFrameId = requestAnimationFrame(updatePlayhead);
++    };
++
++    animationFrameId = requestAnimationFrame(updatePlayhead);
++    return () => cancelAnimationFrame(animationFrameId);
++  }, [videoRef, duration]);
++
++  if (!timeline || timeline.length === 0 || duration <= 0) return null;
++
++  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
++    const rect = e.currentTarget.getBoundingClientRect();
++    const x = e.clientX - rect.left;
++    const percentage = x / rect.width;
++    const seekTime = percentage * duration;
++    if (videoRef.current) {
++      videoRef.current.currentTime = seekTime;
++    }
++  };
++
++  const getSegmentColor = (tag: string, isUsable?: boolean) => {
++    if (isUsable === false) return 'bg-red-500/80 hover:bg-red-400';
++    if (tag.includes('MAIN_A')) return 'bg-emerald-500/80 hover:bg-emerald-400';
++    if (tag.includes('B-ROLL')) return 'bg-blue-500/80 hover:bg-blue-400';
++    return 'bg-slate-500/80 hover:bg-slate-400';
++  };
++
++  return (
++    <div className="w-full flex flex-col gap-2">
++      <div className="flex justify-between items-center text-xs text-slate-400 font-mono">
++        <span ref={timeTextRef}>00:00</span>
++        <span>{formatTime(duration)}</span>
++      </div>
++
++      <div 
++        className="relative w-full h-12 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden cursor-pointer group shadow-inner"
++        onClick={handleTimelineClick}
++      >
++        {/* Segments */}
++        {timeline.map((clip, idx) => {
++          const left = (clip.start / duration) * 100;
++          const width = ((clip.end - clip.start) / duration) * 100;
++
++          return (
++            <div
++              key={idx}
++              className={`absolute top-0 bottom-0 border-r border-slate-950 transition-colors ${getSegmentColor(clip.tag, clip.is_usable)}`}
++              style={{ left: `${left}%`, width: `${width}%` }}
++              title={`[${clip.tag}] ${formatTime(clip.start)} - ${formatTime(clip.end)}`}
++            />
++          );
++        })}
++
++        {/* Hover overlay for entire timeline */}
++        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
++
++        {/* Playhead controlled by requestAnimationFrame */}
++        <div 
++          ref={playheadRef}
++          className="absolute top-0 bottom-0 w-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] z-10 pointer-events-none"
++          style={{ left: '0%' }}
++        >
++          {/* Playhead handle (triangle) */}
++          <div className="absolute top-0 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white drop-shadow-md" />
++        </div>
++        
++      </div>
++      
++      {/* Legenda */}
++      <div className="flex gap-4 items-center justify-center mt-2 text-[10px] uppercase font-bold tracking-wider text-slate-500">
++        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500/80"></span> Valid (MAIN)</div>
++        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500/80"></span> B-ROLL</div>
++        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500/80"></span> Trash (Rejected)</div>
++      </div>
++    </div>
++  );
++}
++
++function formatTime(seconds: number): string {
++  if (isNaN(seconds) || seconds < 0) return '00:00';
++  const m = Math.floor(seconds / 60);
++  const s = Math.floor(seconds % 60);
++  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
++}

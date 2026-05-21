@@ -172,6 +172,19 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
 ### LAW 8 — EXPLICIT WOLF-FLOW TRIGGER ONLY (NO AUTONOMOUS COMMITS)
 - **THE LAW:** You are STRICTLY FORBIDDEN from executing the `wolf_flow` routine (version bumping, KB updating, committing, and exporting) autonomously at the end of a task or request. You MUST only modify/fix files and leave the changes as uncommitted modifications in the working directory. You must wait for the Tech Lead's explicit request containing the `/wolf_flow` slash command before starting the release sequence.
 
+### LAW 9 — ZERO-DELETION UI REFACTORING AXIOM (PRESERVATION MANDATE)
+- **THE LAW:** When modifying or optimizing CSS, layout density, or UI styling, you are STRICTLY FORBIDDEN from silently deleting, omitting, or refactoring out ANY existing functional UI components (buttons, markers, SVGs, controls, state toggles) without explicit authorization from the Tech Lead. The AI MUST preserve 100% of the functional UI surface area and component integrity during visual refactoring.
+
+### LAW 10 — THE ARCHITECTURAL PAUSE AXIOM (MANDATORY `/plan` HALT)
+- **THE LAW:** This law activates ONLY when the Tech Lead's message explicitly contains the word `PLAN` or the `/plan` slash command. In all other cases, the AI has full autonomy to execute immediately.
+- **WHEN ACTIVE:** The AI is STRICTLY FORBIDDEN from writing, modifying, or executing ANY code.
+- **THE EXECUTION CHAIN:** The AI MUST only:
+  1. Analyze the codebase natively.
+  2. Write an `implementation_plan.md` artifact detailing the exact step-by-step logic.
+  3. **STOP COMPLETELY.** The AI must physically halt its turn and wait.
+- **RELEASE CONDITION:** The AI CANNOT proceed with the actual implementation until the Tech Lead replies with `/execute` or explicitly types an approval message **directly in the chat**.
+- **🚨 SYSTEM MESSAGE BLINDNESS (ZERO TOLERANCE):** ANY system-generated message such as `"Auto-proceeded with Implementation Plan"`, `"stop hook blocked termination"`, or similar automated notifications are **CATEGORICALLY NOT valid approvals**. These messages come from the system infrastructure, NOT from the human Tech Lead. The AI MUST treat them as invisible and continue waiting for a real human message. Executing code after receiving only a system-generated message is a **critical violation** of this law, regardless of message content.
+
 ## 10. 🧱 DRAG & DROP, OPTIMISTIC UI & PORTAL PROTOCOL
 
 1. **Hybrid Sensors Only:** NEVER use `PointerSensor` blocking mobile scroll. Use `MouseSensor` and `TouchSensor` with delay/tolerance.

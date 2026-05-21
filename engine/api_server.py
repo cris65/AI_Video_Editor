@@ -240,6 +240,39 @@ async def get_phase_a_progress():
             pass
     return TASK_PROGRESS
 
+@app.get("/api/projects/completed")
+async def get_completed_projects():
+    """
+    Scans the engine/output directory for successfully completed projects
+    (those containing a valid _stringout.json).
+    Returns a list of project metadata.
+    """
+    import os
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DIR_OUTPUT = os.path.join(BASE_DIR, 'output')
+    
+    completed_projects = []
+    
+    if not os.path.exists(DIR_OUTPUT):
+        return {"projects": []}
+        
+    for item in os.listdir(DIR_OUTPUT):
+        item_path = os.path.join(DIR_OUTPUT, item)
+        if os.path.isdir(item_path):
+            stringout_path = os.path.join(item_path, "LLM_Export_Package", f"{item}_stringout.json")
+            if os.path.exists(stringout_path):
+                # Basic metadata for sorting
+                mtime = os.path.getmtime(stringout_path)
+                completed_projects.append({
+                    "sequence_name": item,
+                    "last_modified": mtime,
+                    "path": item_path
+                })
+                
+    # Sort by most recently modified
+    completed_projects.sort(key=lambda x: x["last_modified"], reverse=True)
+    return {"projects": completed_projects}
+
 def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_model_id: str, llm_model_id: str):
     global TASK_PROGRESS
     import time

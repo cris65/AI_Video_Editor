@@ -23,6 +23,13 @@ interface TaskProgress {
   elapsed_seconds?: number;
 }
 
+interface CompletedProject {
+  sequence_name: string;
+  last_modified: number;
+  path: string;
+}
+
+
 interface ImageEngineControlsProps {
   onComplete?: (sequenceName?: string) => void;
 }
@@ -35,6 +42,7 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
   const [isScanning, setIsScanning] = useState(true);
   const [vlmModel, setVlmModel] = useState('mlx-community/gemma-4-e4b-it-4bit');
   const [taskProgress, setTaskProgress] = useState<TaskProgress | null>(null);
+  const [completedProjects, setCompletedProjects] = useState<CompletedProject[]>([]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -78,6 +86,17 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
           setClips(data.clips);
           setSelectedClipIdx(0);
         }
+
+        try {
+          const cpRes = await fetch('http://localhost:8000/api/projects/completed');
+          const cpData = await cpRes.json();
+          if (cpData.projects) {
+            setCompletedProjects(cpData.projects);
+          }
+        } catch (e) {
+          console.warn("Could not load completed projects", e);
+        }
+
       } catch (e) {
         console.error("Could not load clips", e);
       } finally {
@@ -485,6 +504,39 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
         </div>
 
       </div>
+
+      {/* Session Recovery: Completed Projects */}
+      {completedProjects.length > 0 && (
+        <div className="mt-8 pt-8 border-t border-gray-800/60 w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-emerald-500" />
+              Progetti Completati (Resume Session)
+            </h3>
+            <span className="text-xs text-slate-500 font-mono">{completedProjects.length} sessions available</span>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {completedProjects.map((proj, idx) => (
+              <button
+                key={idx}
+                onClick={() => onComplete && onComplete(proj.sequence_name)}
+                className="flex items-center justify-between p-4 bg-[#111318] hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/30 rounded-xl transition-all shadow-sm hover:shadow-emerald-900/20 text-left group"
+              >
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold text-slate-200 break-words group-hover:text-emerald-400 transition-colors">
+                    {proj.sequence_name}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono mt-1">
+                    Ultima modifica: {new Date(proj.last_modified * 1000).toLocaleString()}
+                  </span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 -rotate-90 transition-transform" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
