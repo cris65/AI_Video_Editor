@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Info } from 'lucide-react';
+import { Keyboard } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
 
 interface InteractiveTimelineProps {
@@ -312,14 +312,15 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
       <div className="flex justify-between items-center text-xs text-slate-400 font-mono relative z-[100]">
         <span ref={timeTextRef} className="text-blue-400 font-bold">00:00</span>
 
-        {/* Info Popup — now a minimal ⓘ icon, no label text */}
+        {/* Keyboard Shortcuts Button — styled as a premium interactive pill */}
         <div className="relative flex items-center justify-center">
           <button
             onClick={() => setIsPopupOpen(!isPopupOpen)}
-            className="text-slate-500 hover:text-slate-300 transition-colors focus:outline-none p-1 rounded hover:bg-slate-800/50"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-all border border-slate-700/40 hover:border-slate-600/60 focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer"
             title="Keyboard Shortcuts"
           >
-            <Info size={13} className="opacity-70" />
+            <Keyboard size={12} className="text-blue-400/80" />
+            <span className="text-[10px] font-semibold tracking-wider uppercase font-sans">Keyboard Shortcuts</span>
           </button>
 
           {isPopupOpen && (

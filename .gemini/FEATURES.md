@@ -1,6 +1,6 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.44 - 2026-05-21
+**Version:** v0.1.45 - 2026-05-21
 
 > [!NOTE]
 > This document describes the **Features** — i.e., the functional value exposed to the end user, both as engine capabilities and UI interfaces. It does not describe how the data is structured (→ `STRUCTURE.md`) nor the temporal execution flow (→ `PIPELINE.md`).

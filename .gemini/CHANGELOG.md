@@ -1,8 +1,28 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.44 - 2026-05-21
+**Version:** v0.1.45 - 2026-05-21
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.44 → v0.1.45
+
+**Commit:** `[v0.1.45] feat(ui): integrate Audio Rhythm Engine modal and UX layout`
+
+### Riepilogo File Modificati
+
+| File | +ins | -del | Cosa |
+| ---- | ---- | ---- | ---- |
+| `src/components/dashboard/AudioSettingsModal.tsx` | ~150 | 0 | Creazione nuovo componente modale React per interazione audio. |
+| `src/components/dashboard/PancakeDashboard.tsx` | +25 | -5 | Integrazione AudioSettingsModal, nuovo bottone e riordino cronologico. |
+| `src/components/dashboard/InteractiveTimeline.tsx` | +1 | -1 | Fix di linting: rimossa dipendenza `Info` non utilizzata. |
+
+### Dettagli Release (Audio Rhythm Engine - Phase 2 & UX)
+- **UI/UX:** Aggiunta modale "Dark/Overlay" per selezionare le tracce ed estrarre la griglia BPM (Librosa).
+- **Workflow Layout:** Pulsante "Audio Track" riposizionato nell'Header tra "Stringout" e "Director's Cut" per riflettere il flow cronologico nativo.
+- **Code Quality:** Risolto warning unused import in `InteractiveTimeline.tsx`. Assoluta zero `any` policy rispettata.
+- **Validazione:** ✅ Tipo e linter perfetti nativamente.
 
 ---
 

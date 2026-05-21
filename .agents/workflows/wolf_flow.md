@@ -1,5 +1,5 @@
 ---
-description: "Executes the full autonomous WOLF-FLOW release: bump, audit types, commit, push code, push DB migrations, export KB."
+description: "Executes the full autonomous WOLF-FLOW release: bump, audit types, commit, export KB."
 ---
 
 You are initiating the final WOLF-FLOW Release Cycle. Execute these steps strictly and autonomously:

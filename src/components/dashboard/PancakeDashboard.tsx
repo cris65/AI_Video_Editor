@@ -7,7 +7,8 @@ import { InteractiveTimeline } from './InteractiveTimeline';
 import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag } from 'lucide-react';
+import { AudioSettingsModal } from './AudioSettingsModal';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 
 function formatTime(seconds: number): string {
@@ -71,6 +72,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
   const [isDirectorSettingsOpen, setIsDirectorSettingsOpen] = useState(false);
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
+  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   // Local mutable order — derived from immutable finalCutTimeline source.
   // Re-synced whenever the Director re-generates the cut.
   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
@@ -586,10 +588,20 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             <Film size={12} />
             Stringout
           </button>
+
+          <button
+            onClick={() => setIsAudioModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 ml-1 text-[10px] font-bold rounded-md transition-all bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30"
+            title="Audio Rhythm Engine"
+          >
+            <Music size={12} />
+            Audio Track
+          </button>
+
           <button 
             onClick={() => setIsPreviewMode(true)}
             disabled={finalCutTimeline.length === 0}
-            className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`flex items-center gap-1.5 px-3 py-1 ml-1 text-[10px] font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={finalCutTimeline.length === 0 ? "Final Cut non ancora generato" : "Preview Director's Cut"}
           >
             <PlaySquare size={12} />
@@ -1120,6 +1132,14 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Phase 2: Audio Rhythm Engine Modal */}
+      {isAudioModalOpen && (
+        <AudioSettingsModal 
+          sequenceName={sequenceName}
+          onClose={() => setIsAudioModalOpen(false)}
+        />
       )}
     </div>
   );
