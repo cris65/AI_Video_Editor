@@ -17,6 +17,7 @@ Before starting any new task, answering architectural questions, or planning a f
 - Read `.gemini/SCHEMA.md` to understand the strict TypeScript interfaces for core entities.
 - Read `.gemini/WOLF_PROTOCOL.md` to assimilate the immutable lifecycle of development (The Trinity Ecosystem) and understand your precise execution boundaries.
 - Read `.gemini/TESTING.md` to internalize the Hybrid Local-First Testing Doctrine.
+- Read `.gemini/CHANGELOG.md` to review the chronological walkthroughs of recent changes and release logs.
 
 ---
 
@@ -107,6 +108,7 @@ When the PM types `/wolf_cleaner`, immediately destroy all temporary execution s
 
 - **STEP 1 (DOCUMENTATION FIX):** Execute the KB Audit updates. **🚨 SOTA RULE:** Write objectively in the present tense describing architecture. NO changelogs or 'WOLF-FIX' prefixes.
 - **🚨 DOCUMENTATION VERSIONING RULE:** Whenever updating `.gemini` documentation files, you MUST strictly update their header to reflect the EXACT current version from `package.json` combined with the current date (e.g., `**Version:** vX.X.X - YYYY-MM-DD`).
+- **STEP 2 (WALKTHROUGH & CHANGELOG):** Write/append the structured release walkthrough to the top of `.gemini/CHANGELOG.md` (directly below the title and version header, preserving older history) and also generate the local IDE `walkthrough.md` artifact.
 - **STEP 3 (VALIDATION):** Before any commit, you MUST manually validate the code using `npm run wolf:audit`. If this step fails, you MUST autonomously trigger your 3-attempt auto-heal loop to fix the code. You are forbidden from committing broken code.
 - **STEP 4:** Execute the exact terminal commit/export chain defined in your core training. Be aware of the **WOLF-PUSH-GATE**: The Husky `pre-push` hook enforces a strict pipeline.
 
