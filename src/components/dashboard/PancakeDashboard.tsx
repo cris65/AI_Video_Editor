@@ -57,8 +57,13 @@ export interface UserConstraint {
   time: number;
 }
 
+export interface AudioMarkerFilter {
+  types: string[];
+  minEnergy: number;
+}
+
 export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
-  const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveform, loading, error, refetchFinalCut } = usePancakeData(sequenceName);
+  const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveforms, audioBeats, loading, error, refetchFinalCut, refetchAudioData } = usePancakeData(sequenceName);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   
@@ -70,7 +75,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [clipOverrides, setClipOverrides] = useState<Record<string, any>>({});
   const [filterMode, setFilterMode] = useState<'ALL' | 'VALID' | 'BROLL' | 'TRASH'>('ALL');
   const [directorConfig, setDirectorConfig] = useState<DirectorConfig>({ target_duration: 60, style_prompt: "" });
-  const [isDirectorSettingsOpen, setIsDirectorSettingsOpen] = useState(false);
+  const [isDirectorSettingsOpen, setIsDirectorSettingsOpen] = useState(true);
+  const [waveformView, setWaveformView] = useState<'amplitude' | 'energy'>('amplitude');
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   // Local mutable order — derived from immutable finalCutTimeline source.
@@ -79,6 +85,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
   const hasAutoSuggested = useRef(false);
   const [lastTelemetry, setLastTelemetry] = useState<TelemetryRecord | null>(null);
+  const [audioMarkerFilters, setAudioMarkerFilters] = useState<AudioMarkerFilter>({
+    types: ['percussive', 'harmonic', 'beat', 'bpm_grid'],
+    minEnergy: 0.2
+  });
 
   const formatModelName = (modelId: string) => {
     if (!modelId) return "VLM";
@@ -749,7 +759,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                   onReorder={handleFinalCutReorder}
                   onSaveOrder={handleSaveOrder}
                   userConstraints={userConstraints}
-                  audioWaveform={audioWaveform}
+                  audioWaveforms={audioWaveforms}
+                  waveformView={waveformView}
                   audioDuration={audioDuration}
                 />
               </>
@@ -761,8 +772,13 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                   duration={videoDuration} 
                   userConstraints={userConstraints}
                   clipOverrides={clipOverrides}
-                  audioWaveform={audioWaveform}
+                  audioWaveforms={audioWaveforms}
+                  waveformView={waveformView}
+                  setWaveformView={setWaveformView}
                   audioDuration={audioDuration}
+                  audioBeats={audioBeats}
+                  audioMarkerFilters={audioMarkerFilters}
+                  setAudioMarkerFilters={setAudioMarkerFilters}
                   markerNumbers={globalMarkerNumbers}
                 />
               </>
@@ -1138,7 +1154,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
       {isAudioModalOpen && (
         <AudioSettingsModal 
           sequenceName={sequenceName}
-          onClose={() => setIsAudioModalOpen(false)}
+          onClose={() => {
+            refetchAudioData();
+            setIsAudioModalOpen(false);
+          }}
         />
       )}
     </div>

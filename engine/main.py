@@ -14,6 +14,7 @@ import mlx_client
 import bgm_generator
 import audio_analyzer
 import director
+from utils.telemetry import log_execution
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIR_INPUT = os.path.join(BASE_DIR, 'input')
@@ -274,6 +275,14 @@ def run_pipeline(force: bool = False):
         extracted_frames = max(1, int(total_frames * 0.15))
         
         session_end_dt = datetime.now()
+        
+        try:
+            video_size_mb = os.path.getsize(FILE_PROXY_IN) / (1024 * 1024) if FILE_PROXY_IN else 0
+            log_execution("video_extraction", video_size_mb, cv_duration)
+            log_execution("llm_inference", extracted_frames, mlx_duration)
+        except Exception as e:
+            print(f"⚠️ Errore nel log della telemetria EMA: {e}")
+
         performance_tracker.record_run(
             vlm_model_id=vlm_model_id,
             session_start_time=session_start_dt.isoformat(),

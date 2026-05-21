@@ -1,0 +1,40 @@
+{
+  "audio_analysis": [
+    {
+      "timestamp": 1779373531.5496058,
+      "weight": 1.08,
+      "duration_sec": 1.21,
+      "ratio": 1.1228
+    },
+    {
+      "timestamp": 1779374035.618708,
+      "weight": 1.08,
+      "duration_sec": 2.51,
+      "ratio": 2.328
+    },
+    {
+      "timestamp": 1779374135.590173,
+      "weight": 1.08,
+      "duration_sec": 0.1,
+      "ratio": 0.0939
+    },
+    {
+      "timestamp": 1779374884.5791192,
+      "weight": 1.08,
+      "duration_sec": 9.19,
+      "ratio": 8.511
+    },
+    {
+      "timestamp": 1779380392.52135,
+      "weight": 1.08,
+      "duration_sec": 3.22,
+      "ratio": 2.9812
+    },
+    {
+      "timestamp": 1779381995.8470259,
+      "weight": 1.08,
+      "duration_sec": 3.14,
+      "ratio": 2.9063
+    }
+  ]
+}

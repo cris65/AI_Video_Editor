@@ -106,6 +106,12 @@ export interface PancakeData {
   stringout_timeline: PancakeClip[];
 }
 
+export interface AudioBeat {
+  time: number;
+  energy: number;
+  type: string;
+}
+
 export function usePancakeData(sequenceName: string) {
   const [data, setData] = useState<PancakeData | null>(null);
   const [hitlData, setHitlData] = useState<any>({});
@@ -113,7 +119,8 @@ export function usePancakeData(sequenceName: string) {
   const [gemmaRecipe, setGemmaRecipe] = useState<any[] | null>(null);
   const [audioBpm, setAudioBpm] = useState<number | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
-  const [audioWaveform, setAudioWaveform] = useState<number[]>([]);
+  const [audioWaveforms, setAudioWaveforms] = useState<{ amplitude: number[], energy: number[] } | null>(null);
+  const [audioBeats, setAudioBeats] = useState<AudioBeat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,6 +146,32 @@ export function usePancakeData(sequenceName: string) {
     } catch (e) {
       setGemmaRecipe(null);
       console.warn("Gemma recipe file not found.");
+    }
+  }, [sequenceName]);
+
+  const fetchAudioData = useCallback(async () => {
+    try {
+      const audioRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_audio_beats.json?t=${Date.now()}`);
+      if (audioRes.ok) {
+        const audioJson = await audioRes.json();
+        if (audioJson.bpm) {
+          setAudioBpm(Math.round(audioJson.bpm));
+        }
+        if (audioJson.total_duration_sec) {
+          setAudioDuration(audioJson.total_duration_sec);
+        }
+        if (audioJson.waveforms) {
+          setAudioWaveforms(audioJson.waveforms);
+        } else if (audioJson.waveform) {
+          // Fallback for old JSONs
+          setAudioWaveforms({ amplitude: audioJson.waveform, energy: audioJson.waveform });
+        }
+        if (audioJson.beats) {
+          setAudioBeats(audioJson.beats);
+        }
+      }
+    } catch (e) {
+      console.warn("Audio beats file not found or corrupted.");
     }
   }, [sequenceName]);
 
@@ -189,24 +222,8 @@ export function usePancakeData(sequenceName: string) {
         // 3. Tenta di caricare il file _final_edit.json (Director's Cut)
         await fetchFinalCut();
         
-        // 4. Carica il BPM dal file _audio_beats.json
-        try {
-          const audioRes = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_audio_beats.json?t=${Date.now()}`);
-          if (audioRes.ok) {
-            const audioJson = await audioRes.json();
-            if (audioJson.tempo) {
-              setAudioBpm(Math.round(audioJson.tempo));
-            }
-            if (audioJson.audio_duration) {
-              setAudioDuration(audioJson.audio_duration);
-            }
-            if (audioJson.waveform) {
-              setAudioWaveform(audioJson.waveform);
-            }
-          }
-        } catch (e) {
-          console.warn("Audio beats file not found or corrupted.");
-        }
+        // 4. Carica i dati audio (BPM, Waveform, Beats)
+        await fetchAudioData();
         
       } catch (err: any) {
         setError(err.message || 'Errore sconosciuto durante il caricamento dei dati');
@@ -216,7 +233,20 @@ export function usePancakeData(sequenceName: string) {
     };
 
     fetchData();
-  }, [sequenceName, fetchFinalCut]);
+  }, [sequenceName, fetchFinalCut, fetchAudioData]);
 
-  return { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveform, loading, error, refetchFinalCut: fetchFinalCut };
+  return { 
+    data, 
+    hitlData, 
+    finalCutTimeline, 
+    gemmaRecipe, 
+    audioBpm, 
+    audioDuration, 
+    audioWaveforms, 
+    audioBeats, 
+    loading, 
+    error, 
+    refetchFinalCut: fetchFinalCut, 
+    refetchAudioData: fetchAudioData 
+  };
 }

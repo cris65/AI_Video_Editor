@@ -1,7 +1,7 @@
 {
   "name": "ai-video-editor",
   "private": true,
-  "version": "0.1.46",
+  "version": "0.1.47",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,6 +19,7 @@
     "wolf:audit": "echo '\ud83d\udc3a WOLF AUDIT: Controllo spietato in corso...' && eslint . && tsc --noEmit",
     "sync-locales": "node src/lib/locales/scripts/sync-locales.js",
     "// --- \ud83d\udc3a WOLF PROTOCOL: WORKFLOW & CI ---": "",
+    "wolf:audit:diff": "node scripts/diff_auditor.js",
     "wolf:prep": "npm run wolf:audit && npm run sb:snapshot && echo '\\n\ud83d\udc3a WOLF PREP COMPLETATO: Codice sano e Seed aggiornato! \ud83d\ude80\\n\ud83d\udc49 Prossimo step: D\u00ec ad AG di eseguire il wolf_flow\\n\ud83d\udc49 Ultimo step: git push origin develop --no-verify\\n'",
     "// --- \ud83d\udc3a WOLF PROTOCOL: LOCAL INFRASTRUCTURE ---": "",
     "sb:start": "supabase start",

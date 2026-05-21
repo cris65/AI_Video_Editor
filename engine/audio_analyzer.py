@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+from utils.telemetry import log_execution
 
 def extract_beats(wav_path, output_dir, sequence_name):
     print(f"🥁 Audio Analyzer: Estrazione transienti da {os.path.basename(wav_path)}")
@@ -57,7 +58,7 @@ def extract_beats(wav_path, output_dir, sequence_name):
         with open(beats_json_path, 'w') as f:
             json.dump({
                 "tempo": tempo_val,
-                "audio_duration": float(audio_duration),
+                "audio_duration": audio_duration,
                 "waveform": waveform,
                 "beats": beats_list
             }, f, indent=2)
@@ -67,7 +68,7 @@ def extract_beats(wav_path, output_dir, sequence_name):
         
     except ImportError:
         print("❌ ERRORE: librosa non installato. (Fallback su beat simulati per MOCK_MODE)")
-        beats_list = [float(i * 0.5) for i in range(120)] # 120 bpm = 0.5s inter-beat
+        beats_list = [(i * 0.5) for i in range(120)] # 120 bpm = 0.5s inter-beat
         import math
         import random
         # Genera una finta waveform molto frastagliata (tipo Premiere) a 2000 punti
@@ -75,7 +76,7 @@ def extract_beats(wav_path, output_dir, sequence_name):
         for i in range(2000):
             base = abs(math.sin(i / 50.0)) * 0.5
             spike = random.random() * 0.5 if random.random() > 0.8 else random.random() * 0.1
-            mock_waveform.append(float(min(1.0, base + spike + 0.05)))
+            mock_waveform.append(min(1.0, base + spike + 0.05))
         with open(beats_json_path, 'w') as f:
             json.dump({
                 "tempo": 120.0,
@@ -114,50 +115,154 @@ def analyze_audio_for_api(filename: str, project_id: str):
     
     try:
         import librosa
+        import time
+        start_time = time.time()
         
         # Caricamento audio
         y, sr = librosa.load(wav_path, sr=None)
         audio_duration = librosa.get_duration(y=y, sr=sr)
         
-        print("🥁 Estrazione BPM e transienti via librosa...")
-        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+        print("🥁 Estrazione BPM e transienti via librosa (Omni-Analysis)...")
+        # Step A: HPSS (Harmonic-Percussive Source Separation)
+        print("   ↳ Separazione Armonica/Percussiva in corso (potrebbe richiedere tempo)...")
+        y_harmonic, y_percussive = librosa.effects.hpss(y)
         
-        # Gestione type del tempo
+        raw_markers = []
+        
+        # Step B1: Percussive Markers
+        onset_env_p = librosa.onset.onset_strength(y=y_percussive, sr=sr)
+        frames_p = librosa.onset.onset_detect(onset_envelope=onset_env_p, sr=sr, backtrack=True)
+        times_p = librosa.frames_to_time(frames_p, sr=sr)
+        max_e_p = np.max(onset_env_p) if len(onset_env_p) > 0 and np.max(onset_env_p) > 0 else 1.0
+        for i, frame in enumerate(frames_p):
+            safe_frame = min(frame, len(onset_env_p) - 1)
+            raw_markers.append({
+                "time": float(times_p[i]),
+                "energy": float(onset_env_p[safe_frame] / max_e_p),
+                "type": "percussive"
+            })
+            
+        # Step B2: Harmonic Markers
+        onset_env_h = librosa.onset.onset_strength(y=y_harmonic, sr=sr)
+        frames_h = librosa.onset.onset_detect(onset_envelope=onset_env_h, sr=sr, backtrack=True)
+        times_h = librosa.frames_to_time(frames_h, sr=sr)
+        max_e_h = np.max(onset_env_h) if len(onset_env_h) > 0 and np.max(onset_env_h) > 0 else 1.0
+        for i, frame in enumerate(frames_h):
+            safe_frame = min(frame, len(onset_env_h) - 1)
+            raw_markers.append({
+                "time": float(times_h[i]),
+                "energy": float(onset_env_h[safe_frame] / max_e_h),
+                "type": "harmonic"
+            })
+            
+        # Step B3: Beat Grid (Metronome)
+        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
         if isinstance(tempo, np.ndarray):
             tempo_val = float(tempo[0])
         else:
             tempo_val = float(tempo)
             
-        beat_times = librosa.frames_to_time(beat_frames, sr=sr)
-        
-        # Calcolo dell'energia come envelope (onset_strength) ai beat
-        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-        
-        max_frame = len(onset_env) - 1
-        safe_beat_frames = np.minimum(beat_frames, max_frame)
-        beat_energies = onset_env[safe_beat_frames]
-        
-        max_energy = np.max(onset_env) if len(onset_env) > 0 and np.max(onset_env) > 0 else 1.0
-        normalized_energies = beat_energies / max_energy
-        
-        beats_list = []
-        for i in range(len(beat_times)):
-            beats_list.append({
-                "time": float(round(beat_times[i], 3)),
-                "energy": float(round(normalized_energies[i], 3))
+        onset_env_b = librosa.onset.onset_strength(y=y, sr=sr)
+        times_b = librosa.frames_to_time(beat_frames, sr=sr)
+        max_e_b = np.max(onset_env_b) if len(onset_env_b) > 0 and np.max(onset_env_b) > 0 else 1.0
+        for i, frame in enumerate(beat_frames):
+            safe_frame = min(frame, len(onset_env_b) - 1)
+            raw_markers.append({
+                "time": float(times_b[i]),
+                "energy": float(onset_env_b[safe_frame] / max_e_b),
+                "type": "beat"
             })
             
+        # Step C: Unified Timeline & Deduplication
+        raw_markers.sort(key=lambda x: x["time"])
+        
+        beats_list = []
+        MERGE_WINDOW = 0.05  # 50ms
+        
+        for marker in raw_markers:
+            if not beats_list:
+                beats_list.append(marker)
+                continue
+                
+            last_marker = beats_list[-1]
+            if marker["time"] - last_marker["time"] <= MERGE_WINDOW:
+                # Merge markers
+                prev_energy = last_marker["energy"]
+                last_marker["energy"] = max(last_marker["energy"], marker["energy"])
+                # Combine types without duplicating
+                types_set = set(last_marker["type"].split("_"))
+                types_set.add(marker["type"])
+                last_marker["type"] = "_".join(sorted(list(types_set)))
+                # Update time to the exact point of highest energy
+                if marker["energy"] > prev_energy:
+                    last_marker["time"] = marker["time"]
+            else:
+                beats_list.append(marker)
+                
+        # Round the final list for JSON
+        for b in beats_list:
+            b["time"] = float(round(b["time"], 3))
+            b["energy"] = float(round(b["energy"], 3))
+            
+        print("🥁 Estrazione lightweight dual waveform per la UI...")
+        points_per_sec = 80
+        chunk_size = int(sr / points_per_sec)
+        
+        amplitude_waveform = []
+        energy_waveform = []
+        
+        if len(y) > 0:
+            for i in range(0, len(y), chunk_size):
+                chunk = y[i:i+chunk_size]
+                if len(chunk) > 0:
+                    amplitude_waveform.append(float(round(np.max(np.abs(chunk)), 3)))
+                    
+            # Extract smoothed rhythmic energy waveform using onset_env_b
+            if len(onset_env_b) > 0:
+                # onset_env_b is already calculated using librosa.onset.onset_strength
+                # It has a different length than y, so we need to resample/chunk it to 80 pts/sec
+                # librosa's hop_length defaults to 512.
+                hop_length = 512
+                frames_per_sec = sr / hop_length
+                env_chunk_size = max(1, int(frames_per_sec / points_per_sec))
+                
+                for i in range(0, len(onset_env_b), env_chunk_size):
+                    env_chunk = onset_env_b[i:i+env_chunk_size]
+                    if len(env_chunk) > 0:
+                        energy_waveform.append(float(round(np.max(env_chunk), 3)))
+                        
+                # Normalize energy waveform 0-1
+                max_energy = max(energy_waveform) if energy_waveform else 1.0
+                if max_energy > 0:
+                    energy_waveform = [float(round(e / max_energy, 3)) for e in energy_waveform]
+                    
+            # Ensure equal lengths by padding or truncating
+            min_len = min(len(amplitude_waveform), len(energy_waveform))
+            if min_len > 0:
+                amplitude_waveform = amplitude_waveform[:min_len]
+                energy_waveform = energy_waveform[:min_len]
+        
+        elapsed_sec = time.time() - start_time
+        
         payload = {
             "project_id": project_id,
             "bpm": round(tempo_val, 2),
-            "total_duration_sec": round(float(audio_duration), 2),
-            "beats": beats_list
+            "total_duration_sec": round(audio_duration, 2),
+            "beats": beats_list,
+            "waveforms": {
+                "amplitude": amplitude_waveform,
+                "energy": energy_waveform
+            },
+            "processing_time_sec": round(elapsed_sec, 2)
         }
         
         with open(beats_json_path, 'w') as f:
             json.dump(payload, f, indent=2)
             
-        print(f"✅ Beats JSON salvato in: {beats_json_path}")
+        size_mb = os.path.getsize(wav_path) / (1024 * 1024)
+        log_execution("audio_analysis", size_mb, elapsed_sec)
+        
+        print(f"✅ Beats salvati in {beats_json_path} (Elaborazione in {elapsed_sec:.2f}s)")
         return payload
         
     except ImportError:

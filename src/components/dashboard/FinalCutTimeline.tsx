@@ -27,7 +27,8 @@ interface Props {
   onSaveOrder: () => void;
   targetDuration?: number; // Required for OUT_GLOBAL calculation
   userConstraints?: Record<string, UserConstraint[]>;
-  audioWaveform?: number[];
+  audioWaveforms?: { amplitude: number[], energy: number[] } | null;
+  waveformView?: 'amplitude' | 'energy';
   audioDuration?: number;
 }
 
@@ -41,7 +42,8 @@ export const FinalCutTimeline: React.FC<Props> = ({
   onSaveOrder,
   targetDuration = 60,
   userConstraints = {},
-  audioWaveform = [],
+  audioWaveforms = null,
+  waveformView = 'amplitude',
   audioDuration = 0,
 }) => {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -636,10 +638,13 @@ export const FinalCutTimeline: React.FC<Props> = ({
           </div>
 
           {/* Audio Waveform Overlay — pointer-events-none, non-participant in DnD */}
-          {audioWaveform.length > 0 && audioDuration > 0 && (() => {
-            const pointsPerSecond = audioWaveform.length / audioDuration;
+          {audioWaveforms && audioDuration > 0 && (() => {
+            const activeWaveform = audioWaveforms[waveformView] || [];
+            if (activeWaveform.length === 0) return null;
+            
+            const pointsPerSecond = activeWaveform.length / audioDuration;
             const pointsToShow = Math.ceil(totalDuration * pointsPerSecond);
-            const visibleWaveform = audioWaveform.slice(0, pointsToShow);
+            const visibleWaveform = activeWaveform.slice(0, pointsToShow);
             if (visibleWaveform.length === 0) return null;
             const svgW = 1000;
             const svgH = 100;

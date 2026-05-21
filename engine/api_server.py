@@ -2,6 +2,9 @@
 FastAPI Server Initialization (The Surveyor)
 Provides hardware profiling and API gateway functions.
 """
+import signal
+from main import run_pipeline
+from utils.telemetry import log_execution, get_estimated_eta
 import platform
 import psutil
 import subprocess
@@ -196,9 +199,18 @@ async def get_audio_files():
     if os.path.exists(DIR_INPUT):
         for ext in ('*.mp3', '*.wav', '*.MP3', '*.WAV'):
             for filepath in glob.glob(os.path.join(DIR_INPUT, ext)):
-                audio_files.append(os.path.basename(filepath))
+                try:
+                    size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                    audio_files.append({
+                        "name": os.path.basename(filepath),
+                        "size_mb": round(size_mb, 2),
+                        "type": os.path.splitext(filepath)[1].upper().replace(".", ""),
+                        "estimated_eta_sec": get_estimated_eta("audio_analysis", size_mb)
+                    })
+                except OSError:
+                    pass
                 
-    return {"files": list(set(audio_files))}
+    return {"files": audio_files}
 
 @app.post("/api/audio/analyze")
 async def analyze_audio(payload: AudioAnalyzePayload):
@@ -357,6 +369,14 @@ def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_m
         print(f"✅ Phase B MLX task completed for {sequence_name} in {mlx_duration:.2f}s")
         
         session_end_dt = datetime.now()
+        
+        try:
+            video_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+            log_execution("video_extraction", video_size_mb, cv_duration)
+            log_execution("llm_inference", extracted_frames, mlx_duration)
+        except Exception as e:
+            print(f"⚠️ Errore nel log della telemetria EMA: {e}")
+            
         # Save performance metrics to local JSON history for self-correction
         performance_tracker.record_run(
             vlm_model_id=vlm_model_id,

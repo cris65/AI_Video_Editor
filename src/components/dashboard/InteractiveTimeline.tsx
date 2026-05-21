@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, Fragment } from 'react';
+import { Keyboard, SlidersHorizontal } from 'lucide-react';
 import type { PancakeClip } from '../../hooks/usePancakeData';
+import type { AudioMarkerFilter } from './PancakeDashboard';
 
 interface InteractiveTimelineProps {
   timeline: PancakeClip[];
@@ -8,8 +9,13 @@ interface InteractiveTimelineProps {
   duration: number;
   userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM' | 'AUDIO'; time: number }>>;
   clipOverrides?: Record<string, any>;
-  audioWaveform?: number[];
+  audioWaveforms?: { amplitude: number[], energy: number[] } | null;
+  waveformView?: 'amplitude' | 'energy';
+  setWaveformView?: (view: 'amplitude' | 'energy') => void;
   audioDuration?: number;
+  audioBeats?: { time: number; energy: number; type: string }[];
+  audioMarkerFilters?: AudioMarkerFilter;
+  setAudioMarkerFilters?: (filters: AudioMarkerFilter) => void;
   markerNumbers?: Map<string, number>; // Global M# namespace from PancakeDashboard (Stringout-first)
 }
 
@@ -35,12 +41,28 @@ interface DragState {
   playheadScreenFrac?: number;
 }
 
-export function InteractiveTimeline({ timeline, videoRef, duration, userConstraints, clipOverrides = {}, audioWaveform = [], audioDuration = 0, markerNumbers = new Map() }: InteractiveTimelineProps) {
+export function InteractiveTimeline({ 
+  timeline, 
+  videoRef, 
+  duration, 
+  userConstraints, 
+  clipOverrides = {}, 
+  audioWaveforms = null, 
+  waveformView = 'amplitude',
+  setWaveformView,
+  audioDuration = 0, 
+  audioBeats = [], 
+  audioMarkerFilters,
+  setAudioMarkerFilters,
+  markerNumbers = new Map() 
+}: InteractiveTimelineProps) {
   const playheadRef = useRef<HTMLDivElement>(null);
   const timeTextRef = useRef<HTMLSpanElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isAudioPopupOpen, setIsAudioPopupOpen] = useState(false);
+  const [isWaveformPopupOpen, setIsWaveformPopupOpen] = useState(false);
 
   // Zoom state: [startFraction, endFraction] of total duration, both in [0, 1]
   const [zoomWindow, setZoomWindow] = useState<[number, number]>([0, 1]);
@@ -312,13 +334,160 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
       <div className="flex justify-between items-center text-xs text-slate-400 font-mono relative z-[100]">
         <span ref={timeTextRef} className="text-blue-400 font-bold">00:00</span>
 
-        {/* Keyboard Shortcuts Button — styled as a premium interactive pill */}
-        <div className="relative flex items-center justify-center">
-          <button
-            onClick={() => setIsPopupOpen(!isPopupOpen)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-all border border-slate-700/40 hover:border-slate-600/60 focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer"
-            title="Keyboard Shortcuts"
-          >
+        <div className="flex items-center gap-2">
+          {/* Waveform Control Button */}
+          {setWaveformView && (
+            <div className="relative flex items-center justify-center">
+              <button
+                onClick={() => {
+                  setIsWaveformPopupOpen(!isWaveformPopupOpen);
+                  setIsAudioPopupOpen(false);
+                  setIsPopupOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer ${
+                  isWaveformPopupOpen 
+                    ? 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/30' 
+                    : 'bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/40 hover:border-slate-600/60'
+                }`}
+                title="Waveform Control"
+              >
+                <span className="text-[14px] leading-none">🌊</span>
+                <span className="text-[10px] font-semibold tracking-wider uppercase font-sans">Waveform Control</span>
+              </button>
+
+              {isWaveformPopupOpen && (
+                <div className="absolute bottom-full mb-3 right-0 w-[240px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]" /> Waveform View
+                    </h4>
+                    <button onClick={() => setIsWaveformPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
+                  </div>
+                  
+                  <div className="flex bg-slate-800/50 p-1 rounded-md border border-slate-700/50">
+                    <button
+                      onClick={() => setWaveformView('amplitude')}
+                      className={`flex-1 py-1.5 text-[10px] font-sans rounded transition-colors ${
+                        waveformView === 'amplitude'
+                          ? 'bg-slate-700 text-slate-100 shadow-sm'
+                          : 'text-slate-300 hover:text-slate-100'
+                      }`}
+                    >
+                      Amplitude
+                    </button>
+                    <button
+                      onClick={() => setWaveformView('energy')}
+                      className={`flex-1 py-1.5 text-[10px] font-sans rounded transition-colors ${
+                        waveformView === 'energy'
+                          ? 'bg-slate-700 text-slate-100 shadow-sm'
+                          : 'text-slate-300 hover:text-slate-100'
+                      }`}
+                    >
+                      Energy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Audio Marker Control Button */}
+          {audioMarkerFilters && setAudioMarkerFilters && (
+            <div className="relative flex items-center justify-center">
+              <button
+                onClick={() => {
+                  setIsAudioPopupOpen(!isAudioPopupOpen);
+                  setIsWaveformPopupOpen(false);
+                  setIsPopupOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer ${
+                  isAudioPopupOpen 
+                    ? 'bg-[#FFC107]/10 text-[#FFC107] border-[#FFC107]/30' 
+                    : 'bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/40 hover:border-slate-600/60'
+                }`}
+                title="Audio Marker Control"
+              >
+                <SlidersHorizontal size={12} className={isAudioPopupOpen ? "text-[#FFC107]" : "text-yellow-500/80"} />
+                <span className="text-[10px] font-semibold tracking-wider uppercase font-sans">Audio Marker Control</span>
+              </button>
+
+              {isAudioPopupOpen && (
+                <div className="absolute bottom-full mb-3 right-0 w-[240px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FFC107]" /> Marker Filters
+                    </h4>
+                    <button onClick={() => setIsAudioPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Types Toggle */}
+                    <div className="space-y-2">
+                      <label className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Event Types</label>
+                      <div className="flex flex-col gap-1.5">
+                        {['percussive', 'harmonic', 'beat', 'bpm_grid'].map(t => {
+                          let accentColor = 'accent-yellow-500';
+                          if (t === 'harmonic') accentColor = 'accent-fuchsia-500';
+                          if (t === 'percussive') accentColor = 'accent-slate-200';
+                          if (t === 'bpm_grid') accentColor = 'accent-emerald-500';
+                          
+                          const labelText = t === 'bpm_grid' ? 'BPM Grid (Metronome)' : t.charAt(0).toUpperCase() + t.slice(1);
+                          
+                          return (
+                            <label key={t} className="flex items-center gap-2 text-[10px] text-slate-300 cursor-pointer hover:text-slate-100">
+                              <input 
+                                type="checkbox" 
+                                className={accentColor}
+                                checked={audioMarkerFilters.types.includes(t)}
+                                onChange={(e) => {
+                                  const newTypes = e.target.checked 
+                                    ? [...audioMarkerFilters.types, t] 
+                                    : audioMarkerFilters.types.filter(type => type !== t);
+                                  setAudioMarkerFilters({ ...audioMarkerFilters, types: newTypes });
+                                }}
+                              />
+                              {labelText}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Energy Threshold Slider */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Min Energy</label>
+                        <span className="text-[10px] text-[#FFC107] font-mono font-bold bg-[#FFC107]/10 px-1.5 py-0.5 rounded border border-[#FFC107]/20">
+                          {audioMarkerFilters.minEnergy.toFixed(2)}
+                        </span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0.0" 
+                        max="1.0" 
+                        step="0.05"
+                        value={audioMarkerFilters.minEnergy}
+                        onChange={(e) => setAudioMarkerFilters({ ...audioMarkerFilters, minEnergy: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#FFC107]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Keyboard Shortcuts Button — styled as a premium interactive pill */}
+          <div className="relative flex items-center justify-center">
+            <button
+              onClick={() => {
+                setIsPopupOpen(!isPopupOpen);
+                setIsAudioPopupOpen(false);
+                setIsWaveformPopupOpen(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-all border border-slate-700/40 hover:border-slate-600/60 focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer"
+              title="Keyboard Shortcuts"
+            >
             <Keyboard size={12} className="text-blue-400/80" />
             <span className="text-[10px] font-semibold tracking-wider uppercase font-sans">Keyboard Shortcuts</span>
           </button>
@@ -353,6 +522,7 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
               </div>
             </div>
           )}
+        </div>
         </div>
 
         <span>{formatTime(duration)}</span>
@@ -435,6 +605,58 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
                   );
                 })() : null;
                 return [constraintPills, bmPill];
+              })}
+              
+              {/* Audio Beat Markers (Filtered for UI) */}
+              {audioBeats && audioMarkerFilters && audioBeats.map((beat, i) => {
+                const isBeat = beat.type.includes('beat') && audioMarkerFilters.types.includes('beat');
+                const isHarmonic = beat.type.includes('harmonic') && audioMarkerFilters.types.includes('harmonic');
+                const isPercussive = beat.type.includes('percussive') && audioMarkerFilters.types.includes('percussive');
+                const showBpmGrid = beat.type.includes('beat') && audioMarkerFilters.types.includes('bpm_grid');
+                
+                // Determine if a flag should be shown based on toggles AND energy threshold
+                const showFlag = (isBeat || isHarmonic || isPercussive) && (beat.energy >= audioMarkerFilters.minEnergy);
+
+                // If no flag and no grid, skip rendering
+                if (!showFlag && !showBpmGrid) return null;
+
+                const leftPct = (beat.time / duration) * 100;
+
+                return (
+                  <Fragment key={`audio-bm-${i}`}>
+                    {/* Visual Beat Grid Line (Metronome) - Bypasses energy filter */}
+                    {showBpmGrid && (
+                      <div 
+                        className="absolute top-[24px] w-[1px] bg-white/40 z-[30] pointer-events-none"
+                        style={{ left: `${leftPct}%`, height: '40px' }}
+                      />
+                    )}
+                    
+                    {/* Marker Flag (Harmonic/Percussive/Beat) */}
+                    {showFlag && (() => {
+                      let colorClasses = 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/60';
+                      if (isHarmonic) {
+                        colorClasses = 'bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/60';
+                      } else if (isPercussive) {
+                        colorClasses = 'bg-slate-200/20 text-white border border-slate-300/60';
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (videoRef.current) videoRef.current.currentTime = beat.time;
+                          }}
+                          className={`absolute bottom-1 -translate-x-1/2 flex items-center justify-center gap-[2px] px-1 py-0.5 rounded text-[7px] font-black font-mono cursor-pointer hover:brightness-125 transition-all ${colorClasses} z-[40]`}
+                          style={{ left: `${leftPct}%` }}
+                          title={`AM — ${formatTime(beat.time)} (${beat.type}) — click to seek`}
+                        >
+                          A
+                        </button>
+                      );
+                    })()}
+                  </Fragment>
+                );
               })}
             </div>
           )}
@@ -566,10 +788,13 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
           <div className="absolute top-[24px] bottom-0 left-0 right-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
           {/* Audio Waveform Overlay */}
-          {audioWaveform.length > 0 && audioDuration > 0 && (() => {
-            const pointsPerSecond = audioWaveform.length / audioDuration;
+          {audioWaveforms && audioDuration > 0 && (() => {
+            const activeWaveform = audioWaveforms[waveformView] || [];
+            if (activeWaveform.length === 0) return null;
+            
+            const pointsPerSecond = activeWaveform.length / audioDuration;
             const pointsToShow = Math.ceil(duration * pointsPerSecond);
-            const visibleWaveform = audioWaveform.slice(0, pointsToShow);
+            const visibleWaveform = activeWaveform.slice(0, pointsToShow);
 
             if (visibleWaveform.length === 0) return null;
 
@@ -586,7 +811,7 @@ export function InteractiveTimeline({ timeline, videoRef, duration, userConstrai
             pathD += ` L ${svgWidth},${svgHeight} Z`;
 
             return (
-              <div className="absolute top-[24px] bottom-0 left-0 right-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
+              <div className="absolute top-[24px] bottom-0 left-0 right-0 opacity-80 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
                 <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="none" className="w-full h-full fill-emerald-400">
                   <path d={pathD} />
                 </svg>

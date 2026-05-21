@@ -6,7 +6,25 @@ This file logs the cumulative release walkthroughs, detailing code changes, arch
 
 ---
 
-## 🐺 Walkthrough — v0.1.45 → v0.1.46
+## 🐺 Walkthrough — v0.1.46 → v0.1.47
+
+**Commit:** `[v0.1.47] feat(ui): implement dual waveform rendering and rhythmic energy toggle`
+
+### Riepilogo File Modificati
+
+| File | +ins | -del | Cosa |
+| ---- | ---- | ---- | ---- |
+| `engine/audio_analyzer.py` | +153 | -50 | Estrazione duale: Amplitude (`np.abs(y)`) ed Energy (`onset_env_b`). |
+| `src/components/dashboard/InteractiveTimeline.tsx` | +255 | -20 | UI per "Waveform Control" e switch tra viste. Risolto glitch su SVG overflow. |
+| `src/hooks/usePancakeData.ts` | +72 | -15 | Supporto per JSON nested `waveforms: { amplitude, energy }` con fallback. |
+
+### Dettagli Release (Dual Waveform Rendering)
+- **Audio Extraction Backend:** Modificato il parser di `librosa` per generare due set di dati a 80 punti al secondo. Il primo è l'Amplitude (volume puro e tradizionale, utile per il sync del parlato), il secondo è l'Energy (basato su `onset_strength`, che traccia i picchi ritmici e la tensione emotiva per guidare il VLM).
+- **Frontend State Management:** Introdotto `waveformView` in `PancakeDashboard`, propagato verso il basso su `InteractiveTimeline` e `FinalCutTimeline`.
+- **UI / Popover:** Aggiunto un interruttore galleggiante **Waveform Control** che permette all'utente di alternare istantaneamente il rendering della curva SVG verde tra Amplitude ed Energy. Entrambi i set di punti sono calcolati localmente al volo.
+- **Validazione:** ✅ Typescript e ESLint corretti e funzionanti.
+
+---
 
 **Commit:** `[v0.1.46] feat(engine): inject audio rhythm metadata into LLM director prompt`
 
