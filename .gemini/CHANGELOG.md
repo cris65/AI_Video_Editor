@@ -1,8 +1,26 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.45 - 2026-05-21
+**Version:** v0.1.46 - 2026-05-21
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.45 → v0.1.46
+
+**Commit:** `[v0.1.46] feat(engine): inject audio rhythm metadata into LLM director prompt`
+
+### Riepilogo File Modificati
+
+| File | +ins | -del | Cosa |
+| ---- | ---- | ---- | ---- |
+| `engine/director.py` | +14 | -4 | Iniezione del `[RHYTHM CONTEXT]` e `audio_directive` nel payload inviato a Llama 3 / Gemma 4. |
+
+### Dettagli Release (Audio Rhythm Engine - Phase 3)
+- **Engine / AI Injection:** Implementato il logic bridge finale che rende il LLM consapevole del ritmo audio. `generate_final_cut` scarica l'array dei beats (generato precedentemente da Librosa e salvato in `_audio_beats.json`) e lo inietta come parametro matematico opzionale in `call_director_llm`.
+- **Context Engineering:** Se rileva una traccia musicale, il Director System Prompt include la direttiva rigida di allinearsi alla griglia temporale (*"strictly align clip boundaries..."*). L'array esatto dei timestamp viene aggiunto all'inizio della lista delle clip.
+- **Lazy Fallback:** Totale sicurezza architetturale. Se non ci sono beat, il dizionario non viene caricato e il Director esegue un montaggio puro e narrativo 100% visivo.
+- **Validazione:** ✅ Nessun errore sintattico in Python (`python -m py_compile`).
 
 ---
 

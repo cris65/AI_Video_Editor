@@ -45,7 +45,7 @@ def clean_json_response(raw_text):
             pass
     return None
 
-def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, seed: int = -1, locked_clips=None, llm_model_id="meta-llama/Meta-Llama-3-70B-Instruct"):
+def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, seed: int = -1, locked_clips=None, llm_model_id="meta-llama/Meta-Llama-3-70B-Instruct", audio_bpm=None, audio_beats=None):
     if not check_director_llm_available():
         print("⚠️  [Director] Libreria mlx_lm non disponibile. Fallback euristico.")
         return None
@@ -94,10 +94,20 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
             "They are IMMOVABLE WALLS. Build the sequence by filling the GAPS around them.\n\n"
         )
 
+    audio_directive = ""
+    audio_context = ""
+    if audio_beats and audio_bpm:
+        audio_directive = (
+            "SOUNDTRACK DETECTED: You must strictly align clip boundaries and durations to the provided audio beat timestamps. "
+            "Use the rhythm grid to determine when to cut.\n"
+        )
+        audio_context = f"\n\n[RHYTHM CONTEXT]\nBPM: {audio_bpm}\nBeats Grid (seconds): {audio_beats}\n"
+
     system_prompt = (
         locked_constraint_text
         + "Sei un Master Video Editor e un AI Video Director. Il tuo compito è creare una 'Editing Recipe' per un montaggio video.\n"
-        "REGOLE RIGIDE:\n"
+        + audio_directive
+        + "REGOLE RIGIDE:\n"
         f"1. La durata target è di circa {target_duration} secondi (circa {total_beats} beat musicali).\n"
         f"2. Stile richiesto dal regista: '{style_prompt}'\n"
         "3. DEVI includere tutti i clip marcati come 'MUST INCLUDE (PILLAR)'. Posizionali nei momenti chiave della narrazione.\n"
@@ -119,7 +129,7 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
     
     chat_input = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": "Ecco i clip disponibili:\n" + clips_text + "\n\nGenera la JSON Editing Recipe."}
+        {"role": "user", "content": "Ecco i clip disponibili:\n" + clips_text + audio_context + "\n\nGenera la JSON Editing Recipe."}
     ]
     
     try:
@@ -329,7 +339,11 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     llm_model_id = stringout.get("metadata", {}).get("llm_model_id", "meta-llama/Meta-Llama-3-70B-Instruct")
 
     # We pass ALL usable_clips to LLM so it sees the Global IN/OUT narrative anchors
-    recipe_dict = call_director_llm(usable_clips, target_duration, target_beats_count, style_prompt, seed, locked_clips=locked_clips, llm_model_id=llm_model_id)
+    recipe_dict = call_director_llm(
+        usable_clips, target_duration, target_beats_count, style_prompt, seed, 
+        locked_clips=locked_clips, llm_model_id=llm_model_id,
+        audio_bpm=audio.get("bpm"), audio_beats=audio.get("beats")
+    )
     
     if recipe_dict:
         os.makedirs(output_dir, exist_ok=True)
