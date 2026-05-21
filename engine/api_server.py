@@ -125,6 +125,10 @@ class OrchestratePayload(BaseModel):
     clip_overrides: dict[str, Union[LockedClipOverride, Literal['KEEP', 'TRASH', 'BROLL']]] = {}
     director_config: DirectorConfigPayload = DirectorConfigPayload()
 
+class AudioAnalyzePayload(BaseModel):
+    filename: str
+    project_id: str
+
 @app.post("/api/orchestrate")
 async def orchestrate_director_cut(payload: OrchestratePayload):
     """
@@ -178,6 +182,31 @@ async def orchestrate_director_cut(payload: OrchestratePayload):
             seed=seed,
         )
         return {"ok": True, "output_path": output_path}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/audio/files")
+async def get_audio_files():
+    """Scans engine/input/ and returns available .mp3 and .wav files."""
+    import os, glob
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DIR_INPUT = os.path.join(BASE_DIR, 'input')
+    audio_files = []
+    
+    if os.path.exists(DIR_INPUT):
+        for ext in ('*.mp3', '*.wav', '*.MP3', '*.WAV'):
+            for filepath in glob.glob(os.path.join(DIR_INPUT, ext)):
+                audio_files.append(os.path.basename(filepath))
+                
+    return {"files": list(set(audio_files))}
+
+@app.post("/api/audio/analyze")
+async def analyze_audio(payload: AudioAnalyzePayload):
+    """Analyzes audio to extract BPM and beats."""
+    import audio_analyzer
+    try:
+        result = audio_analyzer.analyze_audio_for_api(payload.filename, payload.project_id)
+        return {"ok": True, "data": result}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

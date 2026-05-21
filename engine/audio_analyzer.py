@@ -87,3 +87,82 @@ def extract_beats(wav_path, output_dir, sequence_name):
     except Exception as e:
         print(f"❌ ERRORE durante l'estrazione dei beat: {e}")
         return None
+
+def analyze_audio_for_api(filename: str, project_id: str):
+    """
+    Analyzes an audio file from engine/input/ and exports a JSON for the LLM Director.
+    Required format:
+    {
+      "project_id": "string",
+      "bpm": 124.5,
+      "total_duration_sec": 180.2,
+      "beats": [ {"time": 0.45, "energy": 0.8}, ... ]
+    }
+    """
+    print(f"🥁 API Audio Analyzer: Avvio analisi per {filename} (Project: {project_id})")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    input_dir = os.path.join(base_dir, 'input')
+    output_dir = os.path.join(base_dir, 'output', project_id, 'LLM_Export_Package')
+    
+    wav_path = os.path.join(input_dir, filename)
+    beats_json_path = os.path.join(output_dir, f"{project_id}_audio_beats.json")
+    
+    if not os.path.exists(wav_path):
+        raise FileNotFoundError(f"File audio non trovato: {wav_path}")
+        
+    os.makedirs(output_dir, exist_ok=True)
+    
+    try:
+        import librosa
+        
+        # Caricamento audio
+        y, sr = librosa.load(wav_path, sr=None)
+        audio_duration = librosa.get_duration(y=y, sr=sr)
+        
+        print("🥁 Estrazione BPM e transienti via librosa...")
+        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+        
+        # Gestione type del tempo
+        if isinstance(tempo, np.ndarray):
+            tempo_val = float(tempo[0])
+        else:
+            tempo_val = float(tempo)
+            
+        beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+        
+        # Calcolo dell'energia come envelope (onset_strength) ai beat
+        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+        
+        max_frame = len(onset_env) - 1
+        safe_beat_frames = np.minimum(beat_frames, max_frame)
+        beat_energies = onset_env[safe_beat_frames]
+        
+        max_energy = np.max(onset_env) if len(onset_env) > 0 and np.max(onset_env) > 0 else 1.0
+        normalized_energies = beat_energies / max_energy
+        
+        beats_list = []
+        for i in range(len(beat_times)):
+            beats_list.append({
+                "time": float(round(beat_times[i], 3)),
+                "energy": float(round(normalized_energies[i], 3))
+            })
+            
+        payload = {
+            "project_id": project_id,
+            "bpm": round(tempo_val, 2),
+            "total_duration_sec": round(float(audio_duration), 2),
+            "beats": beats_list
+        }
+        
+        with open(beats_json_path, 'w') as f:
+            json.dump(payload, f, indent=2)
+            
+        print(f"✅ Beats JSON salvato in: {beats_json_path}")
+        return payload
+        
+    except ImportError:
+        print("❌ ERRORE: librosa non installato.")
+        raise Exception("librosa non installato nel backend.")
+    except Exception as e:
+        print(f"❌ ERRORE durante l'analisi API: {e}")
+        raise e

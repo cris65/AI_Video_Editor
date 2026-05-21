@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.42 - 2026-05-21
+**Version:** v0.1.44 - 2026-05-21
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -55,7 +55,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 6. **`director.py`** — Fase D. AI Director ragionante. Riceve la lista clip con i dati semantici, interpella Gemma 4 per una `editing_recipe`, poi applica la recipe su una griglia matematica di beat. Gestisce il sistema Pillar/Filler e il Safety Net auto-fill. Output: `_final_edit.json` + `_gemma_recipe.json`.
 7. **`edl_exporter.py`** — Fase E. Export Stringout grezzo in CMX3600 EDL.
 8. **`xml_exporter.py`** — Fase E. Export Director's Cut in FCP7 XML (Resolution-Agnostic, legge risoluzione da `hitl_data.json`).
-9. **`api_server.py`** — Runtime server FastAPI (:8000). Espone `/api/system/profiler` (rilevamento hardware Apple Silicon) e `/api/orchestrate` (endpoint POST che riceve il payload ibrido dalla UI e attiva la Fase D isolata).
+9. **`api_server.py`** — Runtime server FastAPI (:8000). Espone `/api/system/profiler` (rilevamento hardware Apple Silicon), `/api/orchestrate` (endpoint POST che riceve il payload ibrido dalla UI e attiva la Fase D isolata), e i nuovi endpoint dell'Audio Rhythm Engine (`/api/audio/files`, `/api/audio/analyze`).
 10. **`main.py`** — Orchestratore CLI Zero-Click. Esegue in sequenza le 5 fasi, con skip automatico della Fase B se MLX Server è offline. Registra le telemetrie prestazionali dell'esecuzione (tempi di OpenCV/YOLO, MLX e frame elaborati) scrivendole in `system_logs/performance_history.json` tramite `performance_tracker.py`.
 
 ---

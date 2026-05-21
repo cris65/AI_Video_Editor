@@ -1,6 +1,6 @@
 # 🚀 EVOLUTION (Roadmap & Phases)
 
-**Version:** v0.1.41 - 2026-05-21
+**Version:** v0.1.44 - 2026-05-21
 
 > [!NOTE]
 > This document tracks the product direction and the current phase of development for the AI Video Editor. It keeps the development progress strictly aligned with the Offline-First architecture (Python/MLX/YOLO) and the HITL interface (React).
@@ -25,6 +25,7 @@ The "heavy" pipeline (Speed 1) that runs only once to map the video.
 **PHASE A2: Audio Analysis (BGM & Transients)**
 - [x] Implementation of Python script (`bgm_generator.py`) to generate tracks.
 - [x] Injection of beat timecodes and waveform in the base JSON to allow future "Cut on Beat".
+- [x] Audio Rhythm Engine APIs (`audio_analyzer.py` + FastAPI) for manual BPM/transient extraction.
 
 **PHASE B: Semantic Analysis (MLX Vision + Gemma 4)**
 - [x] Development of `mlx_client.py` with structured prompt (Rule of Six).

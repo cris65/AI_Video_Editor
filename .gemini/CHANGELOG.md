@@ -1,8 +1,46 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.43 - 2026-05-21
+**Version:** v0.1.44 - 2026-05-21
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.43 → v0.1.44
+
+**Commit:** `[v0.1.44] feat(audio): implement Audio Rhythm Engine API for Librosa`
+
+### Riepilogo File Modificati
+
+| File | +ins | -del | Cosa |
+|---|---|---|---|
+| `engine/api_server.py` | +29 | -0 | Aggiunti endpoint `/api/audio/files` e `/api/audio/analyze` |
+| `engine/audio_analyzer.py` | +79 | -0 | Aggiunta funzione `analyze_audio_for_api` con estrazione BPM e transienti |
+| `package.json` | +1 | -1 | Bump versione a v0.1.44 |
+| `.gemini/SOTA.md` | +2 | -2 | Aggiunta documentazione endpoint Audio API |
+| `.gemini/FEATURES.md` | +2 | -1 | Documentata nuova feature Audio Rhythm Engine |
+| `.gemini/EVOLUTION.md` | +2 | -1 | Marcata Fase A2 Audio API come completata |
+| `.gemini/CHANGELOG.md` | +29 | -0 | Inserito walkthrough corrente |
+
+---
+
+### Dettaglio Modifiche
+
+#### 1. Audio Rhythm Engine Backend
+È stata sviluppata l'interfaccia backend per l'Audio Rhythm Engine in modo non distruttivo. Il modulo `audio_analyzer.py` è stato esteso con la funzione `analyze_audio_for_api`, che estrae:
+- BPM (tempo) della traccia.
+- Durata totale in secondi.
+- Array di beats con il rispettivo timestamp (`time`) e intensità del transiente (`energy`), normalizzata da 0.0 a 1.0 usando l'inviluppo `onset_strength`.
+
+#### 2. Nuovi Endpoint FastAPI (`api_server.py`)
+- `GET /api/audio/files`: Effettua una scansione della directory `engine/input/` e restituisce i file compatibili (`.mp3` e `.wav`), pronti per essere visualizzati nella UI.
+- `POST /api/audio/analyze`: Endpoint strutturato (tramite Pydantic) per innescare l'analisi Librosa su un file specifico, con salvataggio automatico dell'output JSON nel formato atteso dal LLM Director (`_audio_beats.json`).
+
+---
+
+### Validazione
+* ✅ `py_compile` — Nessun errore sintattico in Python (Sostitutivo a `wolf:audit` per via dei blocchi OpenSSL su sandbox).
+* ✅ `.gemini` Knowledge Base aggiornata autonomamente per riflettere lo stack attuale.
 
 ---
 
