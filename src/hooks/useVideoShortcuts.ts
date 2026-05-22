@@ -81,22 +81,38 @@ export function useVideoShortcuts(
         }
 
         case 'KeyI':
+          if (e.repeat) break;
           e.preventDefault();
-          onConstraint('IN', video.currentTime);
+          if (e.shiftKey) {
+            onConstraint('CLEAR_TYPE_IN', video.currentTime);
+          } else {
+            onConstraint('IN', video.currentTime);
+          }
           break;
 
         case 'KeyO':
+          if (e.repeat) break;
           e.preventDefault();
-          onConstraint('OUT', video.currentTime);
+          if (e.shiftKey) {
+            onConstraint('CLEAR_TYPE_OUT', video.currentTime);
+          } else {
+            onConstraint('OUT', video.currentTime);
+          }
           break;
 
         case 'KeyM':
+          if (e.repeat) break;
           e.preventDefault();
-          onConstraint('BM', video.currentTime);
+          if (e.shiftKey) {
+            onConstraint('CLEAR_TYPE_BM', video.currentTime);
+          } else {
+            onConstraint('BM', video.currentTime);
+          }
           break;
 
         case 'KeyX':
         case 'Backspace':
+          if (e.repeat) break;
           e.preventDefault();
           if (e.shiftKey) {
             onConstraint('CLEAR_ALL', video.currentTime);
@@ -107,22 +123,30 @@ export function useVideoShortcuts(
           break;
 
         case 'KeyK':
+          if (e.repeat) break;
           e.preventDefault();
           onOverride('KEEP', video.currentTime);
           break;
 
         case 'KeyT':
+          if (e.repeat) break;
           e.preventDefault();
           onOverride('TRASH', video.currentTime);
           break;
 
         case 'KeyB':
+          if (e.repeat) break;
           e.preventDefault();
           onOverride('BROLL', video.currentTime);
           break;
         case 'KeyA':
+          if (e.repeat) break;
           e.preventDefault();
-          onConstraint('AUDIO', video.currentTime);
+          if (e.shiftKey) {
+            onConstraint('CLEAR_TYPE_AUDIO', video.currentTime);
+          } else {
+            onConstraint('AUDIO', video.currentTime);
+          }
           break;
       }
     };

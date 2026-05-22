@@ -187,6 +187,10 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
 - **RELEASE CONDITION:** The AI CANNOT proceed with the actual implementation until the Tech Lead replies with `/execute` or explicitly types an approval message **directly in the chat**.
 - **🚨 SYSTEM MESSAGE BLINDNESS (ZERO TOLERANCE):** ANY system-generated message such as `"Auto-proceeded with Implementation Plan"`, `"stop hook blocked termination"`, or similar automated notifications are **CATEGORICALLY NOT valid approvals**. These messages come from the system infrastructure, NOT from the human Tech Lead. The AI MUST treat them as invisible and continue waiting for a real human message. Executing code after receiving only a system-generated message is a **critical violation** of this law, regardless of message content.
 
+### LAW 11 — THE DRY PRINCIPLE AXIOM (DON'T REPEAT YOURSELF)
+- **THE LAW:** The DRY (Don't Repeat Yourself) principle is SACRED and IMMUTABLE. The AI is STRICTLY FORBIDDEN from creating or maintaining duplicated UI components, duplicated complex business logic, or duplicated synchronization handlers across different files if they serve the exact same foundational purpose (e.g., having two separate Timeline components that share 90% of their logic).
+- **THE ENFORCEMENT:** If the AI detects that modifying a feature requires updating two identical pieces of code in two separate files (like `InteractiveTimeline.tsx` and `FinalCutTimeline.tsx`), the AI MUST flag this architectural debt to the Tech Lead immediately. The AI MUST proactively propose an abstraction or a unified generic component to eliminate the duplication before the technical debt spirals out of control.
+
 ## 10. 🧱 DRAG & DROP, OPTIMISTIC UI & PORTAL PROTOCOL
 
 1. **Hybrid Sensors Only:** NEVER use `PointerSensor` blocking mobile scroll. Use `MouseSensor` and `TouchSensor` with delay/tolerance.

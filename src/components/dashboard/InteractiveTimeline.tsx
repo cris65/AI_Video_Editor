@@ -21,9 +21,9 @@ interface InteractiveTimelineProps {
 
 // Per-type marker color palette
 const MARKER_COLORS: Record<string, string> = {
-  IN:    '#4CAF50', // Premiere green  — IN marker
-  OUT:   '#E53935', // Premiere red    — OUT marker
-  BM:    '#FF6D00', // Premiere orange — user BM bookmark
+  IN: '#4CAF50', // Premiere green  — IN marker
+  OUT: '#E53935', // Premiere red    — OUT marker
+  BM: '#FF6D00', // Premiere orange — user BM bookmark
   AUDIO: '#FFC107', // Premiere gold   — audio cue
 };
 
@@ -41,20 +41,20 @@ interface DragState {
   playheadScreenFrac?: number;
 }
 
-export function InteractiveTimeline({ 
-  timeline, 
-  videoRef, 
-  duration, 
-  userConstraints, 
-  clipOverrides = {}, 
-  audioWaveforms = null, 
+export function InteractiveTimeline({
+  timeline,
+  videoRef,
+  duration,
+  userConstraints,
+  clipOverrides = {},
+  audioWaveforms = null,
   waveformView = 'amplitude',
   setWaveformView,
-  audioDuration = 0, 
-  audioBeats = [], 
+  audioDuration = 0,
+  audioBeats = [],
   audioMarkerFilters,
   setAudioMarkerFilters,
-  markerNumbers = new Map() 
+  markerNumbers = new Map()
 }: InteractiveTimelineProps) {
   const playheadRef = useRef<HTMLDivElement>(null);
   const timeTextRef = useRef<HTMLSpanElement>(null);
@@ -63,6 +63,10 @@ export function InteractiveTimeline({
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isAudioPopupOpen, setIsAudioPopupOpen] = useState(false);
   const [isWaveformPopupOpen, setIsWaveformPopupOpen] = useState(false);
+
+  // ─── Left-Handed Modifiers State ──────────────────────────────────────────
+  const keysDownRef = useRef<Set<string>>(new Set());
+  const [isModifying, setIsModifying] = useState<'pan' | 'scrub' | null>(null);
 
   // Zoom state: [startFraction, endFraction] of total duration, both in [0, 1]
   const [zoomWindow, setZoomWindow] = useState<[number, number]>([0, 1]);
@@ -277,8 +281,88 @@ export function InteractiveTimeline({
 
   if (!timeline || duration <= 0) return null;
 
+  // ─── P/L Modifiers Key Listener ───────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
+      if (e.code === 'KeyP' || e.code === 'KeyL') {
+        keysDownRef.current.add(e.code);
+        if (keysDownRef.current.has('KeyP') && keysDownRef.current.has('KeyL')) {
+          setIsModifying('scrub');
+        } else if (keysDownRef.current.has('KeyP')) {
+          setIsModifying('pan');
+        }
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'KeyP' || e.code === 'KeyL') {
+        keysDownRef.current.delete(e.code);
+        if (keysDownRef.current.has('KeyP') && keysDownRef.current.has('KeyL')) {
+          setIsModifying('scrub');
+        } else if (keysDownRef.current.has('KeyP')) {
+          setIsModifying('pan');
+        } else {
+          setIsModifying(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // ─── P/L Modifiers Mouse Move Logic ───────────────────────────────────────
+  const handleTimelineMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const isP = keysDownRef.current.has('KeyP');
+    const isL = keysDownRef.current.has('KeyL');
+
+    if (isP && isL) {
+      // Mode 2: Scrub Playhead AND View (Timeline moves under a visually fixed playhead)
+      const track = trackRef.current;
+      if (!track || !videoRef.current) return;
+      const deltaX = e.movementX; // native delta since last move event
+      if (deltaX === 0) return;
+      
+      const rect = track.getBoundingClientRect();
+      const [s, en] = zoomWindow;
+      const span = en - s;
+      
+      // We negate deltaX so dragging mouse right moves the view left (standard pan)
+      const deltaFrac = (-deltaX / rect.width) * span;
+      
+      // 1. Pan the view
+      const newS = Math.max(0, Math.min(s + deltaFrac, 1 - span));
+      setZoomWindow([newS, newS + span]);
+      
+      // 2. Scrub the playhead by the exact same fraction so it stays visually fixed
+      const currentAbsoluteFrac = videoRef.current.currentTime / duration;
+      const newAbsoluteFrac = Math.max(0, Math.min(currentAbsoluteFrac + deltaFrac, 1));
+      videoRef.current.currentTime = newAbsoluteFrac * duration;
+      
+    } else if (isP) {
+      // Mode 1: Pan View ONLY
+      const track = trackRef.current;
+      if (!track) return;
+      const deltaX = e.movementX; // native delta since last move event
+      if (deltaX === 0) return;
+      const rect = track.getBoundingClientRect();
+      const [s, en] = zoomWindow;
+      const span = en - s;
+      
+      // We negate deltaX so dragging mouse right moves the view left (standard pan)
+      const deltaFrac = (-deltaX / rect.width) * span;
+      const newS = Math.max(0, Math.min(s + deltaFrac, 1 - span));
+      setZoomWindow([newS, newS + span]);
+    }
+  };
+
   // ─── Timeline click (remapped through zoom window) ────────────────────────
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // If we are holding modifiers, ignore clicks
+    if (keysDownRef.current.has('KeyP') || keysDownRef.current.has('KeyL')) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const screenFrac = (e.clientX - rect.left) / rect.width;
     const [s, en] = zoomWindow;
@@ -344,11 +428,10 @@ export function InteractiveTimeline({
                   setIsAudioPopupOpen(false);
                   setIsPopupOpen(false);
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer ${
-                  isWaveformPopupOpen 
-                    ? 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/30' 
-                    : 'bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/40 hover:border-slate-600/60'
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer ${isWaveformPopupOpen
+                  ? 'bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/30'
+                  : 'bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/40 hover:border-slate-600/60'
+                  }`}
                 title="Waveform Control"
               >
                 <span className="text-[14px] leading-none">🌊</span>
@@ -363,25 +446,23 @@ export function InteractiveTimeline({
                     </h4>
                     <button onClick={() => setIsWaveformPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
                   </div>
-                  
+
                   <div className="flex bg-slate-800/50 p-1 rounded-md border border-slate-700/50">
                     <button
                       onClick={() => setWaveformView('amplitude')}
-                      className={`flex-1 py-1.5 text-[10px] font-sans rounded transition-colors ${
-                        waveformView === 'amplitude'
-                          ? 'bg-slate-700 text-slate-100 shadow-sm'
-                          : 'text-slate-300 hover:text-slate-100'
-                      }`}
+                      className={`flex-1 py-1.5 text-[10px] font-sans rounded transition-colors ${waveformView === 'amplitude'
+                        ? 'bg-slate-700 text-slate-100 shadow-sm'
+                        : 'text-slate-300 hover:text-slate-100'
+                        }`}
                     >
                       Amplitude
                     </button>
                     <button
                       onClick={() => setWaveformView('energy')}
-                      className={`flex-1 py-1.5 text-[10px] font-sans rounded transition-colors ${
-                        waveformView === 'energy'
-                          ? 'bg-slate-700 text-slate-100 shadow-sm'
-                          : 'text-slate-300 hover:text-slate-100'
-                      }`}
+                      className={`flex-1 py-1.5 text-[10px] font-sans rounded transition-colors ${waveformView === 'energy'
+                        ? 'bg-slate-700 text-slate-100 shadow-sm'
+                        : 'text-slate-300 hover:text-slate-100'
+                        }`}
                     >
                       Energy
                     </button>
@@ -400,11 +481,10 @@ export function InteractiveTimeline({
                   setIsWaveformPopupOpen(false);
                   setIsPopupOpen(false);
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer ${
-                  isAudioPopupOpen 
-                    ? 'bg-[#FFC107]/10 text-[#FFC107] border-[#FFC107]/30' 
-                    : 'bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/40 hover:border-slate-600/60'
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer ${isAudioPopupOpen
+                  ? 'bg-[#FFC107]/10 text-[#FFC107] border-[#FFC107]/30'
+                  : 'bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/40 hover:border-slate-600/60'
+                  }`}
                 title="Audio Marker Control"
               >
                 <SlidersHorizontal size={12} className={isAudioPopupOpen ? "text-[#FFC107]" : "text-yellow-500/80"} />
@@ -419,7 +499,7 @@ export function InteractiveTimeline({
                     </h4>
                     <button onClick={() => setIsAudioPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
                   </div>
-                  
+
                   <div className="space-y-4">
                     {/* Types Toggle */}
                     <div className="space-y-2">
@@ -430,18 +510,18 @@ export function InteractiveTimeline({
                           if (t === 'harmonic') accentColor = 'accent-fuchsia-500';
                           if (t === 'percussive') accentColor = 'accent-slate-200';
                           if (t === 'bpm_grid') accentColor = 'accent-emerald-500';
-                          
+
                           const labelText = t === 'bpm_grid' ? 'BPM Grid (Metronome)' : t.charAt(0).toUpperCase() + t.slice(1);
-                          
+
                           return (
                             <label key={t} className="flex items-center gap-2 text-[10px] text-slate-300 cursor-pointer hover:text-slate-100">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 className={accentColor}
                                 checked={audioMarkerFilters.types.includes(t)}
                                 onChange={(e) => {
-                                  const newTypes = e.target.checked 
-                                    ? [...audioMarkerFilters.types, t] 
+                                  const newTypes = e.target.checked
+                                    ? [...audioMarkerFilters.types, t]
                                     : audioMarkerFilters.types.filter(type => type !== t);
                                   setAudioMarkerFilters({ ...audioMarkerFilters, types: newTypes });
                                 }}
@@ -461,10 +541,10 @@ export function InteractiveTimeline({
                           {audioMarkerFilters.minEnergy.toFixed(2)}
                         </span>
                       </div>
-                      <input 
-                        type="range" 
-                        min="0.0" 
-                        max="1.0" 
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="1.0"
                         step="0.05"
                         value={audioMarkerFilters.minEnergy}
                         onChange={(e) => setAudioMarkerFilters({ ...audioMarkerFilters, minEnergy: parseFloat(e.target.value) })}
@@ -488,41 +568,70 @@ export function InteractiveTimeline({
               className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-all border border-slate-700/40 hover:border-slate-600/60 focus:outline-none hover:scale-[1.02] active:scale-[0.98] shadow-sm cursor-pointer"
               title="Keyboard Shortcuts"
             >
-            <Keyboard size={12} className="text-blue-400/80" />
-            <span className="text-[10px] font-semibold tracking-wider uppercase font-sans">Keyboard Shortcuts</span>
-          </button>
+              <Keyboard size={12} className="text-blue-400/80" />
+              <span className="text-[10px] font-semibold tracking-wider uppercase font-sans">Keyboard Shortcuts</span>
+            </button>
 
-          {isPopupOpen && (
-            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[280px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Keyboard Shortcuts
-                </h4>
-                <button onClick={() => setIsPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
+            {isPopupOpen && (
+              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[520px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Keyboard Shortcuts
+                  </h4>
+                  <button onClick={() => setIsPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
+                </div>
+                
+                <div className="space-y-4 text-slate-400 text-[10px] font-sans">
+                  
+                  {/* Area 1: Global Navigation */}
+                  <div>
+                    <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-blue-400/80">Global Navigation</h5>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                      <div className="flex justify-between items-center"><span>Play / Pause</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Space</kbd></div>
+                      <div className="flex justify-between items-center"><span>10 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">← / →</kbd></div>
+                      <div className="flex justify-between items-center"><span>1 Frame</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + ← / →</kbd></div>
+                      <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
+                      <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
+                    </div>
+                  </div>
+
+                  {/* Area 2: Timeline Modifiers */}
+                  <div>
+                    <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-amber-400/80">Timeline Interaction</h5>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                      <div className="flex justify-between items-center"><span>Zoom In / Out</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">⌃ + Scroll</kbd></div>
+                      <div className="flex justify-between items-center"><span>Pan Timeline View</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">P + Drag</kbd></div>
+                      <div className="flex justify-between items-center"><span>Scrub Playhead</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">P + L + Drag</kbd></div>
+                    </div>
+                  </div>
+
+                  {/* Area 3: Markers & Macros */}
+                  <div>
+                    <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-emerald-400/80">Markers & Status (Hovering Clip)</h5>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                      <div className="flex justify-between items-center"><span style={{ color: '#4CAF50' }}>Marker IN / OUT</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{ backgroundColor: '#4CAF5020', color: '#4CAF50', borderColor: '#4CAF5055' }}>I / O</kbd></div>
+                      <div className="flex justify-between items-center"><span>Remove IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + I / O</kbd></div>
+
+                      <div className="flex justify-between items-center"><span style={{ color: '#FF6D00' }}>Marker BM (M#)</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{ backgroundColor: '#FF6D0020', color: '#FF6D00', borderColor: '#FF6D0055' }}>M</kbd></div>
+                      <div className="flex justify-between items-center"><span>Remove BM Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + M</kbd></div>
+
+                      <div className="flex justify-between items-center"><span style={{ color: '#FFC107' }}>Marker Audio (♪)</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{ backgroundColor: '#FFC10720', color: '#FFC107', borderColor: '#FFC10755' }}>A</kbd></div>
+                      <div className="flex justify-between items-center"><span>Remove Audio Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + A</kbd></div>
+
+                      <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
+                      <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
+                      
+                      <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
+                      <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X</kbd></div>
+                      
+                      <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
+                    </div>
+                  </div>
+
+                </div>
               </div>
-              <div className="space-y-2 text-slate-400 text-[10px] font-sans">
-                <div className="flex justify-between items-center"><span>Play / Pause</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Space</kbd></div>
-                <div className="flex justify-between items-center"><span>10 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">← / →</kbd></div>
-                <div className="flex justify-between items-center"><span>1 Frame</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + ← / →</kbd></div>
-                <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
-                <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
-                <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span style={{color:'#4CAF50'}}>Marker IN</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#4CAF5020',color:'#4CAF50',borderColor:'#4CAF5055'}}>I</kbd></div>
-                <div className="flex justify-between items-center"><span style={{color:'#E53935'}}>Marker OUT</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#E5393520',color:'#E53935',borderColor:'#E5393555'}}>O</kbd></div>
-                <div className="flex justify-between items-center"><span style={{color:'#FF6D00'}}>Marker BM (M#)</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#FF6D0020',color:'#FF6D00',borderColor:'#FF6D0055'}}>M</kbd></div>
-                <div className="flex justify-between items-center"><span style={{color:'#FFC107'}}>Marker Audio (♪)</span><kbd className="px-1.5 py-0.5 rounded font-mono border" style={{backgroundColor:'#FFC10720',color:'#FFC107',borderColor:'#FFC10755'}}>A</kbd></div>
-                <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X / Backspace</kbd></div>
-                <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
-                <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
-                <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
-                <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
-                <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span>Zoom (Ctrl+Scroll)</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">⌃ + Scroll</kbd></div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </div>
 
         <span>{formatTime(duration)}</span>
@@ -531,8 +640,9 @@ export function InteractiveTimeline({
       {/* ── Track ─────────────────────────────────────────────────────────── */}
       <div
         ref={trackRef}
-        className="relative w-full h-[64px] bg-slate-900 border border-slate-800 rounded-lg overflow-hidden cursor-pointer group shadow-inner"
+        className={`relative w-full h-[64px] bg-slate-900 border border-slate-800 rounded-lg overflow-hidden group shadow-inner ${isModifying === 'pan' ? 'cursor-grab' : isModifying === 'scrub' ? 'cursor-col-resize' : 'cursor-pointer'}`}
         onClick={handleTimelineClick}
+        onMouseMove={handleTimelineMouseMove}
         onWheel={handleWheel}
       >
         {/* Static, non-zoomed background bar for the ruler labels area at the top */}
@@ -606,14 +716,14 @@ export function InteractiveTimeline({
                 })() : null;
                 return [constraintPills, bmPill];
               })}
-              
+
               {/* Audio Beat Markers (Filtered for UI) */}
               {audioBeats && audioMarkerFilters && audioBeats.map((beat, i) => {
                 const isBeat = beat.type.includes('beat') && audioMarkerFilters.types.includes('beat');
                 const isHarmonic = beat.type.includes('harmonic') && audioMarkerFilters.types.includes('harmonic');
                 const isPercussive = beat.type.includes('percussive') && audioMarkerFilters.types.includes('percussive');
                 const showBpmGrid = beat.type.includes('beat') && audioMarkerFilters.types.includes('bpm_grid');
-                
+
                 // Determine if a flag should be shown based on toggles AND energy threshold
                 const showFlag = (isBeat || isHarmonic || isPercussive) && (beat.energy >= audioMarkerFilters.minEnergy);
 
@@ -626,12 +736,12 @@ export function InteractiveTimeline({
                   <Fragment key={`audio-bm-${i}`}>
                     {/* Visual Beat Grid Line (Metronome) - Bypasses energy filter */}
                     {showBpmGrid && (
-                      <div 
+                      <div
                         className="absolute top-[24px] w-[1px] bg-white/40 z-[30] pointer-events-none"
                         style={{ left: `${leftPct}%`, height: '40px' }}
                       />
                     )}
-                    
+
                     {/* Marker Flag (Harmonic/Percussive/Beat) */}
                     {showFlag && (() => {
                       let colorClasses = 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/60';
@@ -791,7 +901,7 @@ export function InteractiveTimeline({
           {audioWaveforms && audioDuration > 0 && (() => {
             const activeWaveform = audioWaveforms[waveformView] || [];
             if (activeWaveform.length === 0) return null;
-            
+
             const pointsPerSecond = activeWaveform.length / audioDuration;
             const pointsToShow = Math.ceil(duration * pointsPerSecond);
             const visibleWaveform = activeWaveform.slice(0, pointsToShow);
@@ -887,10 +997,10 @@ export function InteractiveTimeline({
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500/80"></span> B-ROLL</div>
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500/80"></span> Trash (Rejected)</div>
         <span className="text-slate-700">|</span>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#4CAF50'}}></span> Marker IN</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#E53935'}}></span> Marker OUT</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#FF6D00'}}></span> Marker BM</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#FFC107'}}></span> Marker Audio</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4CAF50' }}></span> Marker IN</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#E53935' }}></span> Marker OUT</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FF6D00' }}></span> Marker BM</div>
+        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FFC107' }}></span> Marker Audio</div>
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Bookend [ IN</div>
         <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Bookend OUT ]</div>
         {zoomSpan < 0.99 && (

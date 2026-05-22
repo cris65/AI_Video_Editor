@@ -1,6 +1,6 @@
 # 🗺️ STRUCTURE (Directory Architecture)
 
-**Version:** v0.1.34 - 2026-05-20
+**Version:** v0.1.48 - 2026-05-22
 
 > [!NOTE]
 > This document maps the official repository topology for the AI Video Editor. Refer to this file before assuming relative or absolute paths, with particular attention to the engine's output folder.

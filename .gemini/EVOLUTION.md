@@ -1,6 +1,6 @@
 # 🚀 EVOLUTION (Roadmap & Phases)
 
-**Version:** v0.1.46 - 2026-05-21
+**Version:** v0.1.48 - 2026-05-22
 
 > [!NOTE]
 > This document tracks the product direction and the current phase of development for the AI Video Editor. It keeps the development progress strictly aligned with the Offline-First architecture (Python/MLX/YOLO) and the HITL interface (React).
@@ -85,3 +85,17 @@ The "heavy" pipeline (Speed 1) that runs only once to map the video.
 ### Milestone 4: Production Readiness (i18n & Refactoring)
 - **Localization:** Integration of `react-i18next` to make the UI multi-language without introducing regressions.
 - **UI Cleanup:** High componentization and decoupling of logic from the presentation layer.
+
+---
+
+## 🦅 THE N.A.I.L.E. VISION (Next-Gen Architectural Roadmap)
+
+> [!IMPORTANT]
+> The platform is officially named **N.A.I.L.E.** (Neural AI Linear Editing), playing on the classic NLE acronym while emphasizing the Human-in-the-Loop AI core.
+
+- **Universal Timeline Component:** The `<InteractiveTimeline />` must become a purely data-driven, universal component used seamlessly across both the Stringout and Director's Cut phases.
+- **YOLO & Mobile Safe Areas:** Transition from static center-crops to dynamic OpenCV/YOLO tracking. The AI will output dynamic Pan & Scan / Safe Area coordinates that follow the subject's center of mass.
+- **After Effects (AE) LLM Scripting:** Instead of complex UI integrations, we will leverage LLMs to write raw `.jsx` (ExtendScript) or After Effects Expressions to generate dynamic motion graphics from timeline data.
+- **Adobe UXP Transition:** Future Adobe panel integrations must target the modern UXP (React-based) stack, strictly avoiding legacy CEP architecture.
+- **Multi-Track & Compositing:** Evolve the LLM prompt to handle V1, V2, V3 logic (Picture-in-Picture, split screens, B-Roll overlays).
+- **DevOps & QA Agents:** Dedicate a specific AI Agent to generate and maintain Playwright E2E tests to prevent regressions as the UI scales.

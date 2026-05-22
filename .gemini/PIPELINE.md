@@ -1,6 +1,6 @@
 # 🎬 AI Video Editor — Operational Pipeline & Production Flow
 
-**Version:** v0.1.34 - 2026-05-20
+**Version:** v0.1.48 - 2026-05-22
 **Scope:** Operational guide for booting the development environment and executing the full video analysis pipeline.
 
 ---

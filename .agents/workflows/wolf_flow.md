@@ -16,7 +16,7 @@ You are initiating the final WOLF-FLOW Release Cycle. Execute these steps strict
    This ensures that the latest changes are saved within the repository's Knowledge Base (making them visible to other models like Gemini).
 6. MESSAGE: Read the new version and the git diff. Generate a strict Conventional Commit message format: `[vX.X.X] type(scope): description`.
 7. EXECUTE: Run this exact chained command in the shell:
-   `git add . && git commit -m "<your_generated_message>" && mkdir -p ./WOLF_EXPORTS && cp .gemini/*.md ./WOLF_EXPORTS/ && cp GEMINI.md ./WOLF_EXPORTS/ && echo '✅ WOLF_EXPORTS Export Completed!' && afplay /System/Library/Sounds/Glass.aiff`
+   `git add . && git commit -m "<your_generated_message>" && mkdir -p ./WOLF_EXPORTS && cp .gemini/*.md ./WOLF_EXPORTS/ && cp GEMINI.md ./WOLF_EXPORTS/ && echo '✅ WOLF_EXPORTS Export Completed!'`
 8. AUTONOMOUS HEALING (CRITICAL): If the shell command fails because Husky pre-commit hooks (Linter, TS, or E2E tests) blocked the commit, DO NOT STOP. According to GEMINI.md Section 7, you have a budget of 3 consecutive attempts. Read the terminal error, fix the exact file, and autonomously re-run step 7.
 
 Report the final outcome only when the cycle is fully closed or if the 3 healing attempts are exhausted.

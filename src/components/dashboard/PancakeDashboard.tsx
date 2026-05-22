@@ -66,7 +66,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveforms, audioBeats, loading, error, refetchFinalCut, refetchAudioData } = usePancakeData(sequenceName);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  
+
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -167,7 +167,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
         } else {
           suggestion = "Montaggio bilanciato, ritmo regolare e fluido in perfetta sincronia con la musica.";
         }
-        
+
         setDirectorConfig(prev => {
           const next = { ...prev, style_prompt: suggestion };
           triggerSave(userConstraints, clipOverrides, next);
@@ -182,14 +182,14 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   const combinedTimeline = data?.stringout_timeline || [];
   const fps = data?.metadata?.fps || 25;
 
-  const handleConstraint = useCallback((type: ConstraintType | 'CLEAR' | 'CLEAR_ALL', time: number) => {
+  const handleConstraint = useCallback((type: ConstraintType | 'CLEAR' | 'CLEAR_ALL' | 'CLEAR_TYPE_IN' | 'CLEAR_TYPE_OUT' | 'CLEAR_TYPE_BM' | 'CLEAR_TYPE_AUDIO', time: number) => {
     const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
     if (clipIndex !== -1) {
       const clipKey = combinedTimeline[clipIndex].start.toString();
-      
+
       setUserConstraints(prev => {
         const next = { ...prev };
-        
+
         if (type === 'CLEAR_ALL') {
           delete next[clipKey];
         } else if (type === 'CLEAR') {
@@ -216,14 +216,23 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
               }
             }
           }
+        } else if (type.startsWith('CLEAR_TYPE_')) {
+          const targetType = type.replace('CLEAR_TYPE_', '');
+          const constraints = next[clipKey] || [];
+          const updated = constraints.filter(c => c.type !== targetType);
+          if (updated.length === 0) {
+            delete next[clipKey];
+          } else {
+            next[clipKey] = updated;
+          }
         } else {
-          // IN, OUT, BM -> push
-          next[clipKey] = [...(next[clipKey] || []), { type, time }];
+          // IN, OUT, BM, AUDIO -> push
+          next[clipKey] = [...(next[clipKey] || []), { type: type as ConstraintType, time }];
         }
-        
+
         // Trigger Async Save (Non-Destructive)
         triggerSave(next, clipOverrides, directorConfig);
-        
+
         return next;
       });
     }
@@ -250,11 +259,11 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     if (clipIndex !== -1) {
       const clipKey = combinedTimeline[clipIndex].start.toString();
       console.log(`[handleGlobalBookend] target clipKey=${clipKey}`);
-      
+
       setClipOverrides(prev => {
         const next = { ...prev };
         const targetKey = type === 'START' ? 'is_global_start' : 'is_global_end';
-        
+
         const wasAlreadySet = typeof next[clipKey] === 'object' && next[clipKey] !== null && (next[clipKey] as any)[targetKey];
         console.log(`[handleGlobalBookend] wasAlreadySet=${wasAlreadySet} for ${clipKey}`);
 
@@ -269,13 +278,13 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             }
           }
         }
-        
+
         // Toggle logic: Apply only if it wasn't already set
         if (!wasAlreadySet) {
           const currentOverride = next[clipKey];
           const timeKey = type === 'START' ? 'bookend_start_time' : 'bookend_end_time';
           const newObj: any = { [targetKey]: true, [timeKey]: time };
-          
+
           if (typeof currentOverride === 'string') {
             newObj.force_status = currentOverride;
           } else if (typeof currentOverride === 'object' && currentOverride !== null) {
@@ -283,10 +292,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             newObj[targetKey] = true;
             newObj[timeKey] = time;
           }
-          
+
           next[clipKey] = newObj;
         }
-        
+
         console.log(`[handleGlobalBookend] next clipOverrides:`, next);
         triggerSave(userConstraints, next, directorConfig);
         return next;
@@ -300,7 +309,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
     const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
     if (clipIndex !== -1) {
       const clipKey = combinedTimeline[clipIndex].start.toString();
-      
+
       setClipOverrides(prev => {
         const next = { ...prev };
         if (type === 'CLEAR') {
@@ -320,7 +329,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   }, [combinedTimeline, userConstraints, directorConfig]);
 
   async function triggerSave(
-    constraintsToSave: Record<string, UserConstraint[]>, 
+    constraintsToSave: Record<string, UserConstraint[]>,
     overridesToSave: Record<string, any>,
     configToSave: DirectorConfig
   ) {
@@ -453,18 +462,18 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
   }, [isPreviewMode, activeClipIndex]);
 
   useVideoShortcuts(
-    videoRef, 
-    combinedTimeline, 
-    fps, 
-    handleConstraint, 
+    videoRef,
+    combinedTimeline,
+    fps,
+    handleConstraint,
     handleOverride,
     isPreviewMode,
     currentTimelineTime,
     seekToTimelineTime
   );
 
-  const videoDuration = combinedTimeline.length > 0 
-    ? Math.max(...combinedTimeline.map(c => c.end)) 
+  const videoDuration = combinedTimeline.length > 0
+    ? Math.max(...combinedTimeline.map(c => c.end))
     : 0;
 
   const filteredTimeline = useMemo(() => {
@@ -501,7 +510,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
   useEffect(() => {
     if (isPreviewMode) return; // Disabilita check standard in preview mode
-    
+
     let animationFrameId: number;
     let prevActiveIndex: number | null = null;
 
@@ -579,7 +588,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             <div className="flex items-center gap-3 mt-0.5 font-mono text-[10px] min-w-0">
               <span className="text-slate-500 truncate min-w-0">{sequenceName}</span>
               <span className="text-slate-500 whitespace-nowrap shrink-0">• {combinedTimeline.length} segmenti • {fps.toFixed(2)} fps</span>
-              
+
               {/* Save Status Indicator */}
               <div className="flex items-center gap-1.5 min-w-[80px]">
                 {saveStatus === 'saving' && <span className="text-[10px] text-emerald-400 animate-pulse flex items-center gap-1"><CloudUpload size={12} /> Salvataggio...</span>}
@@ -588,10 +597,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             </div>
           </div>
         </div>
-        
+
         {/* Master Toggle */}
         <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700 shadow-inner mx-2">
-          <button 
+          <button
             onClick={() => setIsPreviewMode(false)}
             className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${!isPreviewMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
           >
@@ -608,7 +617,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             Audio Track
           </button>
 
-          <button 
+          <button
             onClick={() => setIsPreviewMode(true)}
             disabled={finalCutTimeline.length === 0}
             className={`flex items-center gap-1.5 px-3 py-1 ml-1 text-[10px] font-bold rounded-md transition-colors ${isPreviewMode ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-500 hover:text-slate-300'} ${finalCutTimeline.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -617,29 +626,27 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             <PlaySquare size={12} />
             Director's Cut
           </button>
-          
+
           <button
             onClick={() => setIsRecipeModalOpen(true)}
             disabled={!gemmaRecipe || gemmaRecipe.length === 0}
-            className={`flex items-center gap-1.5 px-2.5 py-1 ml-1 text-[10px] font-bold rounded-md transition-all ${
-              !gemmaRecipe || gemmaRecipe.length === 0 
-                ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' 
-                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 ml-1 text-[10px] font-bold rounded-md transition-all ${!gemmaRecipe || gemmaRecipe.length === 0
+              ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500'
+              : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+              }`}
             title={!gemmaRecipe ? "Recipe non disponibile" : "View AI Recipe"}
           >
             <Eye size={12} />
           </button>
-          
+
           <button
             onClick={handleRegenerateCut}
             disabled={isRegenerating || saveStatus === 'saving'}
-            className={`flex items-center gap-1 px-2.5 py-1 ml-1 text-[10px] font-bold rounded-md transition-all ${
-              isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500' 
-              : finalCutTimeline.length === 0 
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+            className={`flex items-center gap-1 px-2.5 py-1 ml-1 text-[10px] font-bold rounded-md transition-all ${isRegenerating || saveStatus === 'saving' ? 'bg-amber-500/20 text-amber-500'
+              : finalCutTimeline.length === 0
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]'
                 : 'bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700'
-            }`}
+              }`}
             title={finalCutTimeline.length === 0 ? "Avvia la generazione del primo montaggio" : "Aggiorna il montaggio applicando le tue nuove regole"}
           >
             {isRegenerating ? (
@@ -652,48 +659,47 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
             {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
           </button>
         </div>
-        
+
         <div className="flex items-center gap-1.5">
-           <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-700 shadow-inner">
-             <button 
-               onClick={() => setFilterMode('ALL')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-             >
-               ALL
-             </button>
-             <button 
-               onClick={() => setFilterMode('VALID')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-             >
-               VALID
-             </button>
-             <button 
-               onClick={() => setFilterMode('BROLL')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-             >
-               B-ROLL
-             </button>
-             <button 
-               onClick={() => setFilterMode('TRASH')}
-               className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-             >
-               TRASH
-             </button>
-           </div>
-           <span className={`flex items-center gap-1 px-2 py-0.5 bg-slate-900/80 rounded-md text-[10px] font-bold border shadow-sm whitespace-nowrap transition-colors ${
-             filterMode === 'VALID' ? 'text-emerald-400 border-emerald-500/30' :
-             filterMode === 'BROLL' ? 'text-blue-400 border-blue-500/30' :
-             filterMode === 'TRASH' ? 'text-red-400 border-red-500/30' :
-             'text-slate-300 border-slate-700'
-           }`}>
-             <Filter size={10} className="opacity-80" />
-             {filterMode === 'BROLL' ? 'B-ROLL' : filterMode}: {filteredTimeline.length} Clips
-           </span>
+          <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-700 shadow-inner">
+            <button
+              onClick={() => setFilterMode('ALL')}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              ALL
+            </button>
+            <button
+              onClick={() => setFilterMode('VALID')}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'VALID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              VALID
+            </button>
+            <button
+              onClick={() => setFilterMode('BROLL')}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'BROLL' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              B-ROLL
+            </button>
+            <button
+              onClick={() => setFilterMode('TRASH')}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${filterMode === 'TRASH' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              TRASH
+            </button>
+          </div>
+          <span className={`flex items-center gap-1 px-2 py-0.5 bg-slate-900/80 rounded-md text-[10px] font-bold border shadow-sm whitespace-nowrap transition-colors ${filterMode === 'VALID' ? 'text-emerald-400 border-emerald-500/30' :
+            filterMode === 'BROLL' ? 'text-blue-400 border-blue-500/30' :
+              filterMode === 'TRASH' ? 'text-red-400 border-red-500/30' :
+                'text-slate-300 border-slate-700'
+            }`}>
+            <Filter size={10} className="opacity-80" />
+            {filterMode === 'BROLL' ? 'B-ROLL' : filterMode}: {filteredTimeline.length} Clips
+          </span>
         </div>
       </header>
 
       <main className="flex-1 p-2 flex flex-col lg:flex-row gap-2 max-w-[1920px] mx-auto w-full min-h-0">
-        
+
         {/* Left Side: Player & Timeline */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Telemetry Display Container */}
@@ -710,7 +716,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 <span className="text-slate-500 italic text-xs">No telemetry data available</span>
               )}
             </div>
-            
+
             {/* Global IN/OUT Constraints */}
             {!isPreviewMode && (
               <div className="flex items-center gap-2">
@@ -734,9 +740,9 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
           </div>
 
           <div className="flex-1 min-h-0 flex items-center justify-center relative">
-            <VideoPlayerSync 
-              src={videoUrl} 
-              ref={videoRef} 
+            <VideoPlayerSync
+              src={videoUrl}
+              ref={videoRef}
               hideControls={isPreviewMode}
             />
             {isPreviewMode && (
@@ -766,10 +772,10 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
               </>
             ) : (
               <>
-                <InteractiveTimeline 
-                  timeline={filteredTimeline} 
-                  videoRef={videoRef} 
-                  duration={videoDuration} 
+                <InteractiveTimeline
+                  timeline={filteredTimeline}
+                  videoRef={videoRef}
+                  duration={videoDuration}
                   userConstraints={userConstraints}
                   clipOverrides={clipOverrides}
                   audioWaveforms={audioWaveforms}
@@ -794,44 +800,44 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
               Timeline Inspector
             </h2>
           </div>
-          
-            <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
-              <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-sm overflow-hidden">
-                <button 
-                  onClick={() => setIsDirectorSettingsOpen(!isDirectorSettingsOpen)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
-                >
-                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                    <Wand2 size={14} className="text-amber-400" />
-                    AI Director Settings
-                  </h3>
-                  <div className="flex items-center gap-3">
-                    {audioBpm && (
-                      <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
-                        🎵 {audioBpm} BPM
-                      </span>
-                    )}
-                    <span className="text-slate-500 font-mono text-sm">{isDirectorSettingsOpen ? '-' : '+'}</span>
-                  </div>
-                </button>
-                
-                {isDirectorSettingsOpen && (
-                  <DirectorSettingsPanel
-                    config={directorConfig}
-                    onSave={(newConfig) => {
-                      setDirectorConfig(newConfig);
-                      triggerSave(userConstraints, clipOverrides, newConfig);
-                    }}
-                    onRegenerate={handleRegenerateCut}
-                    isRegenerating={isRegenerating}
-                    saveStatus={saveStatus}
-                    sequenceFps={fps}
-                  />
-                )}
-              </div>
+
+          <div className="p-4 border-b border-slate-800 bg-slate-900/80 shrink-0 z-10 shadow-md">
+            <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-sm overflow-hidden">
+              <button
+                onClick={() => setIsDirectorSettingsOpen(!isDirectorSettingsOpen)}
+                className="w-full flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
+              >
+                <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                  <Wand2 size={14} className="text-amber-400" />
+                  AI Director Settings
+                </h3>
+                <div className="flex items-center gap-3">
+                  {audioBpm && (
+                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full flex items-center border border-slate-700">
+                      🎵 {audioBpm} BPM
+                    </span>
+                  )}
+                  <span className="text-slate-500 font-mono text-sm">{isDirectorSettingsOpen ? '-' : '+'}</span>
+                </div>
+              </button>
+
+              {isDirectorSettingsOpen && (
+                <DirectorSettingsPanel
+                  config={directorConfig}
+                  onSave={(newConfig) => {
+                    setDirectorConfig(newConfig);
+                    triggerSave(userConstraints, clipOverrides, newConfig);
+                  }}
+                  onRegenerate={handleRegenerateCut}
+                  isRegenerating={isRegenerating}
+                  saveStatus={saveStatus}
+                  sequenceFps={fps}
+                />
+              )}
             </div>
+          </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            
+
             {isPreviewMode ? (
               orderedFinalCut.map((clip, idx) => {
                 const matchingPancakeClip = combinedTimeline.find(
@@ -854,8 +860,8 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 const seqLabel = clip.role === 'PILLAR' ? `P${pillarCount}` : `F${fillerCount}`;
 
                 return (
-                  <div 
-                    key={`fc-card-${idx}`} 
+                  <div
+                    key={`fc-card-${idx}`}
                     id={`fc-card-${idx}`}
                     onClick={() => {
                       if (videoRef.current) {
@@ -865,241 +871,241 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                     className={`p-3 rounded-lg border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${activeClipIndex === idx ? 'bg-slate-800 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-slate-900/50 border-slate-800'} transition-all`}
                     title="Clicca per spostare la playhead su questa clip nel Director's Cut"
                   >
-                     <div className="flex justify-between items-center mb-2 pointer-events-none">
-                       <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1.5 ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                         <span className="text-[9px] opacity-60 font-mono">{seqLabel}</span>
-                         {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
-                       </span>
-                       <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
-                     </div>
-                     <div className="text-xs text-slate-300 pointer-events-none mb-2">
-                       Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
-                     </div>
+                    <div className="flex justify-between items-center mb-2 pointer-events-none">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1.5 ${clip.role === 'PILLAR' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                        <span className="text-[9px] opacity-60 font-mono">{seqLabel}</span>
+                        {clip.role === 'PILLAR' ? 'PILLAR' : 'FILLER'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono">IN: {clip.timeline_in.toFixed(1)}s</span>
+                    </div>
+                    <div className="text-xs text-slate-300 pointer-events-none mb-2">
+                      Source: <span className="font-mono">{clip.source_in.toFixed(1)} &rarr; {clip.source_out.toFixed(1)}</span>
+                    </div>
 
-                     {/* Marker Rows — DB-style, click-to-seek */}
-                      {(() => {
-                        // Match constraints by source_clip_start key
-                        const constraintKey = Object.keys(userConstraints).find(
-                          k => Math.abs(parseFloat(k) - clip.source_clip_start) < 0.1
-                        );
-                        const markerList = constraintKey ? userConstraints[constraintKey] : [];
+                    {/* Marker Rows — DB-style, click-to-seek */}
+                    {(() => {
+                      // Match constraints by source_clip_start key
+                      const constraintKey = Object.keys(userConstraints).find(
+                        k => Math.abs(parseFloat(k) - clip.source_clip_start) < 0.1
+                      );
+                      const markerList = constraintKey ? userConstraints[constraintKey] : [];
 
-                        interface DCMarkerItem {
-                          isNativeBM: boolean;
-                          type: 'IN' | 'OUT' | 'BM' | 'AUDIO';
-                          time: number;
-                          markerNum?: number;
-                        }
-                        const items: DCMarkerItem[] = [];
+                      interface DCMarkerItem {
+                        isNativeBM: boolean;
+                        type: 'IN' | 'OUT' | 'BM' | 'AUDIO';
+                        time: number;
+                        markerNum?: number;
+                      }
+                      const items: DCMarkerItem[] = [];
 
-                        // Add native BM if defined and within range
-                        if (matchingPancakeClip && matchingPancakeClip.best_moment && matchingPancakeClip.best_moment > matchingPancakeClip.start && matchingPancakeClip.best_moment < matchingPancakeClip.end) {
-                          items.push({
-                            isNativeBM: true,
-                            type: 'BM',
-                            time: matchingPancakeClip.best_moment,
-                          });
-                        }
-
-                        // Add user constraints
-                        markerList.forEach((c, mIdx) => {
-                          const markerNum = globalMarkerNumbers.get(`${clip.source_clip_start.toFixed(3)}_${mIdx}`);
-                          items.push({
-                            isNativeBM: false,
-                            type: c.type,
-                            time: c.time,
-                            markerNum,
-                          });
+                      // Add native BM if defined and within range
+                      if (matchingPancakeClip && matchingPancakeClip.best_moment && matchingPancakeClip.best_moment > matchingPancakeClip.start && matchingPancakeClip.best_moment < matchingPancakeClip.end) {
+                        items.push({
+                          isNativeBM: true,
+                          type: 'BM',
+                          time: matchingPancakeClip.best_moment,
                         });
+                      }
 
-                        if (items.length === 0) return null;
+                      // Add user constraints
+                      markerList.forEach((c, mIdx) => {
+                        const markerNum = globalMarkerNumbers.get(`${clip.source_clip_start.toFixed(3)}_${mIdx}`);
+                        items.push({
+                          isNativeBM: false,
+                          type: c.type,
+                          time: c.time,
+                          markerNum,
+                        });
+                      });
 
-                        // Sort chronologically
-                        items.sort((a, b) => a.time - b.time);
+                      if (items.length === 0) return null;
 
-                        const BORDER_COLOR: Record<string, string> = {
-                          IN: '#3b82f6',
-                          OUT: '#a855f7',
-                          BM: '#f97316', // User BM is orange
-                          AUDIO: '#22c55e',
-                        };
+                      // Sort chronologically
+                      items.sort((a, b) => a.time - b.time);
 
-                        return (
-                          <div className="mb-2 flex flex-col border border-slate-800 rounded-lg overflow-hidden">
-                            {items.map((item, mIdx) => {
-                              const borderColor = item.isNativeBM ? '#eab308' : (BORDER_COLOR[item.type] ?? '#94a3b8');
-                              const typeIcon = item.type === 'BM'
-                                ? <svg width="7.5" height="10" viewBox="0 0 10 14" fill="currentColor" className="inline-block"><path d="M0 0H10V10L5 14L0 10V0Z" /></svg>
-                                : item.type === 'AUDIO' ? <span>&#9834;</span>
+                      const BORDER_COLOR: Record<string, string> = {
+                        IN: '#3b82f6',
+                        OUT: '#a855f7',
+                        BM: '#f97316', // User BM is orange
+                        AUDIO: '#22c55e',
+                      };
+
+                      return (
+                        <div className="mb-2 flex flex-col border border-slate-800 rounded-lg overflow-hidden">
+                          {items.map((item, mIdx) => {
+                            const borderColor = item.isNativeBM ? '#eab308' : (BORDER_COLOR[item.type] ?? '#94a3b8');
+                            const typeIcon = item.type === 'BM'
+                              ? <svg width="7.5" height="10" viewBox="0 0 10 14" fill="currentColor" className="inline-block"><path d="M0 0H10V10L5 14L0 10V0Z" /></svg>
+                              : item.type === 'AUDIO' ? <span>&#9834;</span>
                                 : <span className="text-[9px] font-black">{item.type}</span>;
-                              return (
-                                <button
-                                  key={`dc-marker-${mIdx}`}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSeek(item.time);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-slate-800/40 border-b border-slate-800/40 last:border-b-0 cursor-pointer group"
-                                  style={{ borderLeft: `3px solid ${borderColor}` }}
-                                >
-                                  <span className="text-[10px] shrink-0" style={{ color: borderColor }}>
-                                    {typeIcon}
-                                  </span>
+                            return (
+                              <button
+                                key={`dc-marker-${mIdx}`}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSeek(item.time);
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-slate-800/40 border-b border-slate-800/40 last:border-b-0 cursor-pointer group"
+                                style={{ borderLeft: `3px solid ${borderColor}` }}
+                              >
+                                <span className="text-[10px] shrink-0" style={{ color: borderColor }}>
+                                  {typeIcon}
+                                </span>
 
-                                  {item.isNativeBM ? (
+                                {item.isNativeBM ? (
+                                  <span
+                                    className="text-[9px] font-bold font-mono px-1 py-0 rounded shrink-0"
+                                    style={{
+                                      backgroundColor: '#eab30822',
+                                      color: '#eab308',
+                                      border: '1px solid #eab30855',
+                                    }}
+                                  >
+                                    BM
+                                  </span>
+                                ) : (
+                                  item.markerNum !== undefined && (
                                     <span
                                       className="text-[9px] font-bold font-mono px-1 py-0 rounded shrink-0"
                                       style={{
-                                        backgroundColor: '#eab30822',
-                                        color: '#eab308',
-                                        border: '1px solid #eab30855',
+                                        backgroundColor: `${borderColor}22`,
+                                        color: borderColor,
+                                        border: `1px solid ${borderColor}55`,
                                       }}
                                     >
-                                      BM
+                                      {item.type === 'IN' ? 'IN' : item.type === 'OUT' ? 'OUT' : item.type === 'BM' ? 'M' : 'A'}{item.markerNum}
                                     </span>
-                                  ) : (
-                                    item.markerNum !== undefined && (
-                                        <span
-                                          className="text-[9px] font-bold font-mono px-1 py-0 rounded shrink-0"
-                                          style={{
-                                            backgroundColor: `${borderColor}22`,
-                                            color: borderColor,
-                                            border: `1px solid ${borderColor}55`,
-                                          }}
-                                        >
-                                          {item.type === 'IN' ? 'IN' : item.type === 'OUT' ? 'OUT' : item.type === 'BM' ? 'M' : 'A'}{item.markerNum}
-                                        </span>
-                                    )
-                                  )}
+                                  )
+                                )}
 
-                                  <span className="text-[10px] font-mono text-slate-300 shrink-0">[{formatTime(item.time)}]</span>
-                                  <span className="text-[9px] font-mono text-slate-500 flex-1">
-                                    SRT {(clip.timeline_in + (item.time - clip.source_in)).toFixed(2)}s
+                                <span className="text-[10px] font-mono text-slate-300 shrink-0">[{formatTime(item.time)}]</span>
+                                <span className="text-[9px] font-mono text-slate-500 flex-1">
+                                  SRT {(clip.timeline_in + (item.time - clip.source_in)).toFixed(2)}s
+                                </span>
+
+                                {!item.isNativeBM ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (constraintKey) handleRemoveSpecificConstraint(constraintKey, item.time);
+                                    }}
+                                    className="opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-700/50 shrink-0"
+                                    style={{ color: borderColor }}
+                                    title="Remove Marker"
+                                  >
+                                    <X size={10} strokeWidth={2} />
+                                  </button>
+                                ) : (
+                                  <span className="w-[14px] h-[14px]" /> // Spacer
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Semantic Analysis Panel */}
+                    {(matchingPancakeClip) && (
+                      <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {matchedSemantic?.narrative_energy_score !== undefined && (
+                            <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 text-[10px] text-amber-400 font-medium">
+                              <Activity size={10} className="shrink-0" />
+                              <span>Energy: {matchedSemantic.narrative_energy_score}/10</span>
+                            </div>
+                          )}
+                          {matchedSemantic?.emotional_tone && matchedSemantic.emotional_tone !== 'ANALYSIS_FAILED' && (
+                            <div className="bg-blue-500/10 border border-blue-500/25 rounded px-1.5 py-0.5 text-[10px] text-blue-400 font-medium">
+                              <span>Tone: {matchedSemantic.emotional_tone}</span>
+                            </div>
+                          )}
+                          {matchedCine?.shot_size && (
+                            <div className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-300 font-bold">
+                              <span>Size: {matchedCine.shot_size}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {matchedSemantic && (
+                          <>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {matchedSemantic.subject_count !== undefined && (
+                                <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                  Subjects: {matchedSemantic.subject_count}
+                                </span>
+                              )}
+                              {matchedSemantic.gaze_direction && matchedSemantic.gaze_direction !== 'NONE' && (
+                                <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                  Gaze: {matchedSemantic.gaze_direction}
+                                </span>
+                              )}
+                              {matchedSemantic.subject_screen_position && matchedSemantic.subject_screen_position !== 'NONE' && (
+                                <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                  Pos: {matchedSemantic.subject_screen_position.replace('_', ' ')}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Location and Props */}
+                            {matchedSemantic.setting_location && matchedSemantic.setting_location !== 'ANALYSIS_FAILED' && (
+                              <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-slate-300 bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800/80 w-fit">
+                                <MapPin size={9} className="text-rose-400 shrink-0" />
+                                <span className="font-semibold text-slate-300">{matchedSemantic.setting_location}</span>
+                              </div>
+                            )}
+                            {matchedSemantic.key_props && matchedSemantic.key_props.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1 items-center">
+                                <Tag size={9} className="text-sky-400 shrink-0 mr-0.5" />
+                                {matchedSemantic.key_props.map((prop, pidx) => (
+                                  <span key={pidx} className="bg-sky-950/40 border border-sky-900/50 text-sky-400 px-1 py-0.5 rounded text-[8px] font-medium">
+                                    {prop}
                                   </span>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
 
-                                  {!item.isNativeBM ? (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (constraintKey) handleRemoveSpecificConstraint(constraintKey, item.time);
-                                      }}
-                                      className="opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-700/50 shrink-0"
-                                      style={{ color: borderColor }}
-                                      title="Remove Marker"
-                                    >
-                                      <X size={10} strokeWidth={2} />
-                                    </button>
-                                  ) : (
-                                    <span className="w-[14px] h-[14px]" /> // Spacer
-                                  )}
-                                </button>
-                              );
-                            })}
+                        {matchedCine?.scene_description && matchedCine.scene_description !== 'ANALYSIS_FAILED' && (
+                          <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-900/60">
+                            <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-0.5">Scene Description</span>
+                            {matchedCine.scene_description}
                           </div>
-                        );
-                      })()}
+                        )}
 
-                     {/* Semantic Analysis Panel */}
-                     {(matchingPancakeClip) && (
-                       <div className="mt-2.5 space-y-2 pt-2.5 border-t border-slate-800/80 text-left pointer-events-none">
-                         <div className="flex flex-wrap items-center gap-1.5">
-                           {matchedSemantic?.narrative_energy_score !== undefined && (
-                             <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 text-[10px] text-amber-400 font-medium">
-                               <Activity size={10} className="shrink-0" />
-                               <span>Energy: {matchedSemantic.narrative_energy_score}/10</span>
-                             </div>
-                           )}
-                           {matchedSemantic?.emotional_tone && matchedSemantic.emotional_tone !== 'ANALYSIS_FAILED' && (
-                             <div className="bg-blue-500/10 border border-blue-500/25 rounded px-1.5 py-0.5 text-[10px] text-blue-400 font-medium">
-                               <span>Tone: {matchedSemantic.emotional_tone}</span>
-                             </div>
-                           )}
-                           {matchedCine?.shot_size && (
-                             <div className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-300 font-bold">
-                               <span>Size: {matchedCine.shot_size}</span>
-                             </div>
-                           )}
-                         </div>
+                        {matchingPancakeClip.continuity?.match_cut_potential && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                              MATCH CUT
+                            </span>
+                            {matchingPancakeClip.continuity.match_cut_vector && matchingPancakeClip.continuity.match_cut_vector !== 'NONE' && (
+                              <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider">
+                                {matchingPancakeClip.continuity.match_cut_vector}
+                              </span>
+                            )}
+                          </div>
+                        )}
 
-                         {matchedSemantic && (
-                           <>
-                             <div className="flex flex-wrap gap-1 mt-1">
-                               {matchedSemantic.subject_count !== undefined && (
-                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
-                                   Subjects: {matchedSemantic.subject_count}
-                                 </span>
-                               )}
-                               {matchedSemantic.gaze_direction && matchedSemantic.gaze_direction !== 'NONE' && (
-                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
-                                   Gaze: {matchedSemantic.gaze_direction}
-                                 </span>
-                               )}
-                               {matchedSemantic.subject_screen_position && matchedSemantic.subject_screen_position !== 'NONE' && (
-                                 <span className="bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px] font-medium">
-                                   Pos: {matchedSemantic.subject_screen_position.replace('_', ' ')}
-                                 </span>
-                               )}
-                             </div>
-
-                             {/* Location and Props */}
-                             {matchedSemantic.setting_location && matchedSemantic.setting_location !== 'ANALYSIS_FAILED' && (
-                               <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-slate-300 bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800/80 w-fit">
-                                 <MapPin size={9} className="text-rose-400 shrink-0" />
-                                 <span className="font-semibold text-slate-300">{matchedSemantic.setting_location}</span>
-                               </div>
-                             )}
-                             {matchedSemantic.key_props && matchedSemantic.key_props.length > 0 && (
-                               <div className="mt-1 flex flex-wrap gap-1 items-center">
-                                 <Tag size={9} className="text-sky-400 shrink-0 mr-0.5" />
-                                 {matchedSemantic.key_props.map((prop, pidx) => (
-                                   <span key={pidx} className="bg-sky-950/40 border border-sky-900/50 text-sky-400 px-1 py-0.5 rounded text-[8px] font-medium">
-                                     {prop}
-                                   </span>
-                                 ))}
-                               </div>
-                             )}
-                           </>
-                         )}
-
-                         {matchedCine?.scene_description && matchedCine.scene_description !== 'ANALYSIS_FAILED' && (
-                           <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-900/60">
-                             <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-0.5">Scene Description</span>
-                             {matchedCine.scene_description}
-                           </div>
-                         )}
-
-                         {matchingPancakeClip.continuity?.match_cut_potential && (
-                           <div className="flex items-center gap-1.5 mt-1">
-                             <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                               MATCH CUT
-                             </span>
-                             {matchingPancakeClip.continuity.match_cut_vector && matchingPancakeClip.continuity.match_cut_vector !== 'NONE' && (
-                               <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider">
-                                 {matchingPancakeClip.continuity.match_cut_vector}
-                               </span>
-                             )}
-                           </div>
-                         )}
-
-                         {matchedStory?.director_note && matchedStory.director_note !== 'ANALYSIS_FAILED' && (
-                           <div className="text-[11px] text-slate-400 italic leading-relaxed border-l-2 border-slate-700 pl-2 py-0.5">
-                             <span className="text-[9px] text-slate-500 font-bold not-italic block uppercase tracking-wider mb-0.5">Director's Note</span>
-                             "{matchedStory.director_note}"
-                           </div>
-                         )}
-                       </div>
-                     )}
+                        {matchedStory?.director_note && matchedStory.director_note !== 'ANALYSIS_FAILED' && (
+                          <div className="text-[11px] text-slate-400 italic leading-relaxed border-l-2 border-slate-700 pl-2 py-0.5">
+                            <span className="text-[9px] text-slate-500 font-bold not-italic block uppercase tracking-wider mb-0.5">Director's Note</span>
+                            "{matchedStory.director_note}"
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })
             ) : (
               filteredTimeline.map((clip) => (
-                <ClipCard 
-                  key={`${clip.start}-${clip.end}`} 
-                  clip={clip} 
-                  sequenceName={sequenceName} 
+                <ClipCard
+                  key={`${clip.start}-${clip.end}`}
+                  clip={clip}
+                  sequenceName={sequenceName}
                   isActive={combinedTimeline.indexOf(clip) === activeIndex}
                   onClick={() => handleSeek(clip.start)}
                   constraints={userConstraints[clip.start.toString()]}
@@ -1134,7 +1140,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
                 <Eye className="w-4 h-4 text-emerald-400" />
                 Gemma 4 Raw Recipe
               </h3>
-              <button 
+              <button
                 onClick={() => setIsRecipeModalOpen(false)}
                 className="text-slate-500 hover:text-slate-300 transition-colors"
               >
@@ -1152,7 +1158,7 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
       {/* Phase 2: Audio Rhythm Engine Modal */}
       {isAudioModalOpen && (
-        <AudioSettingsModal 
+        <AudioSettingsModal
           sequenceName={sequenceName}
           onClose={() => {
             refetchAudioData();

@@ -51,6 +51,10 @@ export const FinalCutTimeline: React.FC<Props> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [zoomFactor, setZoomFactor] = useState<number>(1);
 
+  // ─── Left-Handed Modifiers State ──────────────────────────────────────────
+  const keysDownRef = useRef<Set<string>>(new Set());
+  const [isModifying, setIsModifying] = useState<'pan' | 'scrub' | null>(null);
+
   // Track IDs of clips explicitly dragged by the user
   const [manuallyMovedIds, setManuallyMovedIds] = useState<Set<string>>(new Set());
 
@@ -133,17 +137,17 @@ export const FinalCutTimeline: React.FC<Props> = ({
     if (activeDragId !== null) return;
     const container = scrollContainerRef.current;
     if (!container || totalDuration === 0) return;
-    
+
     const playheadPct = currentTime / totalDuration;
     const playheadPx = playheadPct * container.scrollWidth;
-    
+
     const viewportWidth = container.clientWidth;
     const scrollLeft = container.scrollLeft;
-    
+
     // Dead zone: 30% to 70% of the visible viewport
     const leftBound = scrollLeft + viewportWidth * 0.3;
     const rightBound = scrollLeft + viewportWidth * 0.7;
-    
+
     if (playheadPx > rightBound) {
       container.scrollLeft = playheadPx - viewportWidth * 0.7;
     } else if (playheadPx < leftBound) {
@@ -209,10 +213,77 @@ export const FinalCutTimeline: React.FC<Props> = ({
     [timeline, currentTime, onReorder]
   );
 
-  // Anti-seek guard: disabled during active drag
+  // ─── P/L Modifiers Key Listener ───────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
+      if (e.code === 'KeyP' || e.code === 'KeyL') {
+        keysDownRef.current.add(e.code);
+        if (keysDownRef.current.has('KeyP') && keysDownRef.current.has('KeyL')) {
+          setIsModifying('scrub');
+        } else if (keysDownRef.current.has('KeyP')) {
+          setIsModifying('pan');
+        }
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'KeyP' || e.code === 'KeyL') {
+        keysDownRef.current.delete(e.code);
+        if (keysDownRef.current.has('KeyP') && keysDownRef.current.has('KeyL')) {
+          setIsModifying('scrub');
+        } else if (keysDownRef.current.has('KeyP')) {
+          setIsModifying('pan');
+        } else {
+          setIsModifying(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // ─── P/L Modifiers Mouse Move Logic ───────────────────────────────────────
+  const handleTimelineMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const isP = keysDownRef.current.has('KeyP');
+    const isL = keysDownRef.current.has('KeyL');
+
+    if (isP && isL) {
+      // Mode 2: Scrub Playhead AND View (Timeline moves under a visually fixed playhead)
+      const container = scrollContainerRef.current;
+      if (!container || totalDuration === 0) return;
+      const deltaX = e.movementX;
+      if (deltaX === 0) return;
+
+      // 1. Pan the timeline view
+      container.scrollLeft -= deltaX;
+
+      // 2. Adjust playhead time so it stays at the exact same screen position
+      // If container moved left (-deltaX), the fixed playhead is now further right in the timeline.
+      // So time increases.
+      const timeDelta = (-deltaX / container.scrollWidth) * totalDuration;
+      onSeek(Math.max(0, Math.min(totalDuration, currentTime + timeDelta)));
+
+    } else if (isP) {
+      // Mode 1: Pan View ONLY
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const deltaX = e.movementX; // native delta since last move event
+      if (deltaX === 0) return;
+      
+      // We negate deltaX so dragging mouse right moves the view left (standard pan)
+      container.scrollLeft -= deltaX;
+    }
+  };
+
+  // Anti-seek guard: disabled during active drag or when modifying
   const handleTimelineClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (activeDragId !== null) return;
+      if (keysDownRef.current.has('KeyP') || keysDownRef.current.has('KeyL')) return;
       if (totalDuration === 0) return;
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -299,12 +370,12 @@ export const FinalCutTimeline: React.FC<Props> = ({
     const reordered: FinalCutClip[] = timeline.map((c, i) =>
       i === activeIdx
         ? {
-            ...c,
-            locked: newLockedState,
-            absolute_in: newLockedState ? c.source_in : undefined,
-            absolute_out: newLockedState ? c.source_out : undefined,
-            timeline_position: newLockedState ? c.timeline_in : undefined,
-          }
+          ...c,
+          locked: newLockedState,
+          absolute_in: newLockedState ? c.source_in : undefined,
+          absolute_out: newLockedState ? c.source_out : undefined,
+          timeline_position: newLockedState ? c.timeline_in : undefined,
+        }
         : c
     );
     onReorder(reordered);
@@ -319,17 +390,18 @@ export const FinalCutTimeline: React.FC<Props> = ({
       }
       switch (e.code) {
         case 'KeyL':
+          if (e.repeat || keysDownRef.current.has('KeyP')) break;
           e.preventDefault();
           handleLockToggle();
           break;
         case 'KeyI':
-          if (e.shiftKey) {
+          if (e.altKey) {
             e.preventDefault();
             handleInGlobal();
           }
           break;
         case 'KeyO':
-          if (e.shiftKey) {
+          if (e.altKey) {
             e.preventDefault();
             handleOutGlobal();
           }
@@ -345,8 +417,8 @@ export const FinalCutTimeline: React.FC<Props> = ({
     () =>
       activeDragId
         ? (timeline.find(
-            c => `${c.source_clip_start}_${c.source_in}` === activeDragId
-          ) ?? null)
+          c => `${c.source_clip_start}_${c.source_in}` === activeDragId
+        ) ?? null)
         : null,
     [activeDragId, timeline]
   );
@@ -407,10 +479,10 @@ export const FinalCutTimeline: React.FC<Props> = ({
       {/* Header row */}
       <div className="flex justify-between items-center text-xs text-slate-400 font-mono font-medium relative">
         <span className="text-blue-400 font-bold">{formatTime(currentTime)}</span>
-        
+
         {/* Info Popup - Ora con click e posizionato in alto */}
         <div className="relative flex items-center justify-center">
-          <button 
+          <button
             onClick={() => setIsPopupOpen(!isPopupOpen)}
             className="text-amber-500 flex items-center gap-2 hover:text-amber-400 transition-colors focus:outline-none"
           >
@@ -418,60 +490,92 @@ export const FinalCutTimeline: React.FC<Props> = ({
             DIRECTOR&apos;S CUT PREVIEW
             <Info size={14} className="opacity-70" />
           </button>
-          
+
           {isPopupOpen && (
-            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[280px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
+            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[520px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Keyboard Shortcuts
                 </h4>
                 <button onClick={() => setIsPopupOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
               </div>
-              <div className="space-y-2 text-slate-400 text-[10px] font-sans">
-                <div className="flex justify-between items-center"><span>Play / Pause</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Space</kbd></div>
-                <div className="flex justify-between items-center"><span>10 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">← / →</kbd></div>
-                <div className="flex justify-between items-center"><span>1 Frame</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + ← / →</kbd></div>
-                <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
-                <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
-                <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span>Marker IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">I / O</kbd></div>
-                <div className="flex justify-between items-center"><span>Marker Bookmark (M#)</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">M</kbd></div>
-                <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X / Backspace</kbd></div>
-                <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
-                <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
-                <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
-                <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
-                <div className="w-full h-px bg-slate-800 my-1" />
-                <div className="flex justify-between items-center"><span>Toggle Lock (Anchor Clip)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">L</kbd></div>
-                <div className="flex justify-between items-center"><span>Sequence IN (Bookend)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">Shift + I</kbd></div>
-                <div className="flex justify-between items-center"><span>Sequence OUT (Bookend)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">Shift + O</kbd></div>
+              
+              <div className="space-y-4 text-slate-400 text-[10px] font-sans">
+                
+                {/* Area 1: Global Navigation */}
+                <div>
+                  <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-blue-400/80">Global Navigation</h5>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    <div className="flex justify-between items-center"><span>Play / Pause</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Space</kbd></div>
+                    <div className="flex justify-between items-center"><span>10 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">← / →</kbd></div>
+                    <div className="flex justify-between items-center"><span>1 Frame</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + ← / →</kbd></div>
+                    <div className="flex justify-between items-center"><span>30 Frames</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Alt + ← / →</kbd></div>
+                    <div className="flex justify-between items-center"><span>Previous / Next Clip</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">↑ / ↓</kbd></div>
+                  </div>
+                </div>
+
+                {/* Area 2: Timeline Modifiers */}
+                <div>
+                  <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-amber-400/80">Timeline Interaction</h5>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    <div className="flex justify-between items-center"><span>Pan Timeline View</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">P + Drag</kbd></div>
+                    <div className="flex justify-between items-center"><span>Scrub Playhead</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">P + L + Drag</kbd></div>
+                    <div className="flex justify-between items-center"><span>Toggle Lock (Anchor Clip)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">L</kbd></div>
+                  </div>
+                </div>
+
+                {/* Area 3: Markers & Macros */}
+                <div>
+                  <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-emerald-400/80">Markers & Status (Hovering Clip)</h5>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    <div className="flex justify-between items-center"><span>Marker IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">I / O</kbd></div>
+                    <div className="flex justify-between items-center"><span>Remove IN / OUT</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + I / O</kbd></div>
+                    
+                    <div className="flex justify-between items-center"><span>Marker Bookmark (M#)</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">M</kbd></div>
+                    <div className="flex justify-between items-center"><span>Remove BM Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + M</kbd></div>
+                    
+                    <div className="flex justify-between items-center"><span>Force Status: KEEP</span><kbd className="bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono border border-emerald-800/50">K</kbd></div>
+                    <div className="flex justify-between items-center"><span>Force Status: TRASH</span><kbd className="bg-red-900/50 px-1.5 py-0.5 rounded text-red-400 font-mono border border-red-800/50">T</kbd></div>
+                    
+                    <div className="flex justify-between items-center"><span>Force Status: B-ROLL</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">B</kbd></div>
+                    <div className="flex justify-between items-center"><span>Remove Single Marker</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">X</kbd></div>
+                    
+                    <div className="flex justify-between items-center"><span>Remove All Markers</span><kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono border border-slate-700">Shift + X</kbd></div>
+                    <div className="col-start-2"></div>
+                    
+                    <div className="col-span-2 w-full h-px bg-slate-800/50 my-0.5" />
+                    
+                    <div className="flex justify-between items-center"><span>Sequence IN (Bookend)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">Alt + I</kbd></div>
+                    <div className="flex justify-between items-center"><span>Sequence OUT (Bookend)</span><kbd className="bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-400 font-mono border border-blue-800/50">Alt + O</kbd></div>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
         </div>
-          {/* Bookend Macro Buttons: lock active clip to sequence start/end */}
-          <div className="flex items-center gap-1 mr-1">
-            <button
-              id="btn-in-global"
-              onClick={handleInGlobal}
-              title="Lock active clip as Sequence IN (position 0). Double-click a locked clip to unlock."
-              className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
-            >
-              <LogIn size={10} />
-              IN
-            </button>
-            <button
-              id="btn-out-global"
-              onClick={handleOutGlobal}
-              title="Lock active clip as Sequence OUT (end position). Double-click a locked clip to unlock."
-              className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
-            >
-              <LogOut size={10} />
-              OUT
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
+        {/* Bookend Macro Buttons: lock active clip to sequence start/end */}
+        <div className="flex items-center gap-1 mr-1">
+          <button
+            id="btn-in-global"
+            onClick={handleInGlobal}
+            title="Lock active clip as Sequence IN (position 0). Double-click a locked clip to unlock."
+            className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
+          >
+            <LogIn size={10} />
+            IN
+          </button>
+          <button
+            id="btn-out-global"
+            onClick={handleOutGlobal}
+            title="Lock active clip as Sequence OUT (end position). Double-click a locked clip to unlock."
+            className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors text-[10px] font-bold tracking-wider"
+          >
+            <LogOut size={10} />
+            OUT
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 mr-2">
             <span className="text-[9px] uppercase tracking-widest text-slate-500">Zoom</span>
             <input
@@ -514,179 +618,179 @@ export const FinalCutTimeline: React.FC<Props> = ({
           {/* Layer 2: Zoom Container */}
           <div
             ref={trackRef}
-            className="relative h-12 bg-slate-800 cursor-pointer"
+            className={`relative h-12 bg-slate-800 ${isModifying === 'pan' ? 'cursor-grab' : isModifying === 'scrub' ? 'cursor-col-resize' : 'cursor-pointer'}`}
             style={{ width: `${zoomFactor * 100}%`, minWidth: '100%' }}
             onClick={handleTimelineClick}
+            onMouseMove={handleTimelineMouseMove}
           >
             {/* Layer 3: FLEX CLIP TRACK — replaces absolute-positioned clips */}
             <SortableContext items={items} strategy={horizontalListSortingStrategy}>
               <div className="flex flex-row h-full w-full">
-              {timeline.map((clip) => {
-                const widthPct =
-                  totalDuration > 0
-                    ? ((clip.timeline_out - clip.timeline_in) / totalDuration) * 100
-                    : 0;
+                {timeline.map((clip) => {
+                  const widthPct =
+                    totalDuration > 0
+                      ? ((clip.timeline_out - clip.timeline_in) / totalDuration) * 100
+                      : 0;
 
-                // Stable label: look up position in ORIGINAL Gemma order (immutable)
-                const origIdx = originalTimeline.findIndex(
-                  c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1
-                    && Math.abs(c.source_in - clip.source_in) < 0.01
-                );
-                let pCount = 0; let fCount = 0;
-                for (let k = 0; k <= origIdx && k < originalTimeline.length; k++) {
-                  if (originalTimeline[k].role === 'PILLAR') pCount++;
-                  else fCount++;
-                }
-                const seqLabel = clip.role === 'PILLAR' ? `P${pCount}` : `F${fCount}`;
-                
-                const clipId = `${clip.source_clip_start}_${clip.source_in}`;
-                const isMoved = manuallyMovedIds.has(clipId);
+                  // Stable label: look up position in ORIGINAL Gemma order (immutable)
+                  const origIdx = originalTimeline.findIndex(
+                    c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1
+                      && Math.abs(c.source_in - clip.source_in) < 0.01
+                  );
+                  let pCount = 0; let fCount = 0;
+                  for (let k = 0; k <= origIdx && k < originalTimeline.length; k++) {
+                    if (originalTimeline[k].role === 'PILLAR') pCount++;
+                    else fCount++;
+                  }
+                  const seqLabel = clip.role === 'PILLAR' ? `P${pCount}` : `F${fCount}`;
 
-                return (
-                  <div
-                    key={clipId}
-                    onDoubleClick={(e) => handleClipDoubleClick(e, clipId)}
-                    style={{ flex: `0 0 ${widthPct}%`, height: '100%', position: 'relative' }}
-                  >
-                    <SortableTimelineClip
-                      id={clipId}
-                      clip={clip}
-                      widthPct={100}
-                      seqLabel={seqLabel}
-                      isMoved={isMoved}
-                      isLocked={clip.locked === true}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </SortableContext>
+                  const clipId = `${clip.source_clip_start}_${clip.source_in}`;
+                  const isMoved = manuallyMovedIds.has(clipId);
 
-          {/* MARKER OVERLAY — z-[20]: above waveform (z-[15]), below playhead (z-[25]).
+                  return (
+                    <div
+                      key={clipId}
+                      onDoubleClick={(e) => handleClipDoubleClick(e, clipId)}
+                      style={{ flex: `0 0 ${widthPct}%`, height: '100%', position: 'relative' }}
+                    >
+                      <SortableTimelineClip
+                        id={clipId}
+                        clip={clip}
+                        widthPct={100}
+                        seqLabel={seqLabel}
+                        isMoved={isMoved}
+                        isLocked={clip.locked === true}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </SortableContext>
+
+            {/* MARKER OVERLAY — z-[20]: above waveform (z-[15]), below playhead (z-[25]).
               Markers positioned absolutely on the TRACK. markerNumbers from PancakeDashboard
               (Stringout-first namespace): key = `${clip.start.toFixed(3)}_${mIdx}`. */}
-          <div className="absolute inset-0 z-[20] pointer-events-none">
-            {timeline.map((clip, cIdx) => {
-              const clipStartPct = totalDuration > 0 ? (clip.timeline_in / totalDuration) * 100 : 0;
-              const clipWidthPct = totalDuration > 0 ? ((clip.timeline_out - clip.timeline_in) / totalDuration) * 100 : 0;
+            <div className="absolute inset-0 z-[20] pointer-events-none">
+              {timeline.map((clip, cIdx) => {
+                const clipStartPct = totalDuration > 0 ? (clip.timeline_in / totalDuration) * 100 : 0;
+                const clipWidthPct = totalDuration > 0 ? ((clip.timeline_out - clip.timeline_in) / totalDuration) * 100 : 0;
 
-              let constraints: UserConstraint[] = [];
-              for (const key of Object.keys(userConstraints)) {
-                if (Math.abs(parseFloat(key) - clip.source_clip_start) < 0.1) {
-                  constraints = userConstraints[key];
-                  break;
+                let constraints: UserConstraint[] = [];
+                for (const key of Object.keys(userConstraints)) {
+                  if (Math.abs(parseFloat(key) - clip.source_clip_start) < 0.1) {
+                    constraints = userConstraints[key];
+                    break;
+                  }
                 }
-              }
 
-              return constraints.map((c, mIdx) => {
-                if (c.type !== 'BM' && c.type !== 'IN' && c.type !== 'OUT') return null;
-                const relativePos = (clip.source_out - clip.source_in) > 0
-                  ? ((c.time - clip.source_in) / (clip.source_out - clip.source_in))
-                  : 0;
-                if (relativePos < 0 || relativePos > 1) return null;
-                const absoluteLeftPct = clipStartPct + relativePos * clipWidthPct;
-                const isClosest = nearestMarker === `${cIdx}-${mIdx}`;
-                // Lookup via Stringout-aligned key: source_clip_start matches clip.start
-                const markerNum = markerNumbers.get(`${clip.source_clip_start.toFixed(3)}_${mIdx}`);
-                return (
-                  <div
-                    key={`overlay-marker-${cIdx}-${mIdx}`}
-                    className="absolute flex flex-col items-center pointer-events-none"
-                    style={{
-                      left: `${absoluteLeftPct}%`,
-                      top: '50%',
-                      transform: `translate(-50%, -50%) ${isClosest ? 'scale(1.3)' : 'scale(1)'}`,
-                      transition: 'transform 150ms',
-                    }}
-                  >
-                    {/* Marker icon */}
+                return constraints.map((c, mIdx) => {
+                  if (c.type !== 'BM' && c.type !== 'IN' && c.type !== 'OUT') return null;
+                  const relativePos = (clip.source_out - clip.source_in) > 0
+                    ? ((c.time - clip.source_in) / (clip.source_out - clip.source_in))
+                    : 0;
+                  if (relativePos < 0 || relativePos > 1) return null;
+                  const absoluteLeftPct = clipStartPct + relativePos * clipWidthPct;
+                  const isClosest = nearestMarker === `${cIdx}-${mIdx}`;
+                  // Lookup via Stringout-aligned key: source_clip_start matches clip.start
+                  const markerNum = markerNumbers.get(`${clip.source_clip_start.toFixed(3)}_${mIdx}`);
+                  return (
                     <div
-                      className={`text-[12px] font-black transition-all duration-150 ${
-                        isClosest ? 'drop-shadow-[0_0_5px_rgba(255,255,255,1)]' : 'drop-shadow-md'
-                      }`}
+                      key={`overlay-marker-${cIdx}-${mIdx}`}
+                      className="absolute flex flex-col items-center pointer-events-none"
                       style={{
-                        color:
-                          c.type === 'IN' ? '#3b82f6'
-                          : c.type === 'OUT' ? '#a855f7'
-                          : isClosest ? '#fbbf24' : '#ffffff',
+                        left: `${absoluteLeftPct}%`,
+                        top: '50%',
+                        transform: `translate(-50%, -50%) ${isClosest ? 'scale(1.3)' : 'scale(1)'}`,
+                        transition: 'transform 150ms',
                       }}
                     >
-                      {c.type === 'IN' && '['}
-                      {c.type === 'OUT' && ']'}
-                      {c.type === 'BM' && (
-                        <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
-                          <path d="M0 0H10V10L5 14L0 10V0Z" />
-                        </svg>
-                      )}
-                    </div>
-                    {/* M# label — 9px, visible above the track center */}
-                    {markerNum !== undefined && (
-                      <span
-                        className="text-[9px] font-bold font-mono leading-none mt-[2px]"
+                      {/* Marker icon */}
+                      <div
+                        className={`text-[12px] font-black transition-all duration-150 ${isClosest ? 'drop-shadow-[0_0_5px_rgba(255,255,255,1)]' : 'drop-shadow-md'
+                          }`}
                         style={{
-                          color: isClosest ? '#fbbf24' : 'rgba(255,255,255,0.85)',
-                          textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+                          color:
+                            c.type === 'IN' ? '#3b82f6'
+                              : c.type === 'OUT' ? '#a855f7'
+                                : isClosest ? '#fbbf24' : '#ffffff',
                         }}
                       >
-                        M{markerNum}
-                      </span>
-                    )}
-                  </div>
-                );
+                        {c.type === 'IN' && '['}
+                        {c.type === 'OUT' && ']'}
+                        {c.type === 'BM' && (
+                          <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                            <path d="M0 0H10V10L5 14L0 10V0Z" />
+                          </svg>
+                        )}
+                      </div>
+                      {/* M# label — 9px, visible above the track center */}
+                      {markerNum !== undefined && (
+                        <span
+                          className="text-[9px] font-bold font-mono leading-none mt-[2px]"
+                          style={{
+                            color: isClosest ? '#fbbf24' : 'rgba(255,255,255,0.85)',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+                          }}
+                        >
+                          M{markerNum}
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })}
+            </div>
+
+            {/* Audio Waveform Overlay — pointer-events-none, non-participant in DnD */}
+            {audioWaveforms && audioDuration > 0 && (() => {
+              const activeWaveform = audioWaveforms[waveformView] || [];
+              if (activeWaveform.length === 0) return null;
+
+              const pointsPerSecond = activeWaveform.length / audioDuration;
+              const pointsToShow = Math.ceil(totalDuration * pointsPerSecond);
+              const visibleWaveform = activeWaveform.slice(0, pointsToShow);
+              if (visibleWaveform.length === 0) return null;
+              const svgW = 1000;
+              const svgH = 100;
+              const step = svgW / visibleWaveform.length;
+              let pathD = `M 0,${svgH}`;
+              visibleWaveform.forEach((val, idx) => {
+                pathD += ` L ${(idx * step).toFixed(2)},${(svgH - val * svgH).toFixed(2)}`;
               });
-            })}
-          </div>
+              pathD += ` L ${svgW},${svgH} Z`;
+              return (
+                <div className="absolute inset-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
+                  <svg
+                    viewBox={`0 0 ${svgW} ${svgH}`}
+                    preserveAspectRatio="none"
+                    className="w-full h-full fill-emerald-400"
+                  >
+                    <path d={pathD} />
+                  </svg>
+                </div>
+              );
+            })()}
 
-          {/* Audio Waveform Overlay — pointer-events-none, non-participant in DnD */}
-          {audioWaveforms && audioDuration > 0 && (() => {
-            const activeWaveform = audioWaveforms[waveformView] || [];
-            if (activeWaveform.length === 0) return null;
-            
-            const pointsPerSecond = activeWaveform.length / audioDuration;
-            const pointsToShow = Math.ceil(totalDuration * pointsPerSecond);
-            const visibleWaveform = activeWaveform.slice(0, pointsToShow);
-            if (visibleWaveform.length === 0) return null;
-            const svgW = 1000;
-            const svgH = 100;
-            const step = svgW / visibleWaveform.length;
-            let pathD = `M 0,${svgH}`;
-            visibleWaveform.forEach((val, idx) => {
-              pathD += ` L ${(idx * step).toFixed(2)},${(svgH - val * svgH).toFixed(2)}`;
-            });
-            pathD += ` L ${svgW},${svgH} Z`;
-            return (
-              <div className="absolute inset-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
-                <svg
-                  viewBox={`0 0 ${svgW} ${svgH}`}
-                  preserveAspectRatio="none"
-                  className="w-full h-full fill-emerald-400"
-                >
-                  <path d={pathD} />
-                </svg>
-              </div>
-            );
-          })()}
-
-          {/* Premiere-style Playhead — z-[25], pointer-events-none, RAF-driven via prop */}
-          <div
-            className="absolute top-0 bottom-0 z-[25] pointer-events-none transition-all duration-75 ease-linear flex flex-col items-center"
-            style={{
-              left: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%`,
-              transform: 'translateX(-50%)',
-            }}
-          >
-            <svg
-              width="11"
-              height="12"
-              viewBox="0 0 11 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="text-blue-500 drop-shadow-[0_0_4px_rgba(59,130,246,0.8)]"
+            {/* Premiere-style Playhead — z-[25], pointer-events-none, RAF-driven via prop */}
+            <div
+              className="absolute top-0 bottom-0 z-[25] pointer-events-none transition-all duration-75 ease-linear flex flex-col items-center"
+              style={{
+                left: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%`,
+                transform: 'translateX(-50%)',
+              }}
             >
-              <path d="M0 0H11V6L5.5 12L0 6V0Z" fill="currentColor" />
-            </svg>
-            <div className="w-[2px] h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)]" />
-          </div>
+              <svg
+                width="11"
+                height="12"
+                viewBox="0 0 11 12"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="text-blue-500 drop-shadow-[0_0_4px_rgba(59,130,246,0.8)]"
+              >
+                <path d="M0 0H11V6L5.5 12L0 6V0Z" fill="currentColor" />
+              </svg>
+              <div className="w-[2px] h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)]" />
+            </div>
           </div>
         </div>
 

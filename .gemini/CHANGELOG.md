@@ -1,8 +1,31 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.46 - 2026-05-21
+**Version:** v0.1.48 - 2026-05-22
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.47 → v0.1.48
+
+### 1. UX/UI Keyboard Shortcuts Overhaul
+- **P/L Mouse Modifiers:** Implemented tracking for P and L keys as modifiers for timeline dragging. `P + Drag` pans the view while keeping the playhead static. `P + L + Drag` scrubs the playhead.
+- **Categorized Keyboard Modal:** Restructured the Keyboard Shortcuts modal in both `InteractiveTimeline` and `FinalCutTimeline` into a 2-column layout organized by "Area of Intervention" (Global Navigation, Timeline Interaction, Markers & Status).
+
+### 2. Selective Marker Deletion
+- **Shift + Marker Keys:** Added functionality to delete only specific categories of markers from the hovered clip using `Shift + I` (IN), `Shift + O` (OUT), `Shift + M` (Bookmarks), and `Shift + A` (Audio).
+- **Macro Rerouting:** Updated `useVideoShortcuts.ts` to emit specific `CLEAR_TYPE_[CATEGORY]` constraints when Shift is held.
+- **Dashboard Handler:** Upgraded `PancakeDashboard.tsx` to intercept `CLEAR_TYPE_*` constraints and filter out only the target marker type locally.
+
+### 3. Bookend Macro Conflict Resolution
+- **Rebinding:** Moved the "Sequence IN/OUT (Bookend)" macros in `FinalCutTimeline` from `Shift + I / O` to `Alt + I / O` to prevent conflicts with the new selective deletion logic.
+
+### 4. Architectural Rules
+- **DRY Axiom:** Added `LAW 11 — THE DRY PRINCIPLE AXIOM` to `GEMINI.md` to permanently forbid the duplication of core UI components and sync handlers, setting the stage for the upcoming Universal Timeline Refactoring.
+
+### Validation
+- **TypeScript:** Validated via Husky / Pre-commit.
+- **ESLint:** Clean.
 
 ---
 

@@ -36,8 +36,8 @@ export default function App() {
             setCurrentView('editor');
           }} />
           <div className="mt-8 flex justify-center w-full">
-            <button 
-              onClick={() => setCurrentView('editor')} 
+            <button
+              onClick={() => setCurrentView('editor')}
               className="text-slate-500 underline text-sm hover:text-slate-300 transition-colors"
             >
               Skip Setup & Go to Editor
