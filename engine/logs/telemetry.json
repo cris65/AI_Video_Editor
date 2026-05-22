@@ -41,6 +41,12 @@
       "weight": 1.08,
       "duration_sec": 3.54,
       "ratio": 3.2838
+    },
+    {
+      "timestamp": 1779492967.786793,
+      "weight": 1.08,
+      "duration_sec": 3.16,
+      "ratio": 2.9285
     }
   ],
   "video_extraction": [

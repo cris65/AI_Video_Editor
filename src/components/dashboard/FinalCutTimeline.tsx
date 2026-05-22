@@ -747,7 +747,7 @@ export const FinalCutTimeline: React.FC<Props> = ({
               if (activeWaveform.length === 0) return null;
 
               const pointsPerSecond = activeWaveform.length / audioDuration;
-              const pointsToShow = Math.ceil(totalDuration * pointsPerSecond);
+              const pointsToShow = Math.ceil(Math.min(totalDuration, audioDuration) * pointsPerSecond);
               const visibleWaveform = activeWaveform.slice(0, pointsToShow);
               if (visibleWaveform.length === 0) return null;
               const svgW = 1000;
@@ -758,8 +758,14 @@ export const FinalCutTimeline: React.FC<Props> = ({
                 pathD += ` L ${(idx * step).toFixed(2)},${(svgH - val * svgH).toFixed(2)}`;
               });
               pathD += ` L ${svgW},${svgH} Z`;
+              
+              const waveformWidthPct = totalDuration > 0 ? (Math.min(audioDuration, totalDuration) / totalDuration) * 100 : 0;
+              
               return (
-                <div className="absolute inset-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
+                <div 
+                  className="absolute inset-y-0 left-0 opacity-40 pointer-events-none z-[15] mix-blend-screen overflow-hidden"
+                  style={{ width: `${waveformWidthPct}%` }}
+                >
                   <svg
                     viewBox={`0 0 ${svgW} ${svgH}`}
                     preserveAspectRatio="none"

@@ -6,6 +6,35 @@ This file logs the cumulative release walkthroughs, detailing code changes, arch
 
 ---
 
+## 🐺 Walkthrough — v0.1.53 → v0.1.54
+
+### Sommario
+
+Migliorata sensibilmente l'UX e l'affidabilità dell'**Audio Rhythm Engine**.
+- La `FinalCutTimeline` ora confina correttamente l'onda verde alla sua durata reale, eliminando gli artefatti visivi di stretching.
+- Aggiunto un sistema di notifica intelligente nella modale audio se la traccia caricata è più corta della durata del montaggio (`target_duration`), con una **Checkbox di Sync rapida** per far combaciare istantaneamente la durata del montaggio all'audio.
+- Implementata la **Pre-idratazione di Stato**: la Dashboard inietta i dati ritmici precedentemente caricati dentro la modale audio. Questo elimina lo "stato vuoto" quando l'utente riapre il pannello, aggiungendo un alert "Ready for Processing" e cambiando il pulsante principale in "REGENERATE AUDIO" con palette `teal-600`.
+- Aggiornato l'`api_server.py` per accettare formati musicali nativi estesi tramite Librosa (`.m4a`, `.aac`, `.flac`, `.wav`), ed aggiornato il copy introduttivo di `App.tsx` mandando in pensione la raccomandazione del vecchio `.mp3`.
+
+### File Modificati
+
+| File | +Ins | -Del | Descrizione |
+|---|---|---|---|
+| `package.json` | 1 | 1 | Bump v0.1.54 |
+| `SOTA.md` | 1 | 1 | Documentazione Audio Modal Pre-hydration & Sync. |
+| `engine/api_server.py` | 2 | 2 | Estensione formati audio (`m4a`, `aac`, `flac`). |
+| `src/App.tsx` | 3 | 3 | Update UI copy per formati Lossless/Moderni. |
+| `src/components/dashboard/PancakeDashboard.tsx` | 7 | 0 | Propagazione `initialAudioData` verso `AudioSettingsModal`. |
+| `src/components/dashboard/AudioSettingsModal.tsx` | 26 | 5 | Inserimento Alert Warning, Checkbox Sync Duration e Pre-idratazione dati (Ready State + Regenerate Button). |
+| `src/components/dashboard/FinalCutTimeline.tsx` | 8 | 2 | Fix `waveformWidthPct` e SVG width cap per audio più corti della sequenza. |
+
+### Validazione
+- **ESLint:** PASS (0 errors, 0 warnings)
+- **TypeScript (TSC):** PASS
+- **Status:** APPROVED & COMMITTED
+
+---
+
 ## 🐺 Walkthrough — v0.1.52 → v0.1.53
 
 ### Sommario

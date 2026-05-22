@@ -1313,6 +1313,13 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       {isAudioModalOpen && (
         <AudioSettingsModal
           sequenceName={sequenceName}
+          currentDuration={directorConfig.target_duration}
+          onUpdateDuration={(newDur) => setDirectorConfig(prev => ({ ...prev, target_duration: newDur }))}
+          initialAudioData={
+            audioDuration && audioBpm && audioWaveforms
+              ? { bpm: audioBpm, duration: audioDuration, waveform: audioWaveforms.amplitude || [] }
+              : null
+          }
           onClose={() => {
             refetchAudioData();
             setIsAudioModalOpen(false);

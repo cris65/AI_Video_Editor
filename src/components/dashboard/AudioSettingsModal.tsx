@@ -5,17 +5,21 @@ import { toast } from 'react-hot-toast';
 
 interface AudioSettingsModalProps {
   sequenceName: string;
+  currentDuration: number;
+  onUpdateDuration: (newDur: number) => void;
+  initialAudioData: { bpm: number; duration: number; waveform: number[] } | null;
   onClose: () => void;
 }
 
-export function AudioSettingsModal({ sequenceName, onClose }: AudioSettingsModalProps) {
+export function AudioSettingsModal({ sequenceName, currentDuration, onUpdateDuration, initialAudioData, onClose }: AudioSettingsModalProps) {
   const [audioFiles, setAudioFiles] = useState<{name: string, size_mb: number, type: string, estimated_eta_sec: number}[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   
-  const [audioData, setAudioData] = useState<{ bpm: number; duration: number; waveform: number[], processingTime?: number } | null>(null);
+  const [audioData, setAudioData] = useState<{ bpm: number; duration: number; waveform: number[], processingTime?: number } | null>(initialAudioData);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [syncDurationChecked, setSyncDurationChecked] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -87,6 +91,13 @@ export function AudioSettingsModal({ sequenceName, onClose }: AudioSettingsModal
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleClose = () => {
+    if (syncDurationChecked && audioData) {
+      onUpdateDuration(audioData.duration);
+    }
+    onClose();
   };
 
   return createPortal(
@@ -174,6 +185,12 @@ export function AudioSettingsModal({ sequenceName, onClose }: AudioSettingsModal
               </h3>
               
               <div className="flex flex-col gap-4">
+                {initialAudioData && (
+                  <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2 text-emerald-400 text-[11px] mb-1">
+                    <Check size={14} className="shrink-0" />
+                    <span><strong>Ready for Processing:</strong> Audio rhythm data is already loaded for this sequence.</span>
+                  </div>
+                )}
                 <div className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl mb-2 flex items-center justify-center relative overflow-hidden shadow-inner">
                   {!audioData ? (
                     <>
@@ -227,7 +244,9 @@ export function AudioSettingsModal({ sequenceName, onClose }: AudioSettingsModal
                   className={`w-full py-4 rounded-xl font-black text-sm tracking-widest uppercase transition-all flex items-center justify-center gap-2 ${
                     isAnalyzing || !selectedFile
                       ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]'
+                      : initialAudioData
+                        ? 'bg-teal-600 hover:bg-teal-500 text-white shadow-[0_0_20px_rgba(13,148,136,0.3)] hover:scale-[1.02]'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]'
                   }`}
                 >
                   {isAnalyzing ? (
@@ -242,13 +261,32 @@ export function AudioSettingsModal({ sequenceName, onClose }: AudioSettingsModal
                   ) : (
                     <>
                       <Activity size={18} />
-                      Analyze Rhythm
+                      {initialAudioData ? 'Regenerate Audio' : 'Analyze Rhythm'}
                     </>
                   )}
                 </button>
                 <p className="text-[10px] text-slate-500 text-center">
                   This will generate <code className="text-slate-400">_audio_beats.json</code> for the Director's Cut.
                 </p>
+
+                {audioData && audioData.duration < currentDuration && (
+                  <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-500 text-xs flex flex-col gap-3">
+                    <p className="leading-relaxed">
+                      ⚠️ <strong className="font-bold">Warning:</strong> The selected audio track ({audioData.duration}s) is shorter than your current Target Video Duration ({currentDuration}s). For a proper beat-synced edit, the audio should be longer.
+                    </p>
+                    <label className="flex items-start gap-2 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        className="mt-0.5 accent-amber-500" 
+                        checked={syncDurationChecked}
+                        onChange={(e) => setSyncDurationChecked(e.target.checked)}
+                      />
+                      <span className="text-amber-400/90 group-hover:text-amber-300 transition-colors">
+                        Force Target Video Duration to match this audio rhythm length ({audioData.duration}s)
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -258,7 +296,7 @@ export function AudioSettingsModal({ sequenceName, onClose }: AudioSettingsModal
         {/* Footer Actions */}
         <div className="p-6 border-t border-slate-800 bg-slate-900 flex justify-end gap-4 shrink-0">
           <button 
-            onClick={onClose}
+            onClick={handleClose}
             className="px-8 py-2.5 rounded-lg font-bold text-sm bg-slate-800 hover:bg-slate-700 text-white transition-all flex items-center gap-2 border border-slate-700 shadow-sm"
           >
             <Check size={18} className="text-emerald-400" />
