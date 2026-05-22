@@ -1,8 +1,25 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.48 - 2026-05-22
+**Version:** v0.1.49 - 2026-05-22
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.48 → v0.1.49
+
+### 1. UX/UI Restorations
+- **Engine Control Recovery:** Restored the "Engine Control" button to the `PancakeDashboard` Master Toggle header, which had been accidentally dropped in prior refactorings.
+- **Routing Hookup:** Plumbed `onOpenEngine` prop down from `App.tsx` through `PancakeDashboardProps` so that clicking the Engine Control button cleanly triggers a top-level state change back to the `ImageEngineControls` (`setup`) view.
+- **Iconography:** Assigned the `Cpu` icon from Lucide-React to cleanly identify the Engine.
+
+### 2. Python Engine Pipeline Adjustments
+- **Director Config Serialization:** Added robust boolean parsing in `director.py` (for `fast_cut`, `social_media`, `rhythmic`) to correctly convert `"true"` string payloads arriving from the Frontend JSON into true Python Booleans before passing them down the MLX Pipeline.
+
+### Validation
+- **TypeScript:** Validated via Husky / Pre-commit.
+- **ESLint:** Clean.
+- **State Navigation:** Confirmed seamless visual handoff back and forth between Editor and Setup views.
 
 ---
 

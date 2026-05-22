@@ -60,7 +60,13 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
 
     clip_list_str = []
     for c in usable_clips:
-        role = "MUST INCLUDE (PILLAR)" if c.get('_has_bm') else "OPTIONAL (FILLER)"
+        if c.get('_has_audio_marker'):
+            role = "MUST INCLUDE (AUDIO SYNC)"
+        elif c.get('_has_bm'):
+            role = "MUST INCLUDE (PILLAR)"
+        else:
+            role = "OPTIONAL (FILLER)"
+            
         if c.get('_is_global_in'):
             role += " - ABSOLUTE FIRST CLIP OF SEQUENCE"
         if c.get('_is_global_out'):
@@ -101,7 +107,17 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
             "SOUNDTRACK DETECTED: You must strictly align clip boundaries and durations to the provided audio beat timestamps. "
             "Use the rhythm grid to determine when to cut.\n"
         )
-        audio_context = f"\n\n[RHYTHM CONTEXT]\nBPM: {audio_bpm}\nBeats Grid (seconds): {audio_beats}\n"
+        
+        formatted_beats = []
+        for b in audio_beats:
+            if isinstance(b, dict):
+                formatted_beats.append({"time": b.get("time", 0.0), "energy": b.get("energy", 0.5)})
+            else:
+                formatted_beats.append({"time": float(b), "energy": 0.5})
+                
+        beats_grid_str = json.dumps(formatted_beats)
+        
+        audio_context = f"\n\n[RHYTHM CONTEXT]\nBPM: {audio_bpm}\nBeats Grid: {beats_grid_str}\n"
 
     system_prompt = (
         locked_constraint_text
@@ -233,7 +249,9 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     overrides = hitl.get("clip_overrides", {})
     constraints = hitl.get("hitl_constraints", {})
     director_config = hitl.get("director_config", {})
-    beats = audio.get("beats", [])
+    
+    raw_beats = audio.get("beats", [])
+    beats = [b.get("time", 0.0) if isinstance(b, dict) else float(b) for b in raw_beats]
     
     if not beats:
         print("⚠️ Nessun beat trovato. Fallback a timecode continui a 120BPM.")
@@ -279,6 +297,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         clip['_in_time'] = None
         clip['_has_out'] = False
         clip['_out_time'] = None
+        clip['_has_audio_marker'] = False
 
         c_list = constraints.get(clip_key, [])
         for c in c_list:
@@ -291,6 +310,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
             elif c['type'] == 'OUT':
                 clip['_has_out'] = True
                 clip['_out_time'] = c['time']
+            elif c['type'] == 'AUDIO':
+                clip['_has_audio_marker'] = True
 
         # --- HITL Lock detection ---
         is_locked = False

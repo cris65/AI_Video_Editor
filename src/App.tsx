@@ -49,6 +49,9 @@ export default function App() {
   }
 
   return (
-    <PancakeDashboard sequenceName={sequenceName} />
+    <PancakeDashboard 
+      sequenceName={sequenceName} 
+      onOpenEngine={() => setCurrentView('setup')}
+    />
   );
 }

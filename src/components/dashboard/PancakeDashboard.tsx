@@ -8,7 +8,7 @@ import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { AudioSettingsModal } from './AudioSettingsModal';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music } from 'lucide-react';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music, Cpu } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 
 function formatTime(seconds: number): string {
@@ -48,6 +48,7 @@ interface TelemetryRecord {
 
 interface PancakeDashboardProps {
   sequenceName: string;
+  onOpenEngine?: () => void;
 }
 
 export type ConstraintType = 'IN' | 'OUT' | 'BM' | 'AUDIO';
@@ -62,7 +63,7 @@ export interface AudioMarkerFilter {
   minEnergy: number;
 }
 
-export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
+export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName, onOpenEngine }) => {
   const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveforms, audioBeats, loading, error, refetchFinalCut, refetchAudioData } = usePancakeData(sequenceName);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -600,6 +601,15 @@ export function PancakeDashboard({ sequenceName }: PancakeDashboardProps) {
 
         {/* Master Toggle */}
         <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700 shadow-inner mx-2">
+          <button
+            onClick={onOpenEngine}
+            className="flex items-center gap-1.5 px-3 py-1 mr-1 text-[10px] font-bold rounded-md transition-all bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30"
+            title="Image Engine Controls"
+          >
+            <Cpu size={12} />
+            Engine Control
+          </button>
+
           <button
             onClick={() => setIsPreviewMode(false)}
             className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${!isPreviewMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
