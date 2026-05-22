@@ -1,7 +1,8 @@
 import os
 import json
-import requests
 import re
+import time
+import datetime
 
 try:
     from mlx_lm import load, generate
@@ -10,14 +11,15 @@ try:
         _make_sampler = make_sampler
     except ImportError:
         import mlx.core as _mx
-        def _make_sampler(temp=0.3, **_kw):
+        def _make_sampler(temp: float = 0.3, **_kw):
             if temp == 0.0:
                 return lambda logits: _mx.argmax(logits, axis=-1)
             return lambda logits: _mx.random.categorical(logits * (1.0 / temp))
     MLX_LM_AVAILABLE = True
 except ImportError:
     MLX_LM_AVAILABLE = False
-    _make_sampler = None
+    def _make_sampler(temp: float = 0.3, **_kw):
+        raise RuntimeError("mlx_lm not available — sampler cannot be constructed")
 
 def check_director_llm_available():
     """
@@ -178,6 +180,7 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
             prompt = system_prompt + "\n\n" + chat_input[1]["content"]
 
         print("🧠 Invocazione LLM (Inferenza in corso)...")
+        _t_start = time.perf_counter()
         output = generate(
             model,
             processor,
@@ -186,17 +189,78 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
             sampler=_make_sampler(temp=0.3),
             verbose=False
         )
-        
+        _inference_time = round(time.perf_counter() - _t_start, 2)
+
         recipe_dict = clean_json_response(output)
         if recipe_dict and isinstance(recipe_dict, dict) and "recipe" in recipe_dict:
-            print(f"✅ LLM ha risposto con successo (Visione: {recipe_dict.get('director_vision', 'ND')})")
+            recipe_dict['_inference_time_seconds'] = _inference_time
+            print(f"✅ LLM ha risposto con successo (Visione: {recipe_dict.get('director_vision', 'ND')}) [{_inference_time}s]")
             return recipe_dict
         else:
             print("⚠️ Il parsing del JSON dal LLM è fallito o formato non valido.")
     except Exception as e:
         print(f"⚠️ Fallimento inferenza nativa LLM: {e}")
-        
+
     return None
+
+def _save_history_archive(
+    output_dir: str,
+    sequence_name: str,
+    export_data: list,
+    recipe_dict,
+    llm_model_id: str,
+    director_config: dict,
+    duration_mode: str,
+) -> None:
+    """
+    Saves an immutable timestamped archive entry to
+    engine/output/{sequence_name}/history/.
+    Includes full _metadata block for benchmarking and session comparison.
+    """
+    now = datetime.datetime.now()
+    ts = now.strftime("%Y%m%d_%H%M%S")
+
+    # Build a clean model label from the HuggingFace repo ID
+    raw_label = llm_model_id.split("/")[-1]
+    MODEL_LABEL_MAP = {
+        'gemma-4-31b-it-4bit': 'Gemma4_31B',
+        'gemma-4-e4b-it-4bit': 'Gemma4_E4B',
+        'Llama-3.3-70B-Instruct-4bit': 'Llama3_70B',
+    }
+    model_label = MODEL_LABEL_MAP.get(raw_label, raw_label.replace('-', '_'))
+    dm = duration_mode.upper()
+
+    filename = f"{ts}_{model_label}_{dm}_recipe.json"
+
+    history_dir = os.path.join(output_dir, "history")
+    os.makedirs(history_dir, exist_ok=True)
+
+    archive_payload = {
+        "_metadata": {
+            "timestamp": now.isoformat(),
+            "sequence_name": sequence_name,
+            "brain_model": llm_model_id,
+            "inference_time_seconds": recipe_dict.get("_inference_time_seconds") if recipe_dict else None,
+            "user_directives": {
+                "target_duration": director_config.get("target_duration"),
+                "rhythmic_strictness": director_config.get("rhythmic_strictness"),
+                "energy_threshold": director_config.get("energy_threshold"),
+                "audio_marker_priority": director_config.get("audio_marker_priority"),
+                "duration_mode": duration_mode,
+                "style_prompt": director_config.get("style_prompt"),
+            },
+            "director_vision": recipe_dict.get("director_vision") if recipe_dict else "HEURISTIC_FALLBACK",
+            "clip_count": len(export_data),
+        },
+        "final_edit_timeline": export_data,
+        "llm_recipe": recipe_dict.get("recipe") if recipe_dict else None,
+    }
+
+    archive_path = os.path.join(history_dir, filename)
+    with open(archive_path, "w") as f:
+        json.dump(archive_payload, f, indent=2)
+    print(f"📦 History Archive salvato: {filename}")
+
 
 def build_locked_grid(locked_clips, beats):
     """
@@ -746,10 +810,21 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         
     with open(output_path, 'w') as f:
         json.dump({"final_edit_timeline": export_data}, f, indent=2)
-        
+
+    # Save immutable history archive entry
+    _save_history_archive(
+        output_dir=output_dir,
+        sequence_name=sequence_name,
+        export_data=export_data,
+        recipe_dict=recipe_dict,
+        llm_model_id=llm_model_id,
+        director_config=director_config,
+        duration_mode=duration_mode,
+    )
+
     print(f"✅ AI Director: Generato final cut con {len(export_data)} clip in sequenza.")
     print(f"✅ Salvato in {output_path}")
-    
+
     return output_path
 
 if __name__ == "__main__":

@@ -1,8 +1,97 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.51 - 2026-05-22
+**Version:** v0.1.52 - 2026-05-22
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.51 → v0.1.52
+
+### Sommario
+
+Release dedicata all'implementazione del **Director History Archive** — un sistema di persistenza immutabile per ogni inferenza eseguita dal Director (Fase D). Ogni run produce ora una snapshot cronologica arricchita con metadati completi, abilitando benchmarking e analisi comparativa tra sessioni. Risolto anche un errore di tipo IDE (`Expected a callable, got None`) nel sampler MLX.
+
+### File Modificati
+
+| File | +Ins | -Del | Descrizione |
+|---|---|---|---|
+| `engine/director.py` | +83 | -8 | History Archive System completo |
+| `.gemini/SOTA.md` | +3 | -1 | Documentazione History Archive |
+
+---
+
+### 1. Director History Archive — `_save_history_archive()`
+
+**File:** `engine/director.py`
+
+**Prima:** Ad ogni Regenerate Cut, `_final_edit.json` veniva sovrascritto. Nessuna traccia storica delle sessioni precedenti. Impossibile confrontare l'output di Gemma 4 E4B vs 31B sullo stesso materiale.
+
+**Dopo:** Nuova funzione privata `_save_history_archive()` invocata subito dopo il salvataggio del file di lavoro corrente. Salva in `engine/output/{sequence_name}/history/` (isolato per progetto) un file immutabile con naming cronologico:
+
+```
+20260522_175513_Gemma4_31B_ORGANIC_recipe.json
+```
+
+**Struttura `_metadata` iniettata:**
+```json
+{
+  "_metadata": {
+    "timestamp": "2026-05-22T17:55:13.421836",
+    "sequence_name": "RAW_BASE_SEQ_AMICI_DONDOLO_SHORT",
+    "brain_model": "mlx-community/gemma-4-31b-it-4bit",
+    "inference_time_seconds": 4.72,
+    "user_directives": {
+      "target_duration": 30,
+      "rhythmic_strictness": 65,
+      "energy_threshold": 0.4,
+      "audio_marker_priority": "DYNAMIC_PRIORITY",
+      "duration_mode": "ORGANIC",
+      "style_prompt": "..."
+    },
+    "director_vision": "A slow-burn emotional descent...",
+    "clip_count": 4
+  }
+}
+```
+
+**Fallback euristico coperto:** Se l'LLM non risponde, il campo `director_vision` diventa `"HEURISTIC_FALLBACK"` e `inference_time_seconds` è `null`.
+
+---
+
+### 2. Inference Timing — `time.perf_counter()`
+
+**File:** `engine/director.py`
+
+`_t_start / _t_end` avvolge la chiamata `generate()`. Il delta arrotondato a 2 decimali viene iniettato nel `recipe_dict` prima del return e poi estratto dal `_metadata` dell'archivio. Il log ora mostra:
+
+```
+✅ LLM ha risposto con successo (Visione: ...) [4.72s]
+```
+
+---
+
+### 3. Fix Type Error — `_make_sampler` always callable
+
+**File:** `engine/director.py`
+
+**Prima:** Nel ramo `except ImportError`, `_make_sampler = None`. Il type checker segnalava `Expected a callable, got None` alla riga della chiamata `generate()`.
+
+**Dopo:** Il ramo `except ImportError` definisce `_make_sampler` come funzione che solleva `RuntimeError` esplicito. È dead code (gated da `check_director_llm_available()`), ma ora il type checker vede sempre un callable.
+
+---
+
+### `.gitignore`
+
+`engine/output/` era già completamente ignorato — nessuna modifica necessaria. Le cartelle `history/` sono automaticamente escluse dal tracking git.
+
+---
+
+### Validazione
+
+- **ESLint:** ✅ 0 errori, 0 warning
+- **TSC:** ✅ 0 errori
+- **IDE Linter:** ✅ `Expected a callable, got None` risolto
 
 ---
 
