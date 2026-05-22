@@ -50,7 +50,8 @@ The Director is the module that closes the loop between AI analysis and human de
 - **Pillar & Filler System:** Clips with user-defined BM (Best Moment) markers become PILLARS anchored to the nearest beat. Clips without constraints become FILLERS, ordered by `visual_quality_score` as a tie-breaker.
 - **Safety Net Auto-Fill:** If the LLM recipe is too short compared to the target duration, the Director autonomously triggers a 4-beat heuristic fallback to fill the remaining gaps.
 - **Audio Rhythm Engine API:** Decoupled REST endpoints (`/api/audio/files` e `/api/audio/analyze`) che permettono alla dashboard UI di listare file audio ed estrarre dinamicamente i transienti (BPM, durata, inviluppo) usando Librosa senza bloccare la main thread.
-- **Dual-Track Export:** Produces `_final_edit.json` (internal timeline) + `_FinalCut.xml` (FCP7 XML ready for Premiere/FCPX) + `_gemma_recipe.json` (Director's AI reasoning for debugging and transparency).
+- **Local Versioning & State Rehydration:** Every execution of the Director preserves the past history natively (`_final_edit_vN.json` and `_gemma_recipe_vN.json`) with an indexed `_version_log.json`. The UI allows non-destructive time-travel across versions via a dedicated rehydration dropdown in the Dashboard.
+- **Dual-Track Export:** Produces `_final_edit.json` (symlink-like pointer for latest timeline) + `_FinalCut.xml` (FCP7 XML ready for Premiere/FCPX) + `_gemma_recipe.json` (latest AI reasoning).
 
 ## Frontend (React HITL Dashboard)
 

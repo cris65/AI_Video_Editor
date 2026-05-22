@@ -8,6 +8,8 @@ from utils.telemetry import log_execution, get_estimated_eta
 import platform
 import psutil
 import subprocess
+import json
+import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -197,6 +199,45 @@ async def orchestrate_director_cut(payload: OrchestratePayload):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+
+@app.get("/api/history/{sequence_name}")
+async def get_version_history(sequence_name: str):
+    """
+    Returns the versioned edit history for a given sequence.
+    Reads _version_log.json from LLM_Export_Package.
+    Falls back to a synthetic legacy entry if only the old _final_edit.json exists.
+    """
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    seq_llm_dir = os.path.join(BASE_DIR, 'output', sequence_name, 'LLM_Export_Package')
+
+    version_log_path = os.path.join(seq_llm_dir, f"{sequence_name}_version_log.json")
+
+    if os.path.exists(version_log_path):
+        with open(version_log_path, 'r') as f:
+            return json.load(f)
+
+    # Backward compat: old project with only a flat _final_edit.json (pre-versioning)
+    legacy_path = os.path.join(seq_llm_dir, f"{sequence_name}_final_edit.json")
+    if os.path.exists(legacy_path):
+        mtime = os.path.getmtime(legacy_path)
+        return {
+            "versions": [{
+                "version": 1,
+                "file": f"{sequence_name}_final_edit.json",
+                "recipe_file": None,
+                "timestamp": datetime.datetime.fromtimestamp(mtime).isoformat(),
+                "brain_model": "unknown (legacy)",
+                "inference_time_seconds": None,
+                "director_vision": "Legacy cut (pre-versioning system)",
+                "clip_count": None,
+                "director_config": None,
+                "is_legacy": True,
+            }]
+        }
+
+    return {"versions": []}
+
+
 @app.get("/api/audio/files")
 async def get_audio_files():
     """Scans engine/input/ and returns available .mp3 and .wav files."""
@@ -206,7 +247,7 @@ async def get_audio_files():
     audio_files = []
     
     if os.path.exists(DIR_INPUT):
-        for ext in ('*.mp3', '*.wav', '*.MP3', '*.WAV'):
+        for ext in ('*.mp3', '*.wav', '*.m4a', '*.aac', '*.flac', '*.MP3', '*.WAV', '*.M4A', '*.AAC', '*.FLAC'):
             for filepath in glob.glob(os.path.join(DIR_INPUT, ext)):
                 try:
                     size_mb = os.path.getsize(filepath) / (1024 * 1024)

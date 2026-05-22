@@ -262,6 +262,59 @@ def _save_history_archive(
     print(f"📦 History Archive salvato: {filename}")
 
 
+def _get_next_version(output_dir: str, sequence_name: str) -> int:
+    """
+    Scans output_dir for versioned final_edit files and returns the next version number.
+    Backward compat: if _final_edit.json exists but no versioned files, returns 1.
+    """
+    import glob as _glob
+    pattern = os.path.join(output_dir, f"{sequence_name}_final_edit_v*.json")
+    existing = _glob.glob(pattern)
+    if not existing:
+        return 1
+    versions = []
+    for path in existing:
+        match = re.search(r'_v(\d+)\.json$', os.path.basename(path))
+        if match:
+            versions.append(int(match.group(1)))
+    return max(versions) + 1 if versions else 1
+
+
+def _update_version_log(
+    output_dir: str,
+    sequence_name: str,
+    version: int,
+    metadata: dict,
+) -> None:
+    """
+    Reads _version_log.json (creates it if missing), appends the new version entry,
+    and writes it back atomically.
+    """
+    log_path = os.path.join(output_dir, f"{sequence_name}_version_log.json")
+    if os.path.exists(log_path):
+        with open(log_path, 'r') as f:
+            log_data: dict = json.load(f)
+    else:
+        log_data = {"versions": []}
+
+    entry = {
+        "version": version,
+        "file": f"{sequence_name}_final_edit_v{version}.json",
+        "recipe_file": f"{sequence_name}_gemma_recipe_v{version}.json",
+        "timestamp": metadata.get("timestamp"),
+        "brain_model": metadata.get("brain_model"),
+        "inference_time_seconds": metadata.get("inference_time_seconds"),
+        "director_vision": metadata.get("director_vision", "HEURISTIC_FALLBACK"),
+        "clip_count": metadata.get("clip_count"),
+        "director_config": metadata.get("director_config"),
+    }
+    log_data["versions"].append(entry)
+
+    with open(log_path, 'w') as f:
+        json.dump(log_data, f, indent=2)
+    print(f"📝 Version Log aggiornato: v{version} registrata.")
+
+
 def build_locked_grid(locked_clips, beats):
     """
     Places locked clips at their absolute timeline positions.
@@ -474,12 +527,20 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         audio_bpm=audio.get("bpm"), audio_beats=audio.get("beats")
     )
     
+    # Compute the next version number ONCE — shared by recipe and final_edit saves
+    os.makedirs(output_dir, exist_ok=True)
+    next_v = _get_next_version(output_dir, sequence_name)
+
     if recipe_dict:
-        os.makedirs(output_dir, exist_ok=True)
+        # Working recipe (always the current — for backward compat)
         recipe_path = os.path.join(output_dir, f"{sequence_name}_gemma_recipe.json")
         with open(recipe_path, 'w') as f:
             json.dump(recipe_dict, f, indent=2)
-            
+        # Versioned recipe (immutable paired with final_edit_vN)
+        versioned_recipe_path = os.path.join(output_dir, f"{sequence_name}_gemma_recipe_v{next_v}.json")
+        with open(versioned_recipe_path, 'w') as f:
+            json.dump(recipe_dict, f, indent=2)
+
     final_timeline = []
 
     # --- Step 1: Place locked walls on the beat grid ---
@@ -789,8 +850,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         final_timeline = trimmed_timeline
         
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f"{sequence_name}_final_edit.json")
-    
+
+    # --- Build export_data from the final timeline ---
     export_data = []
     for item in final_timeline:
         export_item = {
@@ -805,13 +866,35 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         }
         if '_bm_time' in item and item['_bm_time'] is not None:
             export_item['_bm_time'] = round(item['_bm_time'], 3)
-            
         export_data.append(export_item)
-        
-    with open(output_path, 'w') as f:
-        json.dump({"final_edit_timeline": export_data}, f, indent=2)
 
-    # Save immutable history archive entry
+    # --- Versioned file (immutable historical record) ---
+    versioned_filename = f"{sequence_name}_final_edit_v{next_v}.json"
+    versioned_path = os.path.join(output_dir, versioned_filename)
+    with open(versioned_path, 'w') as f:
+        json.dump({"version": next_v, "final_edit_timeline": export_data}, f, indent=2)
+
+    # --- Working file (backward-compat pointer, always the latest) ---
+    output_path = os.path.join(output_dir, f"{sequence_name}_final_edit.json")
+    with open(output_path, 'w') as f:
+        json.dump({"version": next_v, "final_edit_timeline": export_data}, f, indent=2)
+
+    # --- Update version log sidecar ---
+    _update_version_log(
+        output_dir=output_dir,
+        sequence_name=sequence_name,
+        version=next_v,
+        metadata={
+            "timestamp": datetime.datetime.now().isoformat(),
+            "brain_model": llm_model_id,
+            "inference_time_seconds": recipe_dict.get("_inference_time_seconds") if recipe_dict else None,
+            "director_vision": recipe_dict.get("director_vision") if recipe_dict else "HEURISTIC_FALLBACK",
+            "clip_count": len(export_data),
+            "director_config": director_config,
+        },
+    )
+
+    # --- Immutable history archive (timestamped, unchanged from v0.1.52) ---
     _save_history_archive(
         output_dir=output_dir,
         sequence_name=sequence_name,
@@ -822,8 +905,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         duration_mode=duration_mode,
     )
 
-    print(f"✅ AI Director: Generato final cut con {len(export_data)} clip in sequenza.")
-    print(f"✅ Salvato in {output_path}")
+    print(f"✅ AI Director: Generato final cut con {len(export_data)} clip in sequenza (v{next_v}).")
+    print(f"✅ Salvato in {versioned_path}")
 
     return output_path
 

@@ -35,6 +35,28 @@
       "weight": 1.08,
       "duration_sec": 3.14,
       "ratio": 2.9063
+    },
+    {
+      "timestamp": 1779490375.7007282,
+      "weight": 1.08,
+      "duration_sec": 3.54,
+      "ratio": 3.2838
+    }
+  ],
+  "video_extraction": [
+    {
+      "timestamp": 1779490098.081495,
+      "weight": 188.51,
+      "duration_sec": 175.08,
+      "ratio": 0.9288
+    }
+  ],
+  "llm_inference": [
+    {
+      "timestamp": 1779490098.082365,
+      "weight": 2971,
+      "duration_sec": 857.97,
+      "ratio": 0.2888
     }
   ]
 }

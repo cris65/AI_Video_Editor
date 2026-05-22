@@ -1,8 +1,43 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.52 - 2026-05-22
+**Version:** v0.1.53 - 2026-05-22
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.52 → v0.1.53
+
+### Sommario
+
+Implementazione completa della Milestone 1 per l'EPIC "Versioning & Semantic Memory" (Local Versioning & State Rehydration) e risoluzione del routing verso l'Editor.
+Il backend ora mantiene una storia versionata non-distruttiva di ogni inferenza del Director (`_final_edit_vN.json` e `_gemma_recipe_vN.json`), indicizzata in `_version_log.json`. Il frontend è stato potenziato con un motore di reidratazione di stato (Time-Travel) tramite un menu a tendina nella Dashboard.
+Inoltre, è stato corretto il bottone "Skip Setup" implementando una "Workflow Guide" modale per evitare il caricamento di file vuoti, è stato aggiunto un safety net sul fetch di stringout, ed è stato esteso il supporto audio ai formati Lossless (.wav, .m4a, .aac, .flac).
+
+### File Modificati
+
+| File | +Ins | -Del | Descrizione |
+|---|---|---|---|
+| `engine/director.py` | +103 | -8 | Implementazione Local Versioning auto-increment e `_version_log.json` |
+| `engine/api_server.py` | +43 | -2 | Endpoint `GET /api/history` e parsing formati audio moderni (`.m4a`, `.aac`, `.flac`) |
+| `src/hooks/usePancakeData.ts` | +91 | -3 | Rehydration Engine, interfacce `VersionHistory`, isolamento fetch e Safety Net |
+| `src/components/dashboard/PancakeDashboard.tsx` | +119 | -3 | UI `VersionHistoryDropdown` integrato nel top-bar |
+| `src/App.tsx` | +134 | -5 | Workflow Guide Modal (N.A.I.L.E. dark theme) e routing intelligente |
+| `.gemini/SOTA.md` | +1 | -1 | Aggiornata la documentazione architettonica del Versioning |
+| `.gemini/FEATURES.md` | +2 | -1 | Aggiunte note su Rehydration Engine e formati audio |
+| `package.json` | +1 | -1 | Bump v0.1.53 |
+
+### Dettaglio Modifiche Architetturali
+
+1. **Non-Destructive Local Versioning:** Trasformato il salvataggio distruttivo del Director in un sistema storico puro. `LLM_Export_Package/` ospita i file cronologici associati (recipe + timeline). I file base non numerati fungono da symlink-like pointer per compatibilità pregressa.
+2. **Rehydration Engine (UI):** Lo stato `directorConfig` del frontend ora si sincronizza col cambio di versione storico permettendo time-travel live.
+3. **Smart Routing & Safety Nets:** Il `usePancakeData.ts` rileva ora se Vite risponde con un fallback HTML 200 al posto del JSON atteso, bloccando l'esecuzione con un messaggio in chiaro invece del crashtag `Unexpected token '<'`.
+4. **Modern Audio Formats:** L'engine ora cerca nativamente e la modale suggerisce esplicitamente i formati `.m4a`, `.aac`, `.flac`, e `.wav` dichiarando obsoleto l'`.mp3`.
+
+### Validazione
+- **ESLint:** PASS (0 warnings)
+- **TypeScript (TSC):** PASS
+- **Status:** READY FOR EXPORT
 
 ---
 

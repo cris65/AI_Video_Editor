@@ -116,6 +116,34 @@ export interface AudioBeat {
   type: string;
 }
 
+export interface VersionDirectorConfig {
+  target_duration: number;
+  style_prompt: string;
+  rhythmic_strictness?: number;
+  energy_threshold?: number;
+  audio_marker_priority?: 'HARD_CUT' | 'BROLL_BRIDGE' | 'DYNAMIC_PRIORITY';
+  duration_mode?: 'STRICT' | 'ORGANIC';
+  seed?: number;
+  ai_model?: 'gemma-4-4b' | 'gemma-4-31b' | 'llama-3.3-70b';
+}
+
+export interface VersionEntry {
+  version: number;
+  file: string;
+  recipe_file: string | null;
+  timestamp: string;
+  brain_model: string;
+  inference_time_seconds: number | null;
+  director_vision: string;
+  clip_count: number | null;
+  director_config: VersionDirectorConfig | null;
+  is_legacy?: boolean;
+}
+
+export interface VersionHistory {
+  versions: VersionEntry[];
+}
+
 export function usePancakeData(sequenceName: string) {
   const [data, setData] = useState<PancakeData | null>(null);
   const [hitlData, setHitlData] = useState<any>({});
@@ -125,6 +153,8 @@ export function usePancakeData(sequenceName: string) {
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [audioWaveforms, setAudioWaveforms] = useState<{ amplitude: number[], energy: number[] } | null>(null);
   const [audioBeats, setAudioBeats] = useState<AudioBeat[]>([]);
+  const [versionHistory, setVersionHistory] = useState<VersionHistory | null>(null);
+  const [activeVersion, setActiveVersion] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,6 +181,40 @@ export function usePancakeData(sequenceName: string) {
       setGemmaRecipe(null);
       console.warn("Gemma recipe file not found.");
     }
+  }, [sequenceName]);
+
+  const fetchVersionHistory = useCallback(async () => {
+    try {
+      // Use absolute URL — FastAPI endpoint, not handled by Vite middleware
+      const res = await fetch(`http://localhost:8000/api/history/${sequenceName}?t=${Date.now()}`);
+      if (res.ok) {
+        const json: VersionHistory = await res.json();
+        setVersionHistory(json);
+        if (json.versions.length > 0 && activeVersion === null) {
+          setActiveVersion(json.versions[json.versions.length - 1].version);
+        }
+      }
+    } catch (e) {
+      // FastAPI not running or history unavailable — non-fatal, editor continues working
+      console.warn('Version history not available (FastAPI offline or no history yet).');
+    }
+  }, [sequenceName, activeVersion]);
+
+  const loadVersion = useCallback(async (entry: VersionEntry): Promise<VersionDirectorConfig | null> => {
+    try {
+      const res = await fetch(
+        `/engine/output/${sequenceName}/LLM_Export_Package/${entry.file}?t=${Date.now()}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        setFinalCutTimeline(json.final_edit_timeline || []);
+        setActiveVersion(entry.version);
+        return entry.director_config;
+      }
+    } catch (e) {
+      console.warn(`Failed to load version ${entry.version}`);
+    }
+    return null;
   }, [sequenceName]);
 
   const fetchAudioData = useCallback(async () => {
@@ -187,7 +251,13 @@ export function usePancakeData(sequenceName: string) {
         // 1. Carica il file stringout originale (immutabile)
         const res = await fetch(`/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_stringout.json`);
         if (!res.ok) {
-          throw new Error(`Errore HTTP: ${res.status} - Impossibile caricare il JSON. Assicurati che l'Engine abbia esportato correttamente in LLM_Export_Package.`);
+          throw new Error(`HTTP ${res.status} — Sequence "${sequenceName}" not found. Run the Image Engine first.`);
+        }
+        // Safety net: Vite SPA fallback returns HTML (200 + text/html) for missing files.
+        // Detect this before calling res.json() to avoid the cryptic "Unexpected token '<'" crash.
+        const contentType = res.headers.get('content-type') ?? '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Sequence "${sequenceName}" not processed. Run the Image Engine first to generate the output.`);
         }
         const json = await res.json();
         
@@ -228,6 +298,9 @@ export function usePancakeData(sequenceName: string) {
         
         // 4. Carica i dati audio (BPM, Waveform, Beats)
         await fetchAudioData();
+
+        // NOTE: fetchVersionHistory is loaded in a SEPARATE useEffect
+        // to keep it off the critical path of main data loading.
         
       } catch (err: any) {
         setError(err.message || 'Errore sconosciuto durante il caricamento dei dati');
@@ -239,6 +312,14 @@ export function usePancakeData(sequenceName: string) {
     fetchData();
   }, [sequenceName, fetchFinalCut, fetchAudioData]);
 
+  // Separate non-critical effect: loads version history after main data is ready.
+  // Isolated so FastAPI being offline never blocks the main editor load.
+  useEffect(() => {
+    if (!loading) {
+      fetchVersionHistory();
+    }
+  }, [loading, fetchVersionHistory]);
+
   return { 
     data, 
     hitlData, 
@@ -248,9 +329,13 @@ export function usePancakeData(sequenceName: string) {
     audioDuration, 
     audioWaveforms, 
     audioBeats, 
+    versionHistory,
+    activeVersion,
     loading, 
     error, 
-    refetchFinalCut: fetchFinalCut, 
-    refetchAudioData: fetchAudioData 
+    refetchFinalCut: fetchFinalCut,
+    refetchAudioData: fetchAudioData,
+    fetchVersionHistory,
+    loadVersion,
   };
 }

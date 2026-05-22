@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { usePancakeData, DirectorConfig, FinalCutClip } from '../../hooks/usePancakeData';
+import { usePancakeData, DirectorConfig, FinalCutClip, VersionEntry, VersionDirectorConfig } from '../../hooks/usePancakeData';
 import { useVideoShortcuts } from '../../hooks/useVideoShortcuts';
 import { ClipCard } from './ClipCard';
 import { VideoPlayerSync } from './VideoPlayerSync';
@@ -8,7 +8,7 @@ import { FinalCutTimeline } from './FinalCutTimeline';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { AudioSettingsModal } from './AudioSettingsModal';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music, Cpu } from 'lucide-react';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music, Cpu, History, ChevronDown, Clock, Bot } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 
 function formatTime(seconds: number): string {
@@ -64,7 +64,13 @@ export interface AudioMarkerFilter {
 }
 
 export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName, onOpenEngine }) => {
-  const { data, hitlData, finalCutTimeline, gemmaRecipe, audioBpm, audioDuration, audioWaveforms, audioBeats, loading, error, refetchFinalCut, refetchAudioData } = usePancakeData(sequenceName);
+  const { 
+    data, hitlData, finalCutTimeline, gemmaRecipe,
+    audioBpm, audioDuration, audioWaveforms, audioBeats,
+    versionHistory, activeVersion,
+    loading, error,
+    refetchFinalCut, refetchAudioData, fetchVersionHistory, loadVersion
+  } = usePancakeData(sequenceName);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -80,6 +86,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
   const [waveformView, setWaveformView] = useState<'amplitude' | 'energy'>('amplitude');
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+  const [isVersionMenuOpen, setIsVersionMenuOpen] = useState(false);
   // Local mutable order — derived from immutable finalCutTimeline source.
   // Re-synced whenever the Director re-generates the cut.
   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
@@ -397,6 +404,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       const result = await res.json();
       if (!result.ok) throw new Error(result.error ?? 'Director error');
       await refetchFinalCut();
+      await fetchVersionHistory();
       setIsPreviewMode(true);
     } catch (err) {
       console.error('Failed to regenerate cut:', err);
@@ -404,6 +412,24 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       setIsRegenerating(false);
     }
   };
+
+  // Rehydration Engine: loads a historical version and restores its directorConfig
+  const handleVersionSelect = useCallback(async (entry: VersionEntry) => {
+    const config: VersionDirectorConfig | null = await loadVersion(entry);
+    if (config) {
+      setDirectorConfig({
+        target_duration: config.target_duration,
+        style_prompt: config.style_prompt,
+        rhythmic_strictness: config.rhythmic_strictness,
+        energy_threshold: config.energy_threshold,
+        audio_marker_priority: config.audio_marker_priority,
+        duration_mode: config.duration_mode,
+        seed: config.seed,
+        ai_model: config.ai_model,
+      });
+    }
+    setIsVersionMenuOpen(false);
+  }, [loadVersion]);
 
   // Receives the arrayMove'd array from FinalCutTimeline and recalculates timeline positions.
   const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[], seekToTimelineIn?: number) => {
@@ -696,6 +722,93 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
             )}
             {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
           </button>
+
+          {/* Version History Dropdown */}
+          {versionHistory && versionHistory.versions.length > 0 && (
+            <div className="relative ml-1">
+              <button
+                id="version-history-toggle"
+                onClick={() => setIsVersionMenuOpen(prev => !prev)}
+                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                  isVersionMenuOpen
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                    : 'bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700'
+                }`}
+                title="Version History — seleziona un taglio storico"
+              >
+                <History size={11} />
+                <span className="tabular-nums">{versionHistory.versions.length}</span>
+                <ChevronDown size={9} className={`transition-transform ${isVersionMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isVersionMenuOpen && (
+                <div
+                  id="version-history-menu"
+                  className="absolute top-full left-0 mt-1 w-80 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl shadow-black/60 z-50 overflow-hidden"
+                >
+                  <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
+                    <History size={11} className="text-amber-400" />
+                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Version History</span>
+                    <span className="ml-auto text-[9px] text-slate-500">{versionHistory.versions.length} cut{versionHistory.versions.length > 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {[...versionHistory.versions].reverse().map((entry) => {
+                      const isActive = activeVersion === entry.version;
+                      const date = new Date(entry.timestamp);
+                      const dateLabel = date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+                      const timeLabel = date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                      const modelShort = entry.brain_model
+                        .replace('mlx-community/', '')
+                        .replace('-it-4bit', '')
+                        .replace('-Instruct-4bit', '');
+                      return (
+                        <button
+                          key={entry.version}
+                          id={`version-entry-v${entry.version}`}
+                          onClick={() => handleVersionSelect(entry)}
+                          className={`w-full text-left px-3 py-2.5 border-b border-slate-800 last:border-0 transition-colors ${
+                            isActive
+                              ? 'bg-amber-500/10 border-l-2 border-l-amber-400'
+                              : 'hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                              isActive ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'
+                            }`}>
+                              v{entry.version}
+                            </span>
+                            {entry.is_legacy && (
+                              <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-slate-700 text-slate-500 uppercase">legacy</span>
+                            )}
+                            <div className="flex items-center gap-1 ml-auto text-[9px] text-slate-500">
+                              <Clock size={8} />
+                              <span>{dateLabel} · {timeLabel}</span>
+                            </div>
+                          </div>
+                          <p className="text-[9px] text-slate-300 leading-relaxed line-clamp-2 mb-1">
+                            {entry.director_vision}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {entry.clip_count !== null && (
+                              <span className="text-[8px] text-slate-500">{entry.clip_count} clip</span>
+                            )}
+                            {entry.inference_time_seconds !== null && (
+                              <span className="text-[8px] text-slate-500">{entry.inference_time_seconds}s</span>
+                            )}
+                            <div className="flex items-center gap-1 ml-auto">
+                              <Bot size={8} className="text-slate-600" />
+                              <span className="text-[8px] text-slate-600 font-mono truncate max-w-[120px]">{modelShort}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
