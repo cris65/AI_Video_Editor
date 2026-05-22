@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { DirectorConfig } from '../../hooks/usePancakeData';
+import { DirectorConfig, AudioBeat } from '../../hooks/usePancakeData';
 import { Wand2, RefreshCw, Settings2, Info, X } from 'lucide-react';
 import { AdvancedDirectorModal } from './AdvancedDirectorModal';
 
 interface DirectorSettingsPanelProps {
   config: DirectorConfig;
+  audioBeats?: AudioBeat[];
   sourceResolution?: { width: number; height: number };
   onSave: (newConfig: DirectorConfig) => void;
   onRegenerate: () => void;
@@ -68,12 +69,12 @@ function useHardwareProfiler() {
 
 export function DirectorSettingsPanel({
   config,
+  audioBeats,
   sourceResolution,
   onSave,
   onRegenerate,
   isRegenerating,
-  saveStatus,
-  sequenceFps
+  saveStatus
 }: DirectorSettingsPanelProps) {
   const [localConfig, setLocalConfig] = useState<DirectorConfig>(config);
   const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
@@ -85,14 +86,6 @@ export function DirectorSettingsPanel({
   useEffect(() => {
     setLocalConfig(config);
   }, [config]);
-
-  const handleChange = (key: keyof DirectorConfig, value: any) => {
-    setLocalConfig(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleBlurOrMouseUp = () => {
-    onSave(localConfig);
-  };
 
   // --- Auto-Chunking Math ---
   const aiModel = localConfig.ai_model || 'gemma-4-4b';
@@ -115,126 +108,29 @@ export function DirectorSettingsPanel({
   return (
     <>
       <div className="p-4 pt-0 space-y-4 border-t border-slate-800 mt-1">
-        {/* AI Model Selection */}
-        <div>
-          <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">AI Brain Selection</label>
-          <select
-            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none"
-            value={localConfig.ai_model || 'gemma-4-4b'}
-            onChange={(e) => {
-              const updated = { ...localConfig, ai_model: e.target.value as 'gemma-4-4b' | 'gemma-4-31b' };
-              setLocalConfig(updated);
-              onSave(updated);
-            }}
-          >
-            <option value="gemma-4-4b">Gemma 4 (E4B) - Fast Local</option>
-            <option value="gemma-4-31b">Gemma 4 (31B) - Deep Insight</option>
-          </select>
-        </div>
-
-        {/* Deterministic Seed */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wider">
-              Director Seed
-            </label>
-            <span className="text-[9px] font-mono text-slate-600">
-              {(localConfig.seed ?? -1) === -1 ? '🎲 RANDOM' : '🔒 LOCKED'}
+        {/* Visual Recap */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3 shadow-inner">
+          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">AI Brain</span>
+            <span className="text-xs font-bold text-indigo-400">{localConfig.ai_model === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (E4B)'}</span>
+          </div>
+          
+          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Target Duration</span>
+            <span className="text-xs font-bold font-mono text-sky-400">{localConfig.target_duration || 60}s</span>
+          </div>
+          
+          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Duration Mode</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${localConfig.duration_mode === 'STRICT' ? 'bg-rose-900/40 text-rose-400 border border-rose-500/30' : 'bg-sky-900/40 text-sky-400 border border-sky-500/30'}`}>
+              {localConfig.duration_mode ?? 'ORGANIC'}
             </span>
           </div>
-          <input
-            type="number"
-            id="director-seed-input"
-            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none font-mono"
-            value={localConfig.seed ?? -1}
-            onChange={(e) => handleChange('seed', Number(e.target.value))}
-            onBlur={handleBlurOrMouseUp}
-            placeholder="-1 (Random)"
-            min={-1}
-          />
-          <p className="text-[9px] text-slate-600 mt-1">
-            -1 = random every time · any positive integer = reproducible edit
-          </p>
-        </div>
-
-        {/* Duration & Resolution */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Duration (sec)</label>
-            <input 
-              type="number" 
-              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
-              value={localConfig.target_duration || 60}
-              onChange={(e) => handleChange('target_duration', Number(e.target.value))}
-              onBlur={handleBlurOrMouseUp}
-            />
+          
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Resolution</span>
+            <span className="text-xs font-bold font-mono text-slate-300">{localConfig.export_resolution || '1920x1080'}</span>
           </div>
-          <div>
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Target Resolution</label>
-            <select
-              className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none mb-1"
-              value={!["3840x2160", "1920x1080", "1080x1920"].includes(localConfig.export_resolution || "1920x1080") ? "custom" : (localConfig.export_resolution || "1920x1080")}
-              onChange={(e) => {
-                const val = e.target.value;
-                const newRes = val === "custom" ? "1000x1000" : val;
-                const updated = { ...localConfig, export_resolution: newRes };
-                setLocalConfig(updated);
-                onSave(updated);
-              }}
-            >
-              <option value="3840x2160">4K UHD (3840x2160)</option>
-              <option value="1920x1080">Full HD (1920x1080)</option>
-              <option value="1080x1920">Vertical (1080x1920)</option>
-              <option value="custom">Custom...</option>
-            </select>
-            
-            {!["3840x2160", "1920x1080", "1080x1920"].includes(localConfig.export_resolution || "1920x1080") && (
-              <div className="flex gap-2">
-                <input 
-                  type="number" 
-                  className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                  placeholder="W"
-                  value={localConfig.export_resolution?.split('x')[0] || ""}
-                  onChange={(e) => {
-                    const h = localConfig.export_resolution?.split('x')[1] || "1080";
-                    handleChange('export_resolution', `${e.target.value}x${h}`);
-                  }}
-                  onBlur={handleBlurOrMouseUp}
-                />
-                <span className="text-slate-500 self-center font-bold text-[10px]">x</span>
-                <input 
-                  type="number" 
-                  className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-200 focus:border-amber-500 focus:outline-none" 
-                  placeholder="H"
-                  value={localConfig.export_resolution?.split('x')[1] || ""}
-                  onChange={(e) => {
-                    const w = localConfig.export_resolution?.split('x')[0] || "1920";
-                    handleChange('export_resolution', `${w}x${e.target.value}`);
-                  }}
-                  onBlur={handleBlurOrMouseUp}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Quality -> Analysis Rate */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wider">ANALYSIS RATE (FPS)</label>
-            <span className="text-[9px] font-mono font-bold bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded shadow-inner">
-              SEQ: {sequenceFps}
-            </span>
-          </div>
-          <input 
-            type="number" 
-            step="0.1"
-            min="0.1"
-            className="w-full bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1.5 text-slate-200 focus:border-amber-500 focus:outline-none" 
-            value={localConfig.analysis_fps ?? 0.5}
-            onChange={(e) => handleChange('analysis_fps', Number(e.target.value))}
-            onBlur={handleBlurOrMouseUp}
-          />
         </div>
 
         {/* ETA & Auto-Chunking Widget */}
@@ -333,6 +229,7 @@ export function DirectorSettingsPanel({
       {isAdvancedModalOpen && (
         <AdvancedDirectorModal 
           config={config} 
+          audioBeats={audioBeats}
           sourceResolution={sourceResolution}
           onClose={(newConfig) => {
             setIsAdvancedModalOpen(false);

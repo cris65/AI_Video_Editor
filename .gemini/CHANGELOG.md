@@ -1,8 +1,35 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.49 - 2026-05-22
+**Version:** v0.1.50 - 2026-05-22
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.49 → v0.1.50
+
+**Commit:** `[v0.1.50] feat(ui): implement native Audio Beats visualization in Advanced Director Modal`
+
+### Riepilogo File Modificati
+
+| File | +ins | -del | Cosa |
+| ---- | ---- | ---- | ---- |
+| `src/components/dashboard/AdvancedDirectorModal.tsx` | +150 | -50 | Visualizzatori avanzati SVG (Energy Threshold e Rhythmic Strictness) agganciati ai dati audio reali. |
+| `src/components/dashboard/DirectorSettingsPanel.tsx` | +10 | -15 | Cleanup variabili non usate, binding dati audioBeats verso il modal. |
+| `src/components/dashboard/PancakeDashboard.tsx` | +5 | -2 | Passaggio `audioBeats` verso i settings panel. |
+| `engine/director.py` | +3 | -1 | Fix tipizzazione Python su load di `mlx_lm`. |
+| `package.json` | +1 | -1 | Bump a v0.1.50 |
+| `.gemini/SOTA.md` | +2 | -2 | Aggiornamento documentazione KB per UI Modale. |
+
+### Dettagli Release (Visualizzazione Nativa Audio Beats)
+- **Advanced UI Data Binding:** Il pannello avanzato delle impostazioni del Director (`AdvancedDirectorModal`) ora riceve l'array nativo `audioBeats` generato da Librosa.
+- **Rhythmic Strictness Visualizer:** Riprogettato completamente il visualizzatore SVG. Introdotta un'onda sonora organica in background basata su Curve di Bezier Cubiche (`vectorEffect="non-scaling-stroke"`) per una risoluzione cristallina indipendentemente dalle proporzioni del contenitore.
+- **Energy Threshold Visualizer:** Il visualizzatore di soglia d'energia ora non utilizza più dati fittizi, ma mappa dinamicamente il 100% dei veri battiti audio (BPM/Energy) per la clip corrente. Spostando lo slider della soglia (Cutoff Filter), l'interfaccia evidenzia in tempo reale i picchi che supereranno il filtro per l'LLM. 
+- **Code Quality:** Risolti tutti i warning ESLint (rimossi handler/state non usati da `DirectorSettingsPanel`) e un errore di unpack TypeError Python in `director.py`.
+
+### Validazione
+- **TypeScript & ESLint:** Validato localmente con `0` errori (0 unused variables, no any).
+- **Python:** Risolto TypeError sull'unpack di `mlx_lm.load` (tuple size mismatch evitato).
 
 ---
 

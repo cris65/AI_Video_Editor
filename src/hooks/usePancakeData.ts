@@ -12,6 +12,10 @@ export interface DirectorConfig {
   ignore_list?: string;
   safe_zone_margin?: number;
   seed?: number;
+  rhythmic_strictness?: number; // 0-100
+  energy_threshold?: number; // 0.0 - 1.0
+  audio_marker_priority?: 'HARD_CUT' | 'BROLL_BRIDGE' | 'DYNAMIC_PRIORITY';
+  duration_mode?: 'STRICT' | 'ORGANIC';
 }
 
 export interface FinalCutClip {

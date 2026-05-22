@@ -45,14 +45,16 @@ def clean_json_response(raw_text):
             pass
     return None
 
-def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, seed: int = -1, locked_clips=None, llm_model_id="meta-llama/Meta-Llama-3-70B-Instruct", audio_bpm=None, audio_beats=None):
+def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, rhythmic_strictness=50, energy_threshold=0.4, audio_marker_priority="DYNAMIC_PRIORITY", duration_mode="ORGANIC", ignore_list="None", seed: int = -1, locked_clips=None, llm_model_id="meta-llama/Meta-Llama-3-70B-Instruct", audio_bpm=None, audio_beats=None):
     if not check_director_llm_available():
         print("⚠️  [Director] Libreria mlx_lm non disponibile. Fallback euristico.")
         return None
 
     print(f"⏳ Downloading / Loading {llm_model_id} (Director's Brain)...")
     try:
-        model, processor = load(llm_model_id)
+        loaded = load(llm_model_id)
+        model = loaded[0]
+        processor = loaded[1]
         print("✅ Director Model loaded successfully!")
     except Exception as e:
         print(f"❌ Impossibile caricare il modello LLM: {e}")
@@ -111,7 +113,8 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
         formatted_beats = []
         for b in audio_beats:
             if isinstance(b, dict):
-                formatted_beats.append({"time": b.get("time", 0.0), "energy": b.get("energy", 0.5)})
+                if b.get("energy", 0.5) >= energy_threshold:
+                    formatted_beats.append({"time": b.get("time", 0.0), "energy": b.get("energy", 0.5)})
             else:
                 formatted_beats.append({"time": float(b), "energy": 0.5})
                 
@@ -119,26 +122,36 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
         
         audio_context = f"\n\n[RHYTHM CONTEXT]\nBPM: {audio_bpm}\nBeats Grid: {beats_grid_str}\n"
 
+    duration_directive = ""
+    if duration_mode == "STRICT":
+        duration_directive = f"DURATION DIRECTIVE: You MUST hit the target duration exactly. Calculate the math of the audio beats precisely to stop the edit at {target_duration} seconds. No exceptions."
+    else:
+        duration_directive = f"DURATION DIRECTIVE: Target duration is {target_duration} seconds (+/- 10%). Use this as a guideline, but allow the edit to 'breathe' and stretch or compress slightly to end on a natural musical climax or drop."
+
     system_prompt = (
         locked_constraint_text
-        + "Sei un Master Video Editor e un AI Video Director. Il tuo compito è creare una 'Editing Recipe' per un montaggio video.\n"
+        + "You are a Master Video Editor and an AI Video Director. Your task is to create an 'Editing Recipe' for a video montage.\n"
         + audio_directive
-        + "REGOLE RIGIDE:\n"
-        f"1. La durata target è di circa {target_duration} secondi (circa {total_beats} beat musicali).\n"
-        f"2. Stile richiesto dal regista: '{style_prompt}'\n"
-        "3. DEVI includere tutti i clip marcati come 'MUST INCLUDE (PILLAR)'. Posizionali nei momenti chiave della narrazione.\n"
-        "4. Usa i metadati 'Narrative Energy' ed 'Emotional Tone' per costruire il ritmo della sequenza e le scelte logiche.\n"
-        "5. CONTINUITÀ D'AZIONE (ACTION CONTINUITY): Non limitarti a mantenere l'ordine cronologico degli ID. RIMESCOLA l'ordine delle clip per dare senso all'azione. Crea un arco narrativo sensato.\n"
-        "6. SCREEN DIRECTION: Fai estrema attenzione alla direzione. Assicurati che 'Gaze' e i movimenti dei soggetti creino fluidità visiva.\n"
-        "7. SCORE COME SPAREGGIO: Usa il campo 'Score' SOLO come criterio di spareggio.\n"
-        "8. Per ogni clip scelto, decidi quanti 'beats' deve durare (es. 2, 4, 8). La somma totale dei beats dovrebbe avvicinarsi a {total_beats}.\n"
-        "9. RISPONDI ESCLUSIVAMENTE CON UN OGGETTO JSON. Nessuna spiegazione, nessun testo prima o dopo. "
-        "Formato esatto richiesto:\n"
+        + "STRICT RULES:\n"
+        f"1. {duration_directive}\n"
+        f"2. [USER STYLE DIRECTIVE]: {style_prompt}\n"
+        f"3. [NEGATIVE CONSTRAINTS]: {ignore_list}\n"
+        f"4. [RHYTHMIC STRICTNESS]: {rhythmic_strictness}% (At 100%, cut surgically only on musical beats. At 0%, prioritize visual and narrative continuity over the audio grid).\n"
+        f"5. [MINIMUM ENERGY THRESHOLD]: {energy_threshold} (Discard or deprioritize any beats in the audio context that fall below this energy threshold).\n"
+        f"6. [AUDIO MARKER PRIORITIZATION]: {audio_marker_priority}\n"
+        "7. SEMANTIC ANCHORS: You MUST include clips marked as 'MUST INCLUDE (AUDIO SYNC)'. The audio markers (♪) provided in the timeline are NOT just physical cut points; they are 'Emotional Anchors'. You must make the narrative action or visual impact culminate exactly on these anchors.\n"
+        "8. Use the 'Narrative Energy' and 'Emotional Tone' metadata to build the sequence pacing and logical choices.\n"
+        "9. ACTION CONTINUITY: Do not just keep the chronological order of IDs. SHUFFLE the order to make narrative sense and create a compelling arc.\n"
+        "10. SCREEN DIRECTION: Pay close attention to direction. Ensure 'Gaze' and subject movements create visual fluidity.\n"
+        "11. SCORE AS TIEBREAKER: Use the 'Score' field ONLY as a tiebreaker between similar clips.\n"
+        f"12. For each selected clip, decide how many 'beats' it should last (e.g. 2, 4, 8). The total sum of beats must approach {total_beats}.\n"
+        "13. RESPOND EXCLUSIVELY WITH A JSON OBJECT. No explanations, no text before or after. "
+        "Exact required format:\n"
         '{\n'
-        '  "director_vision": "Spiegazione in 2 righe della logica narrativa usata per questa sequenza",\n'
+        '  "director_vision": "2-line explanation of the narrative logic used for this sequence",\n'
         '  "recipe": [\n'
-        '    {"clip_id": "0.0", "beats": 4, "reasoning": "Motivazione basata su Narrative Energy o Gaze..."},\n'
-        '    {"clip_id": "15.3", "beats": 2, "reasoning": "Motivazione della transizione..."}\n'
+        '    {"clip_id": "0.0", "beats": 4, "reasoning": "Reasoning based on Narrative Energy or Gaze..."},\n'
+        '    {"clip_id": "15.3", "beats": 2, "reasoning": "Reasoning for the transition..."}\n'
         '  ]\n'
         '}\n'
     )
@@ -250,15 +263,26 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     constraints = hitl.get("hitl_constraints", {})
     director_config = hitl.get("director_config", {})
     
+    target_duration = director_config.get("target_duration", 60)
+    style_prompt = director_config.get("style_prompt", "Montaggio dinamico, fluido e in sync con la musica.")
+    rhythmic_strictness = director_config.get("rhythmic_strictness", 50)
+    energy_threshold = director_config.get("energy_threshold", 0.4)
+    audio_marker_priority = director_config.get("audio_marker_priority", "DYNAMIC_PRIORITY")
+    duration_mode = director_config.get("duration_mode", "ORGANIC")
+    ignore_list = director_config.get("ignore_list", "None")
+    
     raw_beats = audio.get("beats", [])
-    beats = [b.get("time", 0.0) if isinstance(b, dict) else float(b) for b in raw_beats]
+    beats = []
+    for b in raw_beats:
+        if isinstance(b, dict):
+            if b.get("energy", 0.5) >= energy_threshold:
+                beats.append(b.get("time", 0.0))
+        else:
+            beats.append(float(b))
     
     if not beats:
         print("⚠️ Nessun beat trovato. Fallback a timecode continui a 120BPM.")
         beats = [i * 0.5 for i in range(120)]
-        
-    target_duration = director_config.get("target_duration", 60)
-    style_prompt = director_config.get("style_prompt", "Montaggio dinamico, fluido e in sync con la musica.")
     total_audio_duration = beats[-1] if beats else 0.0
     
     target_beats_count = find_beat_index(target_duration, beats)
@@ -361,8 +385,9 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
 
     # We pass ALL usable_clips to LLM so it sees the Global IN/OUT narrative anchors
     recipe_dict = call_director_llm(
-        usable_clips, target_duration, target_beats_count, style_prompt, seed, 
-        locked_clips=locked_clips, llm_model_id=llm_model_id,
+        usable_clips, target_duration, target_beats_count, style_prompt, 
+        rhythmic_strictness, energy_threshold, audio_marker_priority, duration_mode, ignore_list,
+        seed, locked_clips=locked_clips, llm_model_id=llm_model_id,
         audio_bpm=audio.get("bpm"), audio_beats=audio.get("beats")
     )
     

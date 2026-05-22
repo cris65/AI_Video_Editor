@@ -88,8 +88,32 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
   const [lastTelemetry, setLastTelemetry] = useState<TelemetryRecord | null>(null);
   const [audioMarkerFilters, setAudioMarkerFilters] = useState<AudioMarkerFilter>({
     types: ['percussive', 'harmonic', 'beat', 'bpm_grid'],
-    minEnergy: 0.2
+    minEnergy: 0.4
   });
+
+  const handleAudioMarkerFiltersChange = useCallback((newFilters: AudioMarkerFilter) => {
+    setAudioMarkerFilters(newFilters);
+  }, []);
+
+  const latestStateRef = useRef({ userConstraints, clipOverrides, directorConfig });
+  useEffect(() => {
+    latestStateRef.current = { userConstraints, clipOverrides, directorConfig };
+  });
+
+  // Debounced Sync: Timeline Slider -> Engine Config -> Backend Save
+  // Prevents saving 50 times per second while dragging, avoiding network race conditions
+  // and ensuring the Engine Modal reflects the true final value chosen on mouse up.
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const { userConstraints: currentConstraints, clipOverrides: currentOverrides, directorConfig: currentConfig } = latestStateRef.current;
+      if (audioMarkerFilters.minEnergy !== (currentConfig.energy_threshold ?? 0.4)) {
+        const nextConfig = { ...currentConfig, energy_threshold: audioMarkerFilters.minEnergy };
+        setDirectorConfig(nextConfig);
+        triggerSave(currentConstraints, currentOverrides, nextConfig);
+      }
+    }, 500); // 500ms debounce
+    return () => clearTimeout(handler);
+  }, [audioMarkerFilters.minEnergy]);
 
   const formatModelName = (modelId: string) => {
     if (!modelId) return "VLM";
@@ -144,6 +168,10 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     }
     if (hitlData && hitlData.director_config) {
       setDirectorConfig(hitlData.director_config);
+      setAudioMarkerFilters(prev => ({
+        ...prev,
+        minEnergy: hitlData.director_config.energy_threshold ?? 0.4
+      }));
     }
   }, [hitlData]);
 
@@ -794,7 +822,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                   audioDuration={audioDuration}
                   audioBeats={audioBeats}
                   audioMarkerFilters={audioMarkerFilters}
-                  setAudioMarkerFilters={setAudioMarkerFilters}
+                  setAudioMarkerFilters={handleAudioMarkerFiltersChange}
                   markerNumbers={globalMarkerNumbers}
                 />
               </>
@@ -834,8 +862,10 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
               {isDirectorSettingsOpen && (
                 <DirectorSettingsPanel
                   config={directorConfig}
+                  audioBeats={audioBeats}
                   onSave={(newConfig) => {
                     setDirectorConfig(newConfig);
+                    setAudioMarkerFilters(prev => ({ ...prev, minEnergy: newConfig.energy_threshold ?? 0.4 }));
                     triggerSave(userConstraints, clipOverrides, newConfig);
                   }}
                   onRegenerate={handleRegenerateCut}
