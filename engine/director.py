@@ -5,9 +5,19 @@ import re
 
 try:
     from mlx_lm import load, generate
+    try:
+        from mlx_lm.sample_utils import make_sampler
+        _make_sampler = make_sampler
+    except ImportError:
+        import mlx.core as _mx
+        def _make_sampler(temp=0.3, **_kw):
+            if temp == 0.0:
+                return lambda logits: _mx.argmax(logits, axis=-1)
+            return lambda logits: _mx.random.categorical(logits * (1.0 / temp))
     MLX_LM_AVAILABLE = True
 except ImportError:
     MLX_LM_AVAILABLE = False
+    _make_sampler = None
 
 def check_director_llm_available():
     """
@@ -173,7 +183,7 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
             processor,
             prompt=prompt,
             max_tokens=4096,
-            temperature=0.3,
+            sampler=_make_sampler(temp=0.3),
             verbose=False
         )
         
@@ -380,8 +390,17 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     if locked_clips:
         print(f"🔒 [Director] {len(locked_clips)} clip locked. Costruzione attorno ai muri.")
 
-    # --- Estrazione Modello LLM dalla configurazione ---
-    llm_model_id = stringout.get("metadata", {}).get("llm_model_id", "meta-llama/Meta-Llama-3-70B-Instruct")
+    # --- Estrazione Modello LLM dalla configurazione (UI selection takes priority) ---
+    AI_MODEL_MAP = {
+        'gemma-4-4b':    'mlx-community/gemma-4-e4b-it-4bit',
+        'gemma-4-31b':   'mlx-community/gemma-4-31b-it-4bit',
+        'llama-3.3-70b': 'mlx-community/Llama-3.3-70B-Instruct-4bit',
+    }
+    ui_model_key = director_config.get('ai_model', None)
+    if ui_model_key and ui_model_key in AI_MODEL_MAP:
+        llm_model_id = AI_MODEL_MAP[ui_model_key]
+    else:
+        llm_model_id = stringout.get("metadata", {}).get("llm_model_id", 'mlx-community/gemma-4-e4b-it-4bit')
 
     # We pass ALL usable_clips to LLM so it sees the Global IN/OUT narrative anchors
     recipe_dict = call_director_llm(

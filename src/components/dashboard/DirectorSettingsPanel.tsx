@@ -6,12 +6,12 @@ import { AdvancedDirectorModal } from './AdvancedDirectorModal';
 interface DirectorSettingsPanelProps {
   config: DirectorConfig;
   audioBeats?: AudioBeat[];
+  audioBpm?: number | null;
   sourceResolution?: { width: number; height: number };
   onSave: (newConfig: DirectorConfig) => void;
   onRegenerate: () => void;
   isRegenerating: boolean;
   saveStatus: string;
-  sequenceFps: number;
 }
 
 // Micro-benchmark hook delegato al backend Python
@@ -70,6 +70,7 @@ function useHardwareProfiler() {
 export function DirectorSettingsPanel({
   config,
   audioBeats,
+  audioBpm,
   sourceResolution,
   onSave,
   onRegenerate,
@@ -112,7 +113,7 @@ export function DirectorSettingsPanel({
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3 shadow-inner">
           <div className="flex justify-between items-center pb-2 border-b border-slate-800">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider">AI Brain</span>
-            <span className="text-xs font-bold text-indigo-400">{localConfig.ai_model === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (E4B)'}</span>
+            <span className="text-xs font-bold text-indigo-400">{localConfig.ai_model === 'llama-3.3-70b' ? 'Llama 3.3 (70B)' : localConfig.ai_model === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (E4B)'}</span>
           </div>
           
           <div className="flex justify-between items-center pb-2 border-b border-slate-800">
@@ -230,6 +231,7 @@ export function DirectorSettingsPanel({
         <AdvancedDirectorModal 
           config={config} 
           audioBeats={audioBeats}
+          audioBpm={audioBpm}
           sourceResolution={sourceResolution}
           onClose={(newConfig) => {
             setIsAdvancedModalOpen(false);

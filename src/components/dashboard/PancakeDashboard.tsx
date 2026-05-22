@@ -863,6 +863,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                 <DirectorSettingsPanel
                   config={directorConfig}
                   audioBeats={audioBeats}
+                  audioBpm={audioBpm}
                   onSave={(newConfig) => {
                     setDirectorConfig(newConfig);
                     setAudioMarkerFilters(prev => ({ ...prev, minEnergy: newConfig.energy_threshold ?? 0.4 }));
@@ -871,7 +872,6 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                   onRegenerate={handleRegenerateCut}
                   isRegenerating={isRegenerating}
                   saveStatus={saveStatus}
-                  sequenceFps={fps}
                 />
               )}
             </div>

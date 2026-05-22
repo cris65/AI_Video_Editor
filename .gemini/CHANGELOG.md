@@ -1,10 +1,107 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.50 - 2026-05-22
+**Version:** v0.1.51 - 2026-05-22
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
 
 ---
+
+## 🐺 Walkthrough — v0.1.50 → v0.1.51
+
+### Sommario
+
+Release focalizzata sulla stabilizzazione dell'intero pipeline di orchestrazione AI Director (Fase D). Risolti 4 bug critici che bloccavano l'endpoint `/api/orchestrate` con errori 422, un crash dell'inferenza MLX per API deprecata, e un errato routing del modello LLM. Il pipeline è ora completamente funzionante end-to-end con Gemma 4 31B in locale.
+
+### File Modificati
+
+| File | +Ins | -Del | Descrizione |
+|---|---|---|---|
+| `engine/api_server.py` | +13 | -4 | Allineamento schema Pydantic completo |
+| `engine/director.py` | +22 | -3 | AI_MODEL_MAP + mlx_lm API fix |
+| `src/components/dashboard/AdvancedDirectorModal.tsx` | +13 | -23 | Rimozione Analysis Rate (Fase 1) |
+| `src/components/dashboard/DirectorSettingsPanel.tsx` | +4 | -2 | Label modello Llama 3.3 |
+| `src/components/dashboard/PancakeDashboard.tsx` | +1 | -1 | Fix diagnostica temporanea rimossa |
+| `src/hooks/usePancakeData.ts` | +1 | -1 | Tipo `ai_model` aggiornato con Llama |
+
+---
+
+### 1. Rimozione `Analysis Rate (FPS)` — Separazione Fase 1 / Fase 2
+
+**File:** `AdvancedDirectorModal.tsx`
+
+**Prima:** Il campo `Analysis Rate (FPS)` era presente nel tab "Engine & System" del pannello Director (Fase 2), ma quel parametro controlla il campionamento frame della Fase 1 (`PhaseAPayload`) e non ha rilevanza per l'LLM di orchestrazione.
+
+**Dopo:** Campo fisicamente rimosso. La griglia `grid-cols-2` del blocco "Sequence Format" è stata convertita in `w-full` per mantenere il layout bilanciato con solo il campo "Target Resolution".
+
+---
+
+### 2. Fix 422 — `UserConstraint` mancante di `'AUDIO'`
+
+**File:** `engine/api_server.py`
+
+**Root cause:** Il frontend inviava marker di tipo `"AUDIO"` (shortcut `A`) ma la classe Pydantic `UserConstraint` accettava solo `Literal['IN', 'OUT', 'BM']`. FastAPI rifiutava la request con ValidationError 422.
+
+**Fix:** Aggiunto `'AUDIO'` al Literal type della classe `UserConstraint`.
+
+---
+
+### 3. Fix 422 — `LockedClipOverride` incompatibile con Bookend System
+
+**File:** `engine/api_server.py`
+
+**Root cause:** Il Bookend System (introdotto in v0.1.48) aveva aggiornato la struttura TypeScript `clipOverrides` nel frontend con campi come `force_status`, `is_global_start`, `is_global_end`, ma il modello Pydantic `LockedClipOverride` era rimasto congelato alla vecchia struttura (`action`, `locked`). La `Union[LockedClipOverride, Literal['KEEP','TRASH','BROLL']]` falliva per entrambi i tipi.
+
+**Fix:** `LockedClipOverride` aggiornato con tutti i campi del Bookend System come `Optional`.
+
+---
+
+### 4. Fix 422 — Campi mancanti in `DirectorConfigPayload`
+
+**File:** `engine/api_server.py`
+
+**Root cause:** `duration_mode`, `rhythmic_strictness`, `energy_threshold`, `audio_marker_priority` erano presenti nell'interfaccia TypeScript `DirectorConfig` ma assenti nel modello Pydantic del backend.
+
+**Fix:** Aggiunti tutti e 4 i campi come `Optional` con i default corretti.
+
+---
+
+### 5. Fix mlx_lm API — `generate_step() got unexpected keyword argument 'temperature'`
+
+**File:** `engine/director.py`
+
+**Root cause:** La versione di `mlx_lm` installata nel venv ha deprecato `temperature` come argomento diretto di `generate()`. Il parametro si passa ora tramite un oggetto `sampler` callable.
+
+**Fix:** Importazione condizionale di `make_sampler` da `mlx_lm.sample_utils`. Fallback con lambda nativa `mlx.core.random.categorical`. La chiamata `generate()` usa ora `sampler=_make_sampler(temp=0.3)`.
+
+---
+
+### 6. AI Model Routing — `AI_MODEL_MAP` in `director.py`
+
+**File:** `engine/director.py`
+
+**Prima:** Il `llm_model_id` veniva letto esclusivamente dai metadati del `stringout.json`, ignorando completamente la scelta del modello nell'UI Director. La mappa era assente.
+
+**Dopo:** Introdotto `AI_MODEL_MAP` che mappes le chiavi UI ai percorsi MLX locali reali. La scelta dell'utente nell'`AdvancedDirectorModal` ha **priorità assoluta** sui metadati. Fallback sui metadati stringout se la chiave non è riconosciuta.
+
+```python
+AI_MODEL_MAP = {
+    'gemma-4-4b':    'mlx-community/gemma-4-e4b-it-4bit',
+    'gemma-4-31b':   'mlx-community/gemma-4-31b-it-4bit',
+    'llama-3.3-70b': 'mlx-community/Llama-3.3-70B-Instruct-4bit',
+}
+```
+
+---
+
+### Validazione
+
+- **ESLint:** ✅ 0 errori, 0 warning
+- **TSC:** ✅ 0 errori
+- **API `/api/orchestrate`:** ✅ 200 OK (era 422)
+- **LLM Inference Gemma 4 31B:** ✅ `"A slow-burn emotional descent from tranquil beauty to pensive melancholy..."`
+
+---
+
 
 ## 🐺 Walkthrough — v0.1.49 → v0.1.50
 

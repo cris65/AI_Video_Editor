@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export interface DirectorConfig {
-  ai_model?: 'gemma-4-4b' | 'gemma-4-31b';
+  ai_model?: 'gemma-4-4b' | 'gemma-4-31b' | 'llama-3.3-70b';
   target_duration: number;
   style_prompt: string;
   export_resolution?: string;

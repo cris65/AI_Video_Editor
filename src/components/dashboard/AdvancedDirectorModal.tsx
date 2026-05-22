@@ -147,11 +147,12 @@ function MarkerStrategyVisualizer({ strategy }: { strategy: string }) {
 interface AdvancedDirectorModalProps {
   config: DirectorConfig;
   audioBeats?: AudioBeat[];
+  audioBpm?: number | null;
   sourceResolution?: { width: number; height: number };
   onClose: (newConfig?: DirectorConfig) => void;
 }
 
-export function AdvancedDirectorModal({ config, audioBeats, sourceResolution, onClose }: AdvancedDirectorModalProps) {
+export function AdvancedDirectorModal({ config, audioBeats, audioBpm, sourceResolution, onClose }: AdvancedDirectorModalProps) {
   const [localConfig, setLocalConfig] = useState<DirectorConfig>(config);
   const [activeTab, setActiveTab] = useState<'visual' | 'audio' | 'system'>('visual');
 
@@ -393,8 +394,13 @@ export function AdvancedDirectorModal({ config, audioBeats, sourceResolution, on
               {/* LEFT COLUMN: Audio Controls */}
               <div className="space-y-8">
                 <div>
-                  <h3 className="text-sm font-bold text-amber-500 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
-                    Rhythm Sync Strictness
+                  <h3 className="text-sm font-bold text-amber-500 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2 flex justify-between items-center">
+                    <span>Rhythm Sync Strictness</span>
+                    {audioBpm && (
+                      <span className="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded flex items-center border border-slate-700 normal-case font-mono shadow-inner">
+                        🎵 {audioBpm} BPM
+                      </span>
+                    )}
                   </h3>
                   <div className="space-y-6">
                     <div>
@@ -480,6 +486,7 @@ export function AdvancedDirectorModal({ config, audioBeats, sourceResolution, on
                     >
                       <option value="gemma-4-4b">Gemma 4 (E4B) - Fast Local</option>
                       <option value="gemma-4-31b">Gemma 4 (31B) - Deep Insight</option>
+                      <option value="llama-3.3-70b">Llama 3.3 (70B) - Cloud</option>
                     </select>
                   </div>
                   <div>
@@ -501,7 +508,7 @@ export function AdvancedDirectorModal({ config, audioBeats, sourceResolution, on
                 <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2 mt-8">
                   Sequence Format
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="w-full">
                   <div>
                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-2">Target Resolution</label>
                     <select
@@ -543,17 +550,6 @@ export function AdvancedDirectorModal({ config, audioBeats, sourceResolution, on
                         />
                       </div>
                     )}
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-2">Analysis Rate (FPS)</label>
-                    <input 
-                      type="number" 
-                      step="0.1"
-                      min="0.1"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg text-sm px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none" 
-                      value={localConfig.analysis_fps ?? 0.5}
-                      onChange={(e) => handleChange('analysis_fps', Number(e.target.value))}
-                    />
                   </div>
                 </div>
               </div>

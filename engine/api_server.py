@@ -97,11 +97,11 @@ async def get_system_profiler():
     }
 
 class UserConstraint(BaseModel):
-    type: Literal['IN', 'OUT', 'BM']
+    type: Literal['IN', 'OUT', 'BM', 'AUDIO']
     time: float
 
 class DirectorConfigPayload(BaseModel):
-    ai_model: Optional[Literal['gemma-4-4b', 'gemma-4-31b']] = 'gemma-4-4b'
+    ai_model: Optional[Literal['gemma-4-4b', 'gemma-4-31b', 'llama-3.3-70b']] = 'gemma-4-4b'
     target_duration: float = 60.0
     style_prompt: str = ""
     export_resolution: Optional[str] = "1920x1080"
@@ -112,11 +112,20 @@ class DirectorConfigPayload(BaseModel):
     ignore_list: Optional[str] = None
     safe_zone_margin: Optional[float] = None
     seed: int = Field(default=-1, description="-1 = random, any positive integer = deterministic")
+    duration_mode: Optional[str] = "ORGANIC"
+    rhythmic_strictness: Optional[int] = 50
+    energy_threshold: Optional[float] = 0.4
+    audio_marker_priority: Optional[str] = "DYNAMIC_PRIORITY"
 
 class LockedClipOverride(BaseModel):
     """Structured lock object sent by the HITL frontend for manually anchored clips."""
-    action: Literal['KEEP', 'TRASH', 'BROLL', 'LOCKED'] = 'LOCKED'
-    locked: bool = False
+    force_status: Optional[Literal['KEEP', 'TRASH', 'BROLL']] = None
+    is_global_start: Optional[bool] = False
+    is_global_end: Optional[bool] = False
+    bookend_start_time: Optional[float] = None
+    bookend_end_time: Optional[float] = None
+    action: Optional[Literal['KEEP', 'TRASH', 'BROLL', 'LOCKED']] = 'LOCKED'
+    locked: Optional[bool] = False
     absolute_in: Optional[float] = None    # source_in at lock time (seconds, source space)
     absolute_out: Optional[float] = None   # source_out at lock time (seconds, source space)
     timeline_position: Optional[float] = None  # timeline_in absolute (seconds)
