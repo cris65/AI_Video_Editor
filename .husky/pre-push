@@ -1,0 +1,24 @@
+#!/bin/bash
+# ==============================================================================
+# GIT PRE-PUSH HOOK (HUSKY) - AUTOMATED KB SYNC TO GOOGLE DRIVE
+# ==============================================================================
+
+# Define local paths
+SOURCE_GEMINI="./.gemini"
+SOURCE_GEMINI_MAIN="./GEMINI.md"
+TARGET_DIR="/Users/macbookm4cdv/Library/CloudStorage/GoogleDrive-criseclipse@gmail.com/My Drive/WOLF_KB"
+
+echo "🔄 Git push detected. Syncing WOLF KB directly to Google Drive..."
+
+# Ensure the target directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "⚠️ Target directory not found. Creating it..."
+    mkdir -p "$TARGET_DIR"
+fi
+
+# Sync .gemini contents to target
+rsync -av --delete "$SOURCE_GEMINI/" "$TARGET_DIR/"
+# Copy GEMINI.md to target
+cp "$SOURCE_GEMINI_MAIN" "$TARGET_DIR/"
+
+echo "✅ Sync complete. Google Drive app will handle cloud upload in background."

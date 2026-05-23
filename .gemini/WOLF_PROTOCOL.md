@@ -51,16 +51,16 @@ Questo garantisce la tracciabilità assoluta delle epiche e dei macro-task all'i
 
 ---
 
-## 🔗 Appendix: Automated Knowledge Base Sync (.git/hooks/pre-push)
+## 🔗 Appendix: Automated Knowledge Base Sync (.husky/pre-push)
 
 To guarantee that the Knowledge Base is always aligned between Antigravity (local) and Gemini Web or App, a Git `pre-push` hook is configured to sync the Knowledge Base files to Google Drive automatically.
 
-Location: `.git/hooks/pre-push` (configured as executable: `chmod +x .git/hooks/pre-push`)
+Location: `.husky/pre-push` (configured as executable: `chmod +x .husky/pre-push`)
 
 ```bash
 #!/bin/bash
 # ==============================================================================
-# GIT PRE-PUSH HOOK - AUTOMATED KB SYNC TO GOOGLE DRIVE
+# GIT PRE-PUSH HOOK (HUSKY) - AUTOMATED KB SYNC TO GOOGLE DRIVE
 # ==============================================================================
 
 # Define local paths
@@ -86,6 +86,7 @@ echo "✅ Sync complete. Google Drive app will handle cloud upload in background
 
 ### Operational Behavior
 1. The Git push triggers this hook (since push operations are always executed on the host terminal by the Tech Lead, this bypasses the IDE sandbox restrictions).
-2. The hook performs a differential `rsync` of the `.gemini/` directory directly into the local Google Drive client folder, and copies the main `GEMINI.md` file.
-3. This guarantees that all updates to the Knowledge Base made during local commits are synchronized immediately when pushing.
-4. Google Drive synchronizes the updated files in the background, making them instantly available to the cloud LLMs (Gemini Web/App) to maintain a unified memory across agents.
+2. Husky delegates the push event to the `.husky/pre-push` script.
+3. The hook performs a differential `rsync` of the `.gemini/` directory directly into the local Google Drive client folder, and copies the main `GEMINI.md` file.
+4. This guarantees that all updates to the Knowledge Base made during local commits are synchronized immediately when pushing.
+5. Google Drive synchronizes the updated files in the background, making them instantly available to the cloud LLMs (Gemini Web/App) to maintain a unified memory across agents.
