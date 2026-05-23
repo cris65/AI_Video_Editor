@@ -519,6 +519,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     else:
         llm_model_id = stringout.get("metadata", {}).get("llm_model_id", 'mlx-community/gemma-4-e4b-it-4bit')
 
+    _t_start_llm = time.time()
     # We pass ALL usable_clips to LLM so it sees the Global IN/OUT narrative anchors
     recipe_dict = call_director_llm(
         usable_clips, target_duration, target_beats_count, style_prompt, 
@@ -526,6 +527,9 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         seed, locked_clips=locked_clips, llm_model_id=llm_model_id,
         audio_bpm=audio.get("bpm"), audio_beats=audio.get("beats")
     )
+    
+    if recipe_dict:
+        recipe_dict['_inference_time_seconds'] = round(time.time() - _t_start_llm, 2)
     
     # Compute the next version number ONCE — shared by recipe and final_edit saves
     os.makedirs(output_dir, exist_ok=True)

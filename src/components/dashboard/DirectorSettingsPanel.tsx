@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DirectorConfig, AudioBeat } from '../../hooks/usePancakeData';
-import { Wand2, RefreshCw, Settings2, Info, X } from 'lucide-react';
+import { Wand2, RefreshCw, Settings2 } from 'lucide-react';
 import { AdvancedDirectorModal } from './AdvancedDirectorModal';
 
 interface DirectorSettingsPanelProps {
@@ -12,59 +12,7 @@ interface DirectorSettingsPanelProps {
   onRegenerate: () => void;
   isRegenerating: boolean;
   saveStatus: string;
-}
-
-// Micro-benchmark hook delegato al backend Python
-function useHardwareProfiler() {
-  const [profile, setProfile] = useState({
-    name: 'Awaiting Python Benchmark...',
-    inference_4b: 0.15,
-    inference_31b: 1.8,
-    isReady: false,
-    isOfflineMock: false
-  });
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function fetchHardwareProfile() {
-      try {
-        const response = await fetch('http://localhost:8000/api/system/profiler');
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        const data = await response.json();
-        
-        if (isMounted) {
-          setProfile({
-            name: data.hardware_detected,
-            inference_4b: data.inference_time_4b,
-            inference_31b: data.inference_time_31b,
-            isReady: true,
-            isOfflineMock: false
-          });
-        }
-      } catch (error) {
-        // Fallback gracefully if Python is offline
-        if (isMounted) {
-          setProfile({
-            name: 'MOCK DATA (Python Offline)',
-            inference_4b: 0.15,
-            inference_31b: 1.8,
-            isReady: true,
-            isOfflineMock: true
-          });
-        }
-      }
-    }
-
-    fetchHardwareProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  return profile;
+  regenerationElapsed?: number;
 }
 
 export function DirectorSettingsPanel({
@@ -75,35 +23,28 @@ export function DirectorSettingsPanel({
   onSave,
   onRegenerate,
   isRegenerating,
-  saveStatus
+  saveStatus,
+  regenerationElapsed = 0
 }: DirectorSettingsPanelProps) {
   const [localConfig, setLocalConfig] = useState<DirectorConfig>(config);
   const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
-  const [showHardwareInfo, setShowHardwareInfo] = useState(false);
   
-  // Rilevamento hardware dinamico
-  const hardware = useHardwareProfiler();
-
   useEffect(() => {
     setLocalConfig(config);
   }, [config]);
 
   // --- Auto-Chunking Math ---
-  const aiModel = localConfig.ai_model || 'gemma-4-4b';
   const analysisFps = localConfig.analysis_fps ?? 0.5;
   const targetDuration = localConfig.target_duration || 60;
   
-  const inferenceTime = aiModel === 'gemma-4-31b' ? hardware.inference_31b : hardware.inference_4b;
-
   const totalFrames = Math.ceil(targetDuration * analysisFps);
   const totalTokens = (totalFrames * 840) + 4000;
   const requiredChunks = Math.ceil(totalTokens / 200000);
-  const totalTimeSeconds = totalFrames * inferenceTime;
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}m ${s}s`;
+  const formatElapsedTimer = (sec: number) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   return (
@@ -134,19 +75,9 @@ export function DirectorSettingsPanel({
           </div>
         </div>
 
-        {/* ETA & Auto-Chunking Widget */}
+        {/* Info & Auto-Chunking Widget */}
         <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-800 my-4 shadow-inner relative">
-          <div className="grid grid-cols-3 gap-2 divide-x divide-slate-800">
-            <div className="px-2 flex flex-col items-center justify-center text-center">
-              <span 
-                className="text-[9px] text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1 cursor-pointer hover:text-amber-500 transition-colors"
-                onClick={() => setShowHardwareInfo(!showHardwareInfo)}
-              >
-                Estimated Time
-                <Info size={10} />
-              </span>
-              <span className="text-sm font-bold text-amber-500 font-mono leading-none">{formatTime(totalTimeSeconds)}</span>
-            </div>
+          <div className="grid grid-cols-2 gap-2 divide-x divide-slate-800">
             <div className="px-2 flex flex-col items-center justify-center text-center">
               <span className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Analyzed Frames</span>
               <span className="text-sm font-bold text-slate-300 font-mono leading-none">{totalFrames}</span>
@@ -156,44 +87,6 @@ export function DirectorSettingsPanel({
               <span className="text-sm font-bold text-emerald-500 font-mono leading-none">{requiredChunks}</span>
             </div>
           </div>
-
-          {/* Hardware Info Pop-up */}
-          {showHardwareInfo && (
-            <div className="absolute z-10 bottom-full left-0 right-0 mb-2 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-xl">
-              <div className="flex justify-between items-center mb-2 border-b border-slate-800 pb-1">
-                <span className="font-bold text-[10px] text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                  <Wand2 size={10} /> Dynamic Profiler Live
-                </span>
-                <button onClick={() => setShowHardwareInfo(false)} className="text-slate-500 hover:text-white"><X size={12} /></button>
-              </div>
-              
-              {!hardware.isReady ? (
-                <div className="text-center py-4 px-2 text-xs text-slate-400 animate-pulse font-mono flex items-center justify-center gap-2">
-                  <RefreshCw size={12} className="animate-spin" />
-                  Awaiting Python Benchmark...
-                </div>
-              ) : (
-                <ul className="space-y-1.5 font-mono text-[9px] text-slate-300">
-                  <li className="flex justify-between">
-                    <span className="text-slate-500">Detected Hardware:</span>
-                    <span className={`font-bold ${hardware.isOfflineMock ? 'text-amber-500' : 'text-white'}`}>{hardware.name}</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span className="text-slate-500">Modello AI:</span>
-                    <span>{aiModel === 'gemma-4-31b' ? 'Gemma 4 (31B)' : 'Gemma 4 (E4B)'}</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span className="text-slate-500">Estimated Performance:</span>
-                    <span className="text-amber-400 font-bold">{inferenceTime}s / frame</span>
-                  </li>
-                  <li className="flex justify-between pt-1 border-t border-slate-800/50 mt-1">
-                    <span className="text-slate-500">Total Computation:</span>
-                    <span>{totalFrames} frames × {inferenceTime}s</span>
-                  </li>
-                </ul>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Advanced Settings Trigger */}
@@ -222,7 +115,7 @@ export function DirectorSettingsPanel({
             ) : (
               <Wand2 size={14} />
             )}
-            {isRegenerating ? 'Processing...' : 'Regenerate Cut'}
+            {isRegenerating ? `Processing... (Elapsed: ${formatElapsedTimer(regenerationElapsed)})` : 'Regenerate Cut'}
           </button>
         </div>
       </div>

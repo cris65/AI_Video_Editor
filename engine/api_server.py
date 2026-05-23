@@ -354,10 +354,38 @@ async def get_completed_projects():
             if os.path.exists(stringout_path):
                 # Basic metadata for sorting
                 mtime = os.path.getmtime(stringout_path)
+                
+                # Check for versions
+                director_cut_count = 0
+                latest_brain_model = None
+                latest_inference_time = None
+                
+                version_log_path = os.path.join(item_path, "LLM_Export_Package", f"{item}_version_log.json")
+                if os.path.exists(version_log_path):
+                    try:
+                        with open(version_log_path, 'r') as f:
+                            v_log = json.load(f)
+                            versions = v_log.get("versions", [])
+                            director_cut_count = len(versions)
+                            if versions:
+                                latest_brain_model = versions[-1].get("brain_model")
+                                latest_inference_time = versions[-1].get("inference_time_seconds")
+                    except Exception:
+                        pass
+                else:
+                    # Legacy fallback
+                    legacy_path = os.path.join(item_path, "LLM_Export_Package", f"{item}_final_edit.json")
+                    if os.path.exists(legacy_path):
+                        director_cut_count = 1
+                        latest_brain_model = "unknown (legacy)"
+                        
                 completed_projects.append({
                     "sequence_name": item,
                     "last_modified": mtime,
-                    "path": item_path
+                    "path": item_path,
+                    "director_cut_count": director_cut_count,
+                    "latest_brain_model": latest_brain_model,
+                    "latest_inference_time": latest_inference_time
                 })
                 
     # Sort by most recently modified

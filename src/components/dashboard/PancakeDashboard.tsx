@@ -215,6 +215,27 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     }
   }, [audioBpm]);
 
+  // Precision Stopwatch
+  const [regenerationElapsed, setRegenerationElapsed] = useState(0);
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRegenerating) {
+      setRegenerationElapsed(0);
+      interval = setInterval(() => {
+        setRegenerationElapsed((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRegenerating]);
+
+  const formatElapsedTimer = (sec: number) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   const combinedTimeline = data?.stringout_timeline || [];
   const fps = data?.metadata?.fps || 25;
 
@@ -720,7 +741,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
             ) : (
               <RefreshCw size={12} />
             )}
-            {isRegenerating ? 'Elaborazione...' : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
+            {isRegenerating ? `Elaborazione... (Elapsed: ${formatElapsedTimer(regenerationElapsed)})` : (finalCutTimeline.length === 0 ? 'Generate Cut' : 'Regenerate Cut')}
           </button>
 
           {/* Version History Dropdown */}
@@ -794,7 +815,9 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                               <span className="text-[8px] text-slate-500">{entry.clip_count} clip</span>
                             )}
                             {entry.inference_time_seconds !== null && (
-                              <span className="text-[8px] text-slate-500">{entry.inference_time_seconds}s</span>
+                              <span className="text-[8px] text-slate-500">
+                                {Math.floor(entry.inference_time_seconds / 60).toString().padStart(2, '0')}:{Math.floor(entry.inference_time_seconds % 60).toString().padStart(2, '0')}
+                              </span>
                             )}
                             <div className="flex items-center gap-1 ml-auto">
                               <Bot size={8} className="text-slate-600" />
@@ -985,6 +1008,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                   onRegenerate={handleRegenerateCut}
                   isRegenerating={isRegenerating}
                   saveStatus={saveStatus}
+                  regenerationElapsed={regenerationElapsed}
                 />
               )}
             </div>

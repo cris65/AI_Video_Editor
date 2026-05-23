@@ -27,6 +27,9 @@ interface CompletedProject {
   sequence_name: string;
   last_modified: number;
   path: string;
+  director_cut_count?: number;
+  latest_brain_model?: string;
+  latest_inference_time?: number;
 }
 
 
@@ -527,6 +530,25 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                   <span className="text-sm font-bold text-slate-200 break-words group-hover:text-emerald-400 transition-colors">
                     {proj.sequence_name}
                   </span>
+                  
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    {proj.director_cut_count ? (
+                      <>
+                        <span className="px-1.5 py-0.5 rounded-sm bg-indigo-900/40 text-indigo-400 text-[9px] font-bold uppercase tracking-wider border border-indigo-500/30">
+                          {proj.director_cut_count} Director's Cut{proj.director_cut_count > 1 ? 's' : ''}
+                        </span>
+                        {proj.latest_brain_model && (
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            Latest: {proj.latest_brain_model.split('/').pop()} 
+                            {proj.latest_inference_time ? ` (${Math.floor(proj.latest_inference_time / 60).toString().padStart(2, '0')}:${Math.floor(proj.latest_inference_time % 60).toString().padStart(2, '0')})` : ''}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[9px] text-slate-600 font-mono">Awaiting First Cut</span>
+                    )}
+                  </div>
+                  
                   <span className="text-[10px] text-slate-500 font-mono mt-1">
                     Ultima modifica: {new Date(proj.last_modified * 1000).toLocaleString()}
                   </span>

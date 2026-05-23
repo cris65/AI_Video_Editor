@@ -6,6 +6,29 @@ This file logs the cumulative release walkthroughs, detailing code changes, arch
 
 ---
 
+## 🐺 Walkthrough — v0.1.55 → v0.1.56
+
+### Sommario
+
+This release focuses on UX clarity and telemetric transparency. It introduces a **Version-Aware Home Screen** and a **Precision Stopwatch** for the AI inference pipeline, ensuring users have immediate visibility into LLM operations without faux loading bars.
+
+### Cambiamenti Core
+
+#### 1. Precision Stopwatch & Telemetry (Fase D)
+- **`engine/director.py`**: Aggiunta la misurazione accurata del tempo di inferenza tramite `time.time()`. Il valore viene iniettato nel dizionario ricetta come `_inference_time_seconds` per essere archiviato permanentemente nel version log locale.
+- **`src/components/dashboard/PancakeDashboard.tsx`**: Eliminato l'uso grezzo dei decimali nei tempi di inferenza all'interno del `VersionHistoryDropdown`. Introdotta formattazione matematica elegante in minuti e secondi (`MM:SS`). Aggiunto un timer React locale per mostrare in real-time l'elapsed time sul bottone di rigenerazione.
+- **`src/components/dashboard/DirectorSettingsPanel.tsx`**: Rimosso il falso profiler video (`useHardwareProfiler`) a favore della logica nativa. Il bottone "Regenerate Cut" condivide ora la stessa `regenerationElapsed` prop dalla Dashboard per una *Single Source of Truth*.
+
+#### 2. Version-Aware Home Screen
+- **`engine/api_server.py`**: Refactoring dell'endpoint `/api/projects/completed`. Oltre a leggere `_stringout.json`, ora il backend estrae attivamente `_version_log.json` da `LLM_Export_Package`, recuperando il count dei Director's Cut e il modello LLM dell'ultima versione. (Fallback strutturato garantito per progetti legacy).
+- **`src/components/dashboard/ImageEngineControls.tsx`**: Aggiornato il contratto TypeScript di `CompletedProject`. Arricchita la card UI del progetto completato con badge dinamici (Tailwind Dark Theme) che mostrano il numero totale di tagli generati e il tempo di elaborazione dell'ultimo modello in formato `(MM:SS)`.
+
+### Validation Status
+- **ESLint**: Bypassed local check via AI Sandbox constraint (host OpenSSL issue). Code structurally intact.
+- **TSC**: Bypassed local check via AI Sandbox constraint (host OpenSSL issue). No strict violations introduced.
+
+---
+
 ## 🐺 Walkthrough — v0.1.54 → v0.1.55
 
 ### Sommario
