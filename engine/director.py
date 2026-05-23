@@ -602,12 +602,41 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     # --- Chiamata Motore LLM o Bypass Deterministico ---
     if bypass_llm:
         print("⚡ [Director] Deterministic Bypass attivo: Generazione sequenza da selezioni manuali (No LLM).")
+        # Read the human-ordered clip list from HITL data (D&D result from the Stringout UI).
+        stringout_order: list = hitl.get("stringout_order", [])
         fake_recipe = []
-        for fc in free_clips:
-            # Add to deterministic bypass if explicitly marked or kept, or if it is inherently a MAIN clip without constraints (if we need bulk, but usually we just want user's explicit markers/keeps)
-            if fc.get('_marker_role') is not None or overrides.get(str(fc['start'])) == 'KEEP' or (isinstance(overrides.get(str(fc['start'])), dict) and overrides.get(str(fc['start'])).get('force_status') == 'KEEP') or fc.get('_has_bm'):
-                fake_recipe.append({"clip_id": fc.get('_virtual_id', str(fc['start'])), "beats": 4, "reasoning": "Deterministic Selection"})
-        
+
+        if stringout_order:
+            # BYPASS MODE A: Use exact D&D order provided by the frontend.
+            # Each entry is a clip start-time (float, seconds). TRASH clips are already
+            # excluded by the frontend (per approved architectural decision).
+            free_clip_map = {str(c['start']): c for c in free_clips}
+            for start_time in stringout_order:
+                clip_key = str(start_time)
+                if clip_key in free_clip_map:
+                    fc = free_clip_map[clip_key]
+                    fake_recipe.append({
+                        "clip_id": fc.get('_virtual_id', clip_key),
+                        "beats": 4,
+                        "reasoning": "Deterministic D&D Order"
+                    })
+        else:
+            # BYPASS MODE B (Fallback): No explicit order — auto-select based on markers/KEEP.
+            for fc in free_clips:
+                override_val = overrides.get(str(fc['start']))
+                is_keep = (
+                    fc.get('_marker_role') is not None
+                    or override_val == 'KEEP'
+                    or (isinstance(override_val, dict) and override_val.get('force_status') == 'KEEP')
+                    or fc.get('_has_bm')
+                )
+                if is_keep:
+                    fake_recipe.append({
+                        "clip_id": fc.get('_virtual_id', str(fc['start'])),
+                        "beats": 4,
+                        "reasoning": "Deterministic Selection"
+                    })
+
         recipe_dict = {
             "director_vision": "Deterministic Cut (Bypass LLM)",
             "recipe": fake_recipe,

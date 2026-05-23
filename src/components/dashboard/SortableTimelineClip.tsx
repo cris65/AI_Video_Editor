@@ -1,47 +1,39 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { FinalCutClip } from '../../hooks/usePancakeData';
 
 interface SortableTimelineClipProps {
   id: string;
-  clip: FinalCutClip;
-  widthPct: number;
-  seqLabel: string;
-  isMoved?: boolean;
-  isLocked?: boolean;
+  left: number;
+  width: number;
+  colorClass: string;
+  label: string;
+  bmOffsetPct?: number;
+  badge?: React.ReactNode;
 }
 
 export const SortableTimelineClip: React.FC<SortableTimelineClipProps> = ({
   id,
-  clip,
-  widthPct,
-  seqLabel,
-  isMoved = false,
-  isLocked = false,
+  left,
+  width,
+  colorClass,
+  label,
+  bmOffsetPct,
+  badge
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
 
   const style: React.CSSProperties = {
-    flex: `0 0 ${widthPct}%`,
+    position: 'absolute',
+    left: `${left}%`,
+    width: `${width}%`,
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.25 : 1,
-    position: 'relative',
+    zIndex: isDragging ? 50 : 10,
+    opacity: isDragging ? 0.3 : 1,
     touchAction: 'none',
-    height: '100%',
   };
-
-  // Color hierarchy: locked (manual human anchor) > pillar > b-roll > filler
-  let bgColor = 'bg-emerald-600';
-  if (isLocked) bgColor = 'bg-blue-600';
-  else if (clip.role === 'PILLAR') bgColor = 'bg-amber-500';
-  else if (clip.tag === 'B-ROLL') bgColor = 'bg-blue-500';
-
-  const lockedGlow = isLocked
-    ? 'shadow-[inset_0_0_0_1px_rgba(96,165,250,0.8),0_0_8px_rgba(59,130,246,0.5)]'
-    : '';
 
   return (
     <div
@@ -49,57 +41,36 @@ export const SortableTimelineClip: React.FC<SortableTimelineClipProps> = ({
       style={style}
       {...attributes}
       {...listeners}
-      className={`${bgColor} ${lockedGlow} flex items-center justify-center cursor-grab active:cursor-grabbing relative transition-all duration-300 ${
-        isMoved && !isLocked
-          ? 'z-10 opacity-60 before:absolute before:inset-0 before:bg-black/60 before:shadow-[inset_0_0_8px_rgba(255,255,255,0.8)] before:pointer-events-none border-transparent'
-          : 'border-r border-slate-900 z-10'
-      }`}
-      title={`${isLocked ? '🔒 LOCKED — ' : ''}[${clip.role}] ${clip.tag}`}
+      className={`h-full rounded-sm relative cursor-grab active:cursor-grabbing border-r border-slate-900 ${colorClass}`}
+      title={label}
     >
-      {/* Lock badge — top-right corner on locked clips */}
-      {isLocked && (
-        <span
-          className="absolute top-0.5 right-0.5 text-[9px] leading-none pointer-events-none select-none"
-          aria-label="Locked clip"
+      {badge && (
+        <div className="absolute top-0.5 right-0.5 flex gap-0.5 pointer-events-none z-10">
+          {badge}
+        </div>
+      )}
+      {width > 2 && (
+        <span className="absolute top-0 left-1 text-[9px] text-white font-light tracking-wide overflow-hidden whitespace-nowrap pointer-events-none z-[5] leading-tight pt-px">
+          {label}
+        </span>
+      )}
+      {bmOffsetPct !== undefined && (
+        <div
+          className="absolute flex flex-col items-center z-10 pointer-events-none"
+          style={{
+            left: `${bmOffsetPct}%`,
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
         >
-          🔒
-        </span>
-      )}
-      {widthPct > 4 && (
-        <span className="text-[10px] font-bold text-white/70 tracking-wider select-none pointer-events-none font-mono">
-          {seqLabel}
-        </span>
+          <div className="text-[12px] font-black drop-shadow-md text-yellow-400">
+            <svg width="7.5" height="10.5" viewBox="0 0 10 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+              <path d="M0 0H10V10L5 14L0 10V0Z" />
+            </svg>
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-// Static preview used by DragOverlay (no useSortable)
-interface StaticClipPreviewProps {
-  clip: FinalCutClip;
-  widthPx: number;
-}
-
-export const StaticClipPreview: React.FC<StaticClipPreviewProps> = ({ clip, widthPx }) => {
-  let bgColor = 'bg-emerald-600';
-  if (clip.locked) bgColor = 'bg-blue-600';
-  else if (clip.role === 'PILLAR') bgColor = 'bg-amber-500';
-  else if (clip.tag === 'B-ROLL') bgColor = 'bg-blue-500';
-
-  return (
-    <div
-      style={{ width: `${widthPx}px`, height: '48px' }}
-      className={`${bgColor} rounded-sm opacity-95 shadow-2xl flex items-center justify-center border border-white/20`}
-    >
-      <span className="text-[10px] font-bold text-white/80 tracking-wider select-none">
-        {clip.locked
-          ? '🔒 LOCKED'
-          : clip.role === 'PILLAR'
-          ? '⚓ PILLAR'
-          : clip.tag === 'B-ROLL'
-          ? '🎬 B-ROLL'
-          : '✂️ CUT'}
-      </span>
-    </div>
-  );
-};

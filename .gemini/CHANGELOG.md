@@ -1,8 +1,48 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.59 - 2026-05-23
+**Version:** v0.1.60 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.59 → v0.1.60
+
+### Sommario [ORD-002 REV.5]
+
+This release resolves critical visual and architectural regressions in the new `UniversalTimeline`. It restores the original rendering accuracy, layered component hierarchy, and responsive zoom scaling of the legacy `InteractiveTimeline`.
+
+### Cambiamenti Core
+
+#### 1. Universal Timeline — Zoom Engine Re-architecture
+- **Issue:** The GPU `transform: scaleX(...)` logic was distorting clip borders and displacing timeline markers, causing text elements to stretch and visual markers to detach from their designated timecodes during zooming.
+- **Fix:** Completely reverted to the classic DOM `width: zoomScale * 100%` paired with `transform: translateX(-panOffset%)`. This mathematical approach correctly expands the container natively, meaning all internal percentage-based coordinates (`left: 50%`, `width: 20%`) resolve flawlessly without distortion or manual multiplier injection.
+
+#### 2. Visual Hierarchy & Layering (Z-Index fix)
+- **Issue:** The outer container was styled as a solid grey box, erasing the distinction between the track and the header. Timeline markers were also obscured by the black background ruler bar.
+- **Fix:** Removed the background container style, allowing the timeline track to float naturally with an inner shadow (`bg-slate-900 border-slate-800 rounded-lg shadow-inner`). Added `z-[20]` to the zooming container wrapper, ensuring markers render *above* the static black `bg-black/75` `z-[10]` ruler strip.
+
+#### 3. Clip Colors & Native Best Moment Markers
+- **Issue:** TRASH clips were rendering grey instead of red (`grayscale opacity-30`), and Native AI Best Moment (yellow shield) markers were missing from the clip segments.
+- **Fix:** 
+  - Restored TRASH clips to their native vibrant red by removing the unused `isTrash` opacity classes from `SortableTimelineClip`.
+  - Re-mapped the `clip.best_moment` payload from `PancakeDashboard` and recalculated `bmOffsetPct` inside `UniversalTimelineSegment`, resurrecting the Yellow Shield SVG directly inside the individual colored clip tracks.
+  - Reduced the marker pill sizes (`text-[7px] py-0.5 px-1`) to fit perfectly inside the `24px` ruler boundary without touching the borders.
+
+### File Modificati
+
+| File | Descrizione |
+|---|---|
+| `package.json` | Version bump `0.1.60`. |
+| `src/components/dashboard/UniversalTimeline.tsx` | Rimozione stili outer container. |
+| `src/components/dashboard/UniversalTimelineTrack.tsx` | Z-index +20, fix zoom architecture (width scaling). |
+| `src/components/dashboard/SortableTimelineClip.tsx` | Ripristino colore TRASH, ripristino SVG marker giallo BM. |
+| `src/components/dashboard/UniversalTimelineSegment.tsx` | Calcolo offset `bmOffsetPct`. |
+| `src/components/dashboard/PancakeDashboard.tsx` | Iniezione `bestMoment` nel builder `soClips`. |
+
+### Validazione
+- **ESLint:** PASS (0 errors, 13 react-hooks/exhaustive-deps warnings)
+- **TypeScript (TSC):** PASS
 
 ---
 

@@ -139,6 +139,9 @@ class OrchestratePayload(BaseModel):
     clip_overrides: dict[str, Union[LockedClipOverride, Literal['KEEP', 'TRASH', 'BROLL']]] = {}
     director_config: DirectorConfigPayload = DirectorConfigPayload()
     bypass_llm: bool = False
+    # Ordered list of clip start-times (float, seconds) representing the human D&D order.
+    # If provided in bypass_llm mode, the director uses this exact sequence instead of auto-selecting.
+    stringout_order: list[float] = []
 
 class AudioAnalyzePayload(BaseModel):
     filename: str
@@ -180,6 +183,7 @@ async def orchestrate_director_cut(payload: OrchestratePayload):
         "hitl_constraints": {k: [c.model_dump() for c in v] for k, v in payload.hitl_constraints.items()},
         "clip_overrides": normalized_overrides,
         "director_config": director_cfg_dict,
+        "stringout_order": payload.stringout_order,
     }
     try:
         with open(hitl_path, 'w') as f:

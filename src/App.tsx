@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PancakeDashboard } from './components/dashboard/PancakeDashboard';
 import { ImageEngineControls } from './components/dashboard/ImageEngineControls';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FolderOpen, RotateCcw, X, ArrowRight, Cpu, Film } from 'lucide-react';
 
 interface VideoClip {
@@ -167,9 +168,11 @@ export default function App() {
   }
 
   return (
-    <PancakeDashboard
-      sequenceName={sequenceName}
-      onOpenEngine={() => setCurrentView('setup')}
-    />
+    <ErrorBoundary>
+      <PancakeDashboard
+        sequenceName={sequenceName}
+        onOpenEngine={() => setCurrentView('setup')}
+      />
+    </ErrorBoundary>
   );
 }

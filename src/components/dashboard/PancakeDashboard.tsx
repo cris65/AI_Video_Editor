@@ -3,8 +3,8 @@ import { usePancakeData, DirectorConfig, FinalCutClip, VersionEntry, VersionDire
 import { useVideoShortcuts } from '../../hooks/useVideoShortcuts';
 import { ClipCard } from './ClipCard';
 import { VideoPlayerSync } from './VideoPlayerSync';
-import { InteractiveTimeline } from './InteractiveTimeline';
-import { FinalCutTimeline } from './FinalCutTimeline';
+import { UniversalTimeline } from './UniversalTimeline';
+import type { UniversalClip } from '../../types/UniversalClip';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { AudioSettingsModal } from './AudioSettingsModal';
@@ -19,20 +19,11 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
 }
 
-// Pure function: recalculates timeline_in/timeline_out after manual reorder.
-// Durations are invariant (source_out - source_in). Returns a new immutable array.
-function recalcTimeline(clips: FinalCutClip[]): FinalCutClip[] {
-  let cursor = 0;
-  return clips.map(clip => {
-    const duration = clip.source_out - clip.source_in;
-    const recalculated: FinalCutClip = {
-      ...clip,
-      timeline_in: cursor,
-      timeline_out: cursor + duration,
-    };
-    cursor += duration;
-    return recalculated;
-  });
+function getSegmentColor(clip: any, isTrash = false): string {
+  if (isTrash) return 'bg-red-500/80 hover:bg-red-400 border-r border-slate-950';
+  if (clip.role === 'PILLAR') return 'bg-amber-500/20 border-amber-500/40';
+  if (clip.tag && clip.tag.includes('B-ROLL')) return 'bg-blue-500/80 hover:bg-blue-400 border-r border-slate-950';
+  return 'bg-emerald-500/80 hover:bg-emerald-400 border-r border-slate-950';
 }
 
 interface TelemetryRecord {
@@ -64,7 +55,7 @@ export interface AudioMarkerFilter {
 }
 
 export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName, onOpenEngine }) => {
-  const { 
+  const {
     data, hitlData, finalCutTimeline, gemmaRecipe,
     audioBpm, audioDuration, audioWaveforms, audioBeats,
     versionHistory, activeVersion,
@@ -97,9 +88,10 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     types: ['percussive', 'harmonic', 'beat', 'bpm_grid'],
     minEnergy: 0.4
   });
+  const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
 
-  const handleAudioMarkerFiltersChange = useCallback((newFilters: AudioMarkerFilter) => {
-    setAudioMarkerFilters(newFilters);
+  const toggleMarkerVisibility = useCallback((type: string) => {
+    setHiddenMarkers(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
   }, []);
 
   const latestStateRef = useRef({ userConstraints, clipOverrides, directorConfig });
@@ -434,6 +426,37 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     }
   };
 
+  // Direct Export (Deterministic Bypass): sends the current D&D order directly to Python.
+  // Always visible — the user can trigger it even without reordering (just tagging TRASH/KEEP).
+  const handleDirectExport = useCallback(async (stringoutOrder: number[]) => {
+    setIsRegenerating(true);
+    try {
+      const orchestratePayload = {
+        sequence_name: sequenceName,
+        hitl_constraints: userConstraints,
+        clip_overrides: clipOverrides,
+        director_config: directorConfig,
+        bypass_llm: true,
+        stringout_order: stringoutOrder,
+      };
+      const res = await fetch('http://localhost:8000/api/orchestrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orchestratePayload),
+      });
+      if (!res.ok) throw new Error('Direct Export failed');
+      const result = await res.json();
+      if (!result.ok) throw new Error((result as { error?: string }).error ?? 'Director error');
+      await refetchFinalCut();
+      await fetchVersionHistory();
+      setIsPreviewMode(true);
+    } catch (err) {
+      console.error('Direct Export failed:', err);
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [sequenceName, userConstraints, clipOverrides, directorConfig, refetchFinalCut, fetchVersionHistory]);
+
   // Rehydration Engine: loads a historical version and restores its directorConfig
   const handleVersionSelect = useCallback(async (entry: VersionEntry) => {
     const config: VersionDirectorConfig | null = await loadVersion(entry);
@@ -452,42 +475,9 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     setIsVersionMenuOpen(false);
   }, [loadVersion]);
 
-  // Receives the arrayMove'd array from FinalCutTimeline and recalculates timeline positions.
-  const handleFinalCutReorder = useCallback((newTimeline: FinalCutClip[], seekToTimelineIn?: number) => {
-    setOrderedFinalCut(recalcTimeline(newTimeline));
-    if (seekToTimelineIn !== undefined) {
-      setPendingSeek(seekToTimelineIn);
-    }
-  }, []);
-
-  // Persists the current clip order into _hitl_data.json under clip_order_override.
-  const handleSaveOrder = useCallback(() => {
-    const payload = {
-      hitl_constraints: userConstraints,
-      clip_overrides: clipOverrides,
-      director_config: directorConfig,
-      clip_order_override: orderedFinalCut,
-    };
-    setSaveStatus('saving');
-    fetch(`/api/save-hitl?sequence=${sequenceName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload, null, 2),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Save failed');
-        setSaveStatus('saved');
-        // Do NOT call refetchFinalCut() here, otherwise the Python's raw timeline will overwrite our sorted local state.
-        setTimeout(() => setSaveStatus('idle'), 2000);
-      })
-      .catch(err => {
-        console.error('Failed to save order:', err);
-        setSaveStatus('idle');
-      });
-  }, [userConstraints, clipOverrides, directorConfig, orderedFinalCut, sequenceName, refetchFinalCut]);
 
   // useSequencePlayer now consumes orderedFinalCut so playback respects manual reorder.
-  const { currentTimelineTime, activeClipIndex, seekToTimelineTime } = useSequencePlayer(
+  const { currentTimelineTime, activeClipIndex, seekToTimelineTime, virtualTimeRef } = useSequencePlayer(
     videoRef,
     audioRef,
     orderedFinalCut,
@@ -583,6 +573,62 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     // Sort chronologically only — no teleportation (bookends are metadata for LLM, not UI reordering)
     return [...result].sort((a, b) => a.start - b.start);
   }, [combinedTimeline, filterMode, clipOverrides]);
+
+  const soClips: UniversalClip[] = useMemo(() => {
+    return filteredTimeline.map(clip => {
+      const override = clipOverrides[clip.start.toString()];
+      const forceStatus = typeof override === 'string' ? override : override?.force_status;
+      const isTrash = forceStatus === 'TRASH' || (forceStatus !== 'KEEP' && forceStatus !== 'BROLL' && clip.is_usable === false);
+      return {
+        id: clip.start.toString(),
+        displayStart: clip.start,
+        displayEnd: clip.end,
+        colorClass: getSegmentColor(clip, isTrash),
+        label: clip.clip_name,
+        isTrash,
+        sourceStart: clip.start,
+        sourceEnd: clip.end,
+        sourceClipStart: clip.start,
+        bestMoment: clip.best_moment
+      };
+    });
+  }, [filteredTimeline, clipOverrides]);
+
+  const soTotalDuration = useMemo(() => {
+    return soClips.reduce((acc, c) => acc + (c.sourceEnd - c.sourceStart), 0);
+  }, [soClips]);
+
+  const dcClips: UniversalClip[] = useMemo(() => {
+    // We map against finalCutTimeline to ensure P#/F# labels match the source
+    return orderedFinalCut.map(clip => {
+      // Find its original chronological index to assign the correct P/F label
+      const originalIdx = finalCutTimeline.findIndex(
+        c => Math.abs(c.source_clip_start - clip.source_clip_start) < 0.1 && Math.abs(c.source_in - clip.source_in) < 0.01
+      );
+      
+      let pCount = 0; let fCount = 0;
+      for (let k = 0; k <= originalIdx && k < finalCutTimeline.length; k++) {
+        if (finalCutTimeline[k].role === 'PILLAR') pCount++;
+        else fCount++;
+      }
+      
+      const isMoved = originalIdx !== orderedFinalCut.indexOf(clip);
+
+      return {
+        id: `${clip.source_clip_start}_${clip.source_in}`,
+        displayStart: clip.timeline_in,
+        displayEnd: clip.timeline_out,
+        colorClass: getSegmentColor(clip),
+        label: clip.role === 'PILLAR' ? `P${pCount}` : `F${fCount}`,
+        isLocked: clip.locked,
+        isMoved,
+        isTrash: false,
+        sourceStart: clip.source_in,
+        sourceEnd: clip.source_out,
+        sourceClipStart: clip.source_clip_start
+      };
+    });
+  }, [orderedFinalCut, finalCutTimeline]);
 
   useEffect(() => {
     if (isPreviewMode) return; // Disabilita check standard in preview mode
@@ -750,11 +796,10 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
               <button
                 id="version-history-toggle"
                 onClick={() => setIsVersionMenuOpen(prev => !prev)}
-                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
-                  isVersionMenuOpen
+                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md transition-all ${isVersionMenuOpen
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                     : 'bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700'
-                }`}
+                  }`}
                 title="Version History — seleziona un taglio storico"
               >
                 <History size={11} />
@@ -787,16 +832,14 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                           key={entry.version}
                           id={`version-entry-v${entry.version}`}
                           onClick={() => handleVersionSelect(entry)}
-                          className={`w-full text-left px-3 py-2.5 border-b border-slate-800 last:border-0 transition-colors ${
-                            isActive
+                          className={`w-full text-left px-3 py-2.5 border-b border-slate-800 last:border-0 transition-colors ${isActive
                               ? 'bg-amber-500/10 border-l-2 border-l-amber-400'
                               : 'hover:bg-slate-800'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
-                              isActive ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'
-                            }`}>
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isActive ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'
+                              }`}>
                               v{entry.version}
                             </span>
                             {entry.is_legacy && (
@@ -929,39 +972,48 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
           </div>
           <div className="shrink-0 mt-4">
             {isPreviewMode ? (
-              <>
-                <FinalCutTimeline
-                  timeline={orderedFinalCut}
-                  originalTimeline={finalCutTimeline}
-                  markerNumbers={globalMarkerNumbers}
-                  currentTime={currentTimelineTime}
-                  onSeek={seekToTimelineTime}
-                  onReorder={handleFinalCutReorder}
-                  onSaveOrder={handleSaveOrder}
-                  userConstraints={userConstraints}
-                  audioWaveforms={audioWaveforms}
-                  waveformView={waveformView}
-                  audioDuration={audioDuration}
-                />
-              </>
+              <UniversalTimeline
+                mode="director_cut"
+                clips={dcClips}
+                videoRef={videoRef}
+                virtualTimeRef={virtualTimeRef}
+                duration={videoDuration}
+                userConstraints={userConstraints}
+                hiddenMarkers={hiddenMarkers}
+                toggleMarkerVisibility={toggleMarkerVisibility}
+                audioWaveforms={audioWaveforms}
+                waveformView={waveformView}
+                setWaveformView={setWaveformView}
+                audioDuration={audioDuration}
+                audioBeats={audioBeats}
+                markerNumbers={globalMarkerNumbers}
+                dcActions={{
+                  onBookendStart: () => handleGlobalBookend('START', currentTimelineTime),
+                  onBookendEnd: () => handleGlobalBookend('END', currentTimelineTime),
+                  onLockToggle: () => { /* Lock logic implemented via ClipCard currently */ },
+                  onDirectExportDC: () => handleDirectExport(orderedFinalCut.map(c => c.source_clip_start))
+                }}
+              />
             ) : (
-              <>
-                <InteractiveTimeline
-                  timeline={filteredTimeline}
-                  videoRef={videoRef}
-                  duration={videoDuration}
-                  userConstraints={userConstraints}
-                  clipOverrides={clipOverrides}
-                  audioWaveforms={audioWaveforms}
-                  waveformView={waveformView}
-                  setWaveformView={setWaveformView}
-                  audioDuration={audioDuration}
-                  audioBeats={audioBeats}
-                  audioMarkerFilters={audioMarkerFilters}
-                  setAudioMarkerFilters={handleAudioMarkerFiltersChange}
-                  markerNumbers={globalMarkerNumbers}
-                />
-              </>
+              <UniversalTimeline
+                mode="stringout"
+                clips={soClips}
+                globalTimeline={combinedTimeline}
+                videoRef={videoRef}
+                duration={soTotalDuration}
+                userConstraints={userConstraints}
+                hiddenMarkers={hiddenMarkers}
+                toggleMarkerVisibility={toggleMarkerVisibility}
+                audioWaveforms={audioWaveforms}
+                waveformView={waveformView}
+                setWaveformView={setWaveformView}
+                audioDuration={audioDuration}
+                audioBeats={audioBeats}
+                markerNumbers={globalMarkerNumbers}
+                audioMarkerFilters={audioMarkerFilters}
+                setAudioMarkerFilters={setAudioMarkerFilters}
+                onSaveStringoutOrder={(validClips) => handleDirectExport(validClips.map(c => c.start))}
+              />
             )}
           </div>
         </div>

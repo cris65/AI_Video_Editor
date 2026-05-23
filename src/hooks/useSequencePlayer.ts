@@ -11,6 +11,7 @@ export function useSequencePlayer(
   const [activeClipIndex, setActiveClipIndex] = useState(0);
   const rafRef = useRef<number>();
   const isSeeking = useRef(false);
+  const virtualTimeRef = useRef(0);
 
 
   // Reset sequence when timeline is regenerated
@@ -51,7 +52,7 @@ export function useSequencePlayer(
         audio.play().catch(e => console.warn("Audio play blocked", e));
       }
     };
-    
+
     const handlePause = () => {
       if (audio) {
         audio.pause();
@@ -60,7 +61,7 @@ export function useSequencePlayer(
 
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
-    
+
     return () => {
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
@@ -82,20 +83,21 @@ export function useSequencePlayer(
     const loop = () => {
       if (!isSeeking.current) {
         const vTime = video.currentTime;
-        
+
         const currentIndex = activeClipIndex;
         const currentClip = finalCutTimeline[currentIndex];
 
         // 1. Calculate global timeline time
         const elapsed = vTime - currentClip.source_in;
-        setCurrentTimelineTime(currentClip.timeline_in + elapsed);
+        virtualTimeRef.current = currentClip.timeline_in + elapsed;
+        setCurrentTimelineTime(virtualTimeRef.current);
 
         // 2. Audio sync watchdog
         if (audio && !audio.paused && !video.paused) {
-           const expectedAudioTime = currentClip.timeline_in + elapsed;
-           if (Math.abs(audio.currentTime - expectedAudioTime) > 0.15) {
-               audio.currentTime = expectedAudioTime;
-           }
+          const expectedAudioTime = currentClip.timeline_in + elapsed;
+          if (Math.abs(audio.currentTime - expectedAudioTime) > 0.15) {
+            audio.currentTime = expectedAudioTime;
+          }
         }
 
         // 3. TRIGGER CUT (Hot Swap)
@@ -105,12 +107,12 @@ export function useSequencePlayer(
             isSeeking.current = true;
             setActiveClipIndex(nextIndex);
             const nextClip = finalCutTimeline[nextIndex];
-            
+
             video.currentTime = nextClip.source_in;
             if (audio) {
               audio.currentTime = nextClip.timeline_in;
             }
-            
+
             const onSeeked = () => {
               isSeeking.current = false;
               video.removeEventListener('seeked', onSeeked);
@@ -124,7 +126,7 @@ export function useSequencePlayer(
           }
         }
       }
-      
+
       rafRef.current = requestAnimationFrame(loop);
     };
 
@@ -139,21 +141,21 @@ export function useSequencePlayer(
   const seekToTimelineTime = useCallback((targetTime: number) => {
     if (!videoRef.current) return;
     const clipIndex = finalCutTimeline.findIndex(c => targetTime >= c.timeline_in && targetTime < c.timeline_out);
-    
+
     if (clipIndex !== -1) {
       const clip = finalCutTimeline[clipIndex];
       const elapsed = targetTime - clip.timeline_in;
       const targetSource = clip.source_in + elapsed;
-      
+
       isSeeking.current = true;
       setActiveClipIndex(clipIndex);
       setCurrentTimelineTime(targetTime);
-      
+
       videoRef.current.currentTime = targetSource;
       if (audioRef.current) {
         audioRef.current.currentTime = targetTime;
       }
-      
+
       const onSeeked = () => {
         isSeeking.current = false;
         videoRef.current?.removeEventListener('seeked', onSeeked);
@@ -162,5 +164,5 @@ export function useSequencePlayer(
     }
   }, [finalCutTimeline, videoRef, audioRef]);
 
-  return { currentTimelineTime, activeClipIndex, seekToTimelineTime };
+  return { currentTimelineTime, activeClipIndex, seekToTimelineTime, virtualTimeRef };
 }

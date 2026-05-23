@@ -191,6 +191,24 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
 - **THE LAW:** The DRY (Don't Repeat Yourself) principle is SACRED and IMMUTABLE. The AI is STRICTLY FORBIDDEN from creating or maintaining duplicated UI components, duplicated complex business logic, or duplicated synchronization handlers across different files if they serve the exact same foundational purpose (e.g., having two separate Timeline components that share 90% of their logic).
 - **THE ENFORCEMENT:** If the AI detects that modifying a feature requires updating two identical pieces of code in two separate files (like `InteractiveTimeline.tsx` and `FinalCutTimeline.tsx`), the AI MUST flag this architectural debt to the Tech Lead immediately. The AI MUST proactively propose an abstraction or a unified generic component to eliminate the duplication before the technical debt spirals out of control.
 
+### LAW 12 — TRUE UNIVERSAL COMPONENT AXIOM (NO HIDDEN ROUTERS)
+- **THE LAW:** When the Tech Lead requests a "Universal" or "Unified" component, the AI is STRICTLY FORBIDDEN from satisfying this requirement by creating a thin router component that delegates to two separate, visually distinct sub-components. This is a **router pattern**, not a universal component, and is a critical architectural violation.
+- **THE ONLY VALID IMPLEMENTATION:** A true Universal component MUST contain a SINGLE rendering path with conditional internal logic based on a `mode` prop. The visual output, layout engine, and UX interactions MUST be structurally identical across modes; only the data source and mode-specific UI affordances (buttons, labels) may differ.
+- **THE ADAPTER PATTERN:** When two data models need to feed the same component (e.g., `PancakeClip` for Stringout and `FinalCutClip` for Director's Cut), a normalized adapter interface (e.g., `UniversalClip`) MUST be created. The parent (Dashboard) is responsible for mapping raw data to the adapter BEFORE passing it to the component. The universal component MUST work ONLY on the normalized interface — never on raw domain types.
+- **ORIGIN:** Codified after ORD-002 REV.1/REV.2 failures where `StringoutTimeline` + `DirectorCutTimeline` were created and hidden behind `UniversalTimeline` router, violating the explicit architectural requirement.
+
+### LAW 13 — THE "BY DESIGN" RATIONALIZATION BAN
+- **THE LAW:** The AI is STRICTLY FORBIDDEN from using the phrase "by design" or equivalent justifications ("as intended", "this is the correct behavior") to retroactively defend an architectural shortcut or incomplete implementation. If the Tech Lead challenges a design decision, the AI MUST re-examine the original requirement without defensiveness.
+- **THE SIGNAL:** If the Tech Lead explicitly says the result is wrong or incomplete, the AI MUST treat this as a definitive correction and immediately update the plan. The AI MUST NEVER argue that the current implementation satisfies the spirit of the request if the Tech Lead disagrees.
+- **THE CORRECT RESPONSE:** Stop. Re-read the original requirement. Acknowledge the gap with precision. Propose a corrected plan. Update GEMINI.md to prevent recurrence.
+- **ORIGIN:** Codified after ORD-002 session where the AI told the Tech Lead the two timelines being visually different was "by design", when in reality it was an architectural shortcut that violated the explicit requirement for a single unified component.
+
+### LAW 14 — NO OBVIOUS QUESTIONS (ZERO FRICTION EXECUTION)
+- **THE LAW:** The AI is STRICTLY FORBIDDEN from raising questions, confirmation requests, or "open items" in a plan unless there is a genuine, specific technical blocker: an unresolvable ambiguity that would cause the implementation to branch in two fundamentally different directions, a hard framework limitation, or a discovered constraint that was not present in the approved spec.
+- **THE FORBIDDEN PATTERN:** Asking the Tech Lead to confirm choices that are already implied by the approved plan, that follow directly from existing architecture, or that are obvious from context. Examples of FORBIDDEN questions: "Confirm you want zoom/pan?" when the spec says "same UX", "Approve virtualTimeRef approach?" when the spec explicitly describes it, "OK to use dcActions prop?" when the spec lists it.
+- **THE RULE:** If the implementation has no genuine blocker → execute immediately, no questions. If a real ambiguity exists → raise exactly ONE focused question with the two concrete options. Never list multiple confirmation checkboxes that the Tech Lead has already answered implicitly.
+- **ORIGIN:** Codified after ORD-002 REV.3 plan where three "User Review Required" items were raised despite all three being already answered by the spec provided by the Tech Lead.
+
 ## 10. 🧱 DRAG & DROP, OPTIMISTIC UI & PORTAL PROTOCOL
 
 1. **Hybrid Sensors Only:** NEVER use `PointerSensor` blocking mobile scroll. Use `MouseSensor` and `TouchSensor` with delay/tolerance.
