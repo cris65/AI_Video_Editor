@@ -897,13 +897,12 @@ export function InteractiveTimeline({
           {/* Hover overlay */}
           <div className="absolute top-[24px] bottom-0 left-0 right-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-          {/* Audio Waveform Overlay */}
           {audioWaveforms && audioDuration > 0 && (() => {
             const activeWaveform = audioWaveforms[waveformView] || [];
             if (activeWaveform.length === 0) return null;
 
             const pointsPerSecond = activeWaveform.length / audioDuration;
-            const pointsToShow = Math.ceil(duration * pointsPerSecond);
+            const pointsToShow = Math.ceil(Math.min(duration, audioDuration) * pointsPerSecond);
             const visibleWaveform = activeWaveform.slice(0, pointsToShow);
 
             if (visibleWaveform.length === 0) return null;
@@ -920,8 +919,13 @@ export function InteractiveTimeline({
             });
             pathD += ` L ${svgWidth},${svgHeight} Z`;
 
+            const waveformWidthPct = duration > 0 ? (Math.min(audioDuration, duration) / duration) * 100 : 0;
+
             return (
-              <div className="absolute top-[24px] bottom-0 left-0 right-0 opacity-80 pointer-events-none z-[15] mix-blend-screen overflow-hidden">
+              <div 
+                className="absolute top-[24px] bottom-0 left-0 opacity-80 pointer-events-none z-[15] mix-blend-screen overflow-hidden"
+                style={{ width: `${waveformWidthPct}%` }}
+              >
                 <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="none" className="w-full h-full fill-emerald-400">
                   <path d={pathD} />
                 </svg>

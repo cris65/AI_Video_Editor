@@ -1,8 +1,39 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.53 - 2026-05-22
+**Version:** v0.1.55 - 2026-05-23
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.54 → v0.1.55
+
+### Sommario
+
+This release resolves two critical UX issues related to the Audio Rhythm Engine, specifically targeting the `InteractiveTimeline` visualizer and the `AudioSettingsModal` sync logic.
+
+#### 1. InteractiveTimeline Waveform Scaling Fix
+- **Issue**: The Audio Waveform overlay in `InteractiveTimeline.tsx` was stretching across 100% of the timeline regardless of the audio track's physical duration.
+- **Fix**: Replaced the hardcoded `right-0` stretching with a precise proportional calculation (`waveformWidthPct`) and applied `Math.min(duration, audioDuration)` to the SVG renderer's path slice. The waveform now accurately visualizes its true length and stops exactly where the audio stops.
+
+#### 2. AudioSettingsModal UI/UX Overhaul & Deflag System
+- **Issue**: The "Force Target Video Duration" checkbox disappeared when the durations were perfectly synced, replacing itself with a static text banner. This prevented users from manually untoggling ("deflagging") the synced state.
+- **Fix**: The UI has been rewritten to always display an interactive checkbox with a **Dynamic Theme** (Amber for Warning/Unsynced, Emerald for Synced). 
+- **Deflag Logic**: If the user unchecks a previously synced state and clicks "Done & Close", the system intercepts the deselect and automatically reverts the `target_duration` to the standard fallback of **60s**, completely resolving the lock-in state.
+- **Syntax Repair**: Repaired a broken JSX syntax tree in the component resulting from partial AST modifications.
+
+### 📊 File Modificati
+| File | +Ins | -Del | Descrizione |
+|------|------|------|-------------|
+| `src/components/dashboard/InteractiveTimeline.tsx` | +10 | -2 | Aggiunto `waveformWidthPct` e SVG path slice proporzionale. |
+| `src/components/dashboard/AudioSettingsModal.tsx` | +20 | -5 | Rewrite UI per checkbox dinamica (Verde/Ambra) e fallback 60s deflag. |
+| `.gemini/SOTA.md` | +2 | -2 | Documentazione fallback deflag e InteractiveTimeline fix. |
+| `package.json` | +1 | -1 | Bump v0.1.55. |
+
+### Validazione
+- **ESLint:** PASS (0 errors, 0 warnings)
+- **TypeScript (TSC):** PASS
+- **Status:** APPROVED & COMMITTED
 
 ---
 
