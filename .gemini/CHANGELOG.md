@@ -1,8 +1,36 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.55 - 2026-05-23
+**Version:** v0.1.57 - 2026-05-23
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.56 → v0.1.57
+
+### Sommario
+
+This release introduces a critical architectural evolution for the Director Phase (D). It decouples the rhythmic syncing logic ("Geometra Math") from the LLM, enabling the **Deterministic Bypass**. Users can now natively export an XML from manual selections (markers and KEEP) with perfect musical syncing, completely skipping the AI inference.
+
+### Cambiamenti Core
+
+#### 1. Deterministic Bypass & Geometra Math
+- **`engine/director.py`**:
+  - Implementato il `bypass_llm`: se invocato con questo flag, il Director ignora la chiamata al VLM e assembla in cronologia pura solo le clip con marker o forza di `KEEP`.
+  - Implementata la **Geometra Math**: un algoritmo di allocazione dinamica dei trim basato sui ruoli. `trim_in` viene calcolato in base alla natura del marker (IN, OUT, AUDIO/BM) applicando un clamping di sicurezza per non eccedere la durata fisica della clip.
+  - Implementato il **Virtual Sub-Clipping**: quando una clip ha molteplici marker temporali distanti tra loro più di 2.0s, viene sdoppiata in RAM creando instanze virtuali (es. `C420_v1`, `C420_v2`).
+  - Refactoring del Regex LLM per prioritizzare match stringa esatto su `_virtual_id`.
+
+#### 2. Backend Orchestrator
+- **`engine/api_server.py`**: Aggiunto `bypass_llm: bool = False` al JSON payload della rotta `/api/orchestrate` per attivare il Bypass Deterministico mantenendo architettura DRY.
+
+### File Modificati
+| File | Descrizione |
+|---|---|
+| `engine/api_server.py` | Aggiunto flag `bypass_llm` a `OrchestratePayload`. |
+| `engine/director.py` | Virtual Sub-Clipping, Bypass LLM e Geometra Math implementati. |
+| `package.json` | Version bump `0.1.57`. |
+| `.gemini/SOTA.md` | Aggiornata documentazione Fase D. |
 
 ---
 

@@ -138,6 +138,7 @@ class OrchestratePayload(BaseModel):
     # Accepts both legacy string overrides ('KEEP'/'TRASH'/'BROLL') and structured lock objects
     clip_overrides: dict[str, Union[LockedClipOverride, Literal['KEEP', 'TRASH', 'BROLL']]] = {}
     director_config: DirectorConfigPayload = DirectorConfigPayload()
+    bypass_llm: bool = False
 
 class AudioAnalyzePayload(BaseModel):
     filename: str
@@ -194,6 +195,7 @@ async def orchestrate_director_cut(payload: OrchestratePayload):
             output_dir=seq_llm_dir,
             sequence_name=payload.sequence_name,
             seed=seed,
+            bypass_llm=payload.bypass_llm,
         )
         return {"ok": True, "output_path": output_path}
     except Exception as e:

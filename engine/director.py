@@ -378,7 +378,7 @@ def extract_gaps(occupied, beats, limit):
     return gaps
 
 
-def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequence_name, seed: int = -1):
+def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequence_name, seed: int = -1, bypass_llm: bool = False):
     print(f"🎬 AI Director: Inizio Risoluzione Vincoli per {sequence_name}")
     
     stringout = load_json(stringout_path)
@@ -450,55 +450,129 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         clip['_out_time'] = None
         clip['_has_audio_marker'] = False
 
-        c_list = constraints.get(clip_key, [])
-        for c in c_list:
-            if c['type'] == 'BM':
-                clip['_has_bm'] = True
-                clip['_bm_time'] = c['time']
-            elif c['type'] == 'IN':
-                clip['_has_in'] = True
-                clip['_in_time'] = c['time']
-            elif c['type'] == 'OUT':
-                clip['_has_out'] = True
-                clip['_out_time'] = c['time']
-            elif c['type'] == 'AUDIO':
-                clip['_has_audio_marker'] = True
-
-        # --- HITL Lock detection ---
-        is_locked = False
-        locked_pos = None
-        clip['_is_global_in'] = False
-        clip['_is_global_out'] = False
+        c_list = sorted(constraints.get(clip_key, []), key=lambda x: x['time'])
         
-        if isinstance(override, dict):
-            if override.get('locked', False):
-                is_locked = True
-                locked_pos = override.get('timeline_position')
-                clip['absolute_in'] = override.get('absolute_in', clip['start'])
-                clip['absolute_out'] = override.get('absolute_out', clip['end'])
+        constraint_groups = []
+        if c_list:
+            current_group = [c_list[0]]
+            for c in c_list[1:]:
+                if c['time'] - current_group[-1]['time'] > 2.0:
+                    constraint_groups.append(current_group)
+                    current_group = [c]
+                else:
+                    current_group.append(c)
+            constraint_groups.append(current_group)
 
-            if override.get('is_global_start'):
-                is_locked = True
-                locked_pos = 0.0  # GLOBAL START
-                clip['_is_global_in'] = True
-                if not clip.get('absolute_in'):
-                    clip['absolute_in'] = clip.get('_in_time', clip['start'])
-                if not clip.get('absolute_out'):
-                    clip['absolute_out'] = clip.get('_out_time', clip['end'])
+        if len(constraint_groups) > 1:
+            for i, group in enumerate(constraint_groups):
+                virtual_clip = clip.copy()
+                virtual_clip['_virtual_id'] = f"{clip_key}_v{i+1}"
+                virtual_clip['_has_bm'] = False
+                virtual_clip['_bm_time'] = None
+                virtual_clip['_has_in'] = False
+                virtual_clip['_in_time'] = None
+                virtual_clip['_has_out'] = False
+                virtual_clip['_out_time'] = None
+                virtual_clip['_has_audio_marker'] = False
+                virtual_clip['_marker_role'] = None
+                virtual_clip['_marker_target_time'] = None
+                
+                for c in group:
+                    if c['type'] == 'BM':
+                        virtual_clip['_has_bm'] = True
+                        virtual_clip['_bm_time'] = c['time']
+                        if not virtual_clip['_marker_role']:
+                            virtual_clip['_marker_role'] = 'BM'
+                            virtual_clip['_marker_target_time'] = c['time']
+                    elif c['type'] == 'IN':
+                        virtual_clip['_has_in'] = True
+                        virtual_clip['_in_time'] = c['time']
+                        if not virtual_clip['_marker_role']:
+                            virtual_clip['_marker_role'] = 'IN'
+                            virtual_clip['_marker_target_time'] = c['time']
+                    elif c['type'] == 'OUT':
+                        virtual_clip['_has_out'] = True
+                        virtual_clip['_out_time'] = c['time']
+                        if not virtual_clip['_marker_role']:
+                            virtual_clip['_marker_role'] = 'OUT'
+                            virtual_clip['_marker_target_time'] = c['time']
+                    elif c['type'] == 'AUDIO':
+                        virtual_clip['_has_audio_marker'] = True
+                        if not virtual_clip['_marker_role']:
+                            virtual_clip['_marker_role'] = 'AUDIO'
+                            virtual_clip['_marker_target_time'] = c['time']
 
-            if override.get('is_global_end'):
-                is_locked = True
-                locked_pos = target_duration  # GLOBAL END
-                clip['_is_global_out'] = True
-                if not clip.get('absolute_in'):
-                    clip['absolute_in'] = clip.get('_in_time', clip['start'])
-                if not clip.get('absolute_out'):
-                    clip['absolute_out'] = clip.get('_out_time', clip['end'])
+                is_locked = False
+                locked_pos = None
+                virtual_clip['_is_global_in'] = False
+                virtual_clip['_is_global_out'] = False
+                if isinstance(override, dict):
+                    if override.get('locked', False):
+                        is_locked = True
+                        locked_pos = override.get('timeline_position')
+                        virtual_clip['absolute_in'] = override.get('absolute_in', clip['start'])
+                        virtual_clip['absolute_out'] = override.get('absolute_out', clip['end'])
+                    if override.get('is_global_start'):
+                        is_locked = True
+                        locked_pos = 0.0
+                        virtual_clip['_is_global_in'] = True
+                        if not virtual_clip.get('absolute_in'): virtual_clip['absolute_in'] = virtual_clip.get('_in_time', clip['start'])
+                        if not virtual_clip.get('absolute_out'): virtual_clip['absolute_out'] = virtual_clip.get('_out_time', clip['end'])
+                    if override.get('is_global_end'):
+                        is_locked = True
+                        locked_pos = target_duration
+                        virtual_clip['_is_global_out'] = True
+                        if not virtual_clip.get('absolute_in'): virtual_clip['absolute_in'] = virtual_clip.get('_in_time', clip['start'])
+                        if not virtual_clip.get('absolute_out'): virtual_clip['absolute_out'] = virtual_clip.get('_out_time', clip['end'])
+                virtual_clip['_locked'] = is_locked
+                virtual_clip['_locked_timeline_pos'] = locked_pos
+                usable_clips.append(virtual_clip)
+        else:
+            clip['_virtual_id'] = clip_key
+            clip['_marker_role'] = None
+            clip['_marker_target_time'] = None
+            for c in c_list:
+                if c['type'] == 'BM':
+                    clip['_has_bm'] = True
+                    clip['_bm_time'] = c['time']
+                    if not clip['_marker_role']: clip['_marker_role'] = 'BM'; clip['_marker_target_time'] = c['time']
+                elif c['type'] == 'IN':
+                    clip['_has_in'] = True
+                    clip['_in_time'] = c['time']
+                    if not clip['_marker_role']: clip['_marker_role'] = 'IN'; clip['_marker_target_time'] = c['time']
+                elif c['type'] == 'OUT':
+                    clip['_has_out'] = True
+                    clip['_out_time'] = c['time']
+                    if not clip['_marker_role']: clip['_marker_role'] = 'OUT'; clip['_marker_target_time'] = c['time']
+                elif c['type'] == 'AUDIO':
+                    clip['_has_audio_marker'] = True
+                    if not clip['_marker_role']: clip['_marker_role'] = 'AUDIO'; clip['_marker_target_time'] = c['time']
 
-        clip['_locked'] = is_locked
-        clip['_locked_timeline_pos'] = locked_pos
-
-        usable_clips.append(clip)
+            is_locked = False
+            locked_pos = None
+            clip['_is_global_in'] = False
+            clip['_is_global_out'] = False
+            if isinstance(override, dict):
+                if override.get('locked', False):
+                    is_locked = True
+                    locked_pos = override.get('timeline_position')
+                    clip['absolute_in'] = override.get('absolute_in', clip['start'])
+                    clip['absolute_out'] = override.get('absolute_out', clip['end'])
+                if override.get('is_global_start'):
+                    is_locked = True
+                    locked_pos = 0.0
+                    clip['_is_global_in'] = True
+                    if not clip.get('absolute_in'): clip['absolute_in'] = clip.get('_in_time', clip['start'])
+                    if not clip.get('absolute_out'): clip['absolute_out'] = clip.get('_out_time', clip['end'])
+                if override.get('is_global_end'):
+                    is_locked = True
+                    locked_pos = target_duration
+                    clip['_is_global_out'] = True
+                    if not clip.get('absolute_in'): clip['absolute_in'] = clip.get('_in_time', clip['start'])
+                    if not clip.get('absolute_out'): clip['absolute_out'] = clip.get('_out_time', clip['end'])
+            clip['_locked'] = is_locked
+            clip['_locked_timeline_pos'] = locked_pos
+            usable_clips.append(clip)
 
     # --- Separate locked walls from free clips ---
     locked_clips = [c for c in usable_clips if c.get('_locked')]
@@ -520,23 +594,38 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         llm_model_id = stringout.get("metadata", {}).get("llm_model_id", 'mlx-community/gemma-4-e4b-it-4bit')
 
     _t_start_llm = time.time()
-    # We pass ALL usable_clips to LLM so it sees the Global IN/OUT narrative anchors
-    recipe_dict = call_director_llm(
-        usable_clips, target_duration, target_beats_count, style_prompt, 
-        rhythmic_strictness, energy_threshold, audio_marker_priority, duration_mode, ignore_list,
-        seed, locked_clips=locked_clips, llm_model_id=llm_model_id,
-        audio_bpm=audio.get("bpm"), audio_beats=audio.get("beats")
-    )
-    
-    if recipe_dict:
-        recipe_dict['_inference_time_seconds'] = round(time.time() - _t_start_llm, 2)
     
     # Compute the next version number ONCE — shared by recipe and final_edit saves
     os.makedirs(output_dir, exist_ok=True)
     next_v = _get_next_version(output_dir, sequence_name)
 
-    if recipe_dict:
-        # Working recipe (always the current — for backward compat)
+    # --- Chiamata Motore LLM o Bypass Deterministico ---
+    if bypass_llm:
+        print("⚡ [Director] Deterministic Bypass attivo: Generazione sequenza da selezioni manuali (No LLM).")
+        fake_recipe = []
+        for fc in free_clips:
+            # Add to deterministic bypass if explicitly marked or kept, or if it is inherently a MAIN clip without constraints (if we need bulk, but usually we just want user's explicit markers/keeps)
+            if fc.get('_marker_role') is not None or overrides.get(str(fc['start'])) == 'KEEP' or (isinstance(overrides.get(str(fc['start'])), dict) and overrides.get(str(fc['start'])).get('force_status') == 'KEEP') or fc.get('_has_bm'):
+                fake_recipe.append({"clip_id": fc.get('_virtual_id', str(fc['start'])), "beats": 4, "reasoning": "Deterministic Selection"})
+        
+        recipe_dict = {
+            "director_vision": "Deterministic Cut (Bypass LLM)",
+            "recipe": fake_recipe,
+            "_inference_time_seconds": 0.0
+        }
+    else:
+        # Modifica clip_list_str per LLM usando il _virtual_id (if we need to)
+        for c in usable_clips:
+            c['_llm_display_id'] = c.get('_virtual_id', str(c['start']))
+            
+        recipe_dict = call_director_llm(
+            usable_clips, target_duration, target_beats_count, style_prompt, 
+            rhythmic_strictness, energy_threshold, audio_marker_priority, duration_mode, ignore_list,
+            seed=seed, locked_clips=locked_clips, llm_model_id=llm_model_id,
+            audio_bpm=audio.get('bpm'), audio_beats=audio.get('beats')
+        )
+        if recipe_dict:
+            recipe_dict['_inference_time_seconds'] = round(time.time() - _t_start_llm, 2)
         recipe_path = os.path.join(output_dir, f"{sequence_name}_gemma_recipe.json")
         with open(recipe_path, 'w') as f:
             json.dump(recipe_dict, f, indent=2)
@@ -569,25 +658,34 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         used_clip_starts = set()
         
         for item in recipe:
-            clip_id_raw = item.get("clip_id")
-            if clip_id_raw is None:
+            if not isinstance(item, dict):
+                continue
+            clip_id_raw = str(item.get("clip_id", ""))
+            if not clip_id_raw:
                 continue
                 
-            try:
-                requested_id = float(clip_id_raw)
-            except ValueError:
-                continue
-                
-            # 1. Fuzzy Matching — only from free_clips (locked clips are already placed)
+            # 1. Fuzzy Matching — check virtual_id exactly first
             best_clip = None
-            min_diff = float('inf')
             for c in free_clips:
-                if c['start'] in used_clip_starts:
-                    continue
-                diff = abs(c['start'] - requested_id)
-                if diff < min_diff and diff <= 0.5:
-                    min_diff = diff
-                    best_clip = c
+                if c.get('_virtual_id') == clip_id_raw:
+                    if c['start'] not in used_clip_starts:
+                        best_clip = c
+                        break
+            
+            # If no exact match on virtual_id, try proximity via float cast
+            if not best_clip:
+                try:
+                    requested_id = float(clip_id_raw)
+                    min_diff = float('inf')
+                    for c in free_clips:
+                        if c['start'] in used_clip_starts:
+                            continue
+                        diff = abs(c['start'] - requested_id)
+                        if diff < min_diff and diff <= 0.5:
+                            min_diff = diff
+                            best_clip = c
+                except ValueError:
+                    pass
                     
             if not best_clip:
                 continue
@@ -625,19 +723,27 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
             clip_dur = clip['end'] - clip['start']
             target_dur = beats[end_idx] - beats[start_idx]
             
-            if clip.get('_has_bm'):
-                source_in = clip['_bm_time'] - (target_dur / 2)
-                source_out = clip['_bm_time'] + (target_dur / 2)
+            # Geometra Math for Rhythmic Trim Alignment
+            if clip.get('_marker_target_time') is not None:
+                m_time = clip['_marker_target_time']
+                role = clip.get('_marker_role', 'BM')
+                if role == 'IN':
+                    trim_in = m_time - clip['start']
+                elif role == 'OUT':
+                    trim_in = (m_time - clip['start']) - target_dur
+                else: # BM or AUDIO
+                    trim_in = (m_time - clip['start']) - (target_dur / 2)
+                    
+                # Clamping for safety
+                trim_in = max(0, min(trim_in, clip_dur - target_dur))
+                
+                source_in = clip['start'] + trim_in
+                source_out = source_in + target_dur
             else:
                 source_in = clip['start']
                 source_out = clip['start'] + target_dur
-                
-            if source_in < clip['start']:
-                diff = clip['start'] - source_in
-                source_in += diff
-                source_out += diff
-            if source_out > clip['end']:
-                source_out = clip['end']
+                if source_out > clip['end']:
+                    source_out = clip['end']
                 
             final_timeline.append({
                 "clip_ref": clip,
