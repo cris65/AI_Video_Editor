@@ -1,8 +1,26 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.57 - 2026-05-23
+**Version:** v0.1.58 - 2026-05-23
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.57 → v0.1.58
+
+### Sommario [ORD-001]
+This release is a documentation-only update focused on the "Knowledge Base Evolution". It establishes the new **Order Tracking** paradigm for strict traceability and formally promotes the **LLM Rationale & Conversational Editing** to an actionable phase (Phase 4).
+
+### Cambiamenti Core
+- **`WOLF_PROTOCOL.md`**: Istituzionalizzata la **Rule 1: Strict Order Tracking**. Adesso ogni task etichettato (es. `[ORD-XXX]`) viene obbligatoriamente riflesso nell'intestazione della chat e nei nomi dei file generati.
+- **`EVOLUTION.md`**: Rimossa la voce dalla *N.A.I.L.E. Vision* per essere formalizzata in **🟣 PHASE 4: Conversational Workflow (The Rationale Bridge)**. Questo sposta l'obiettivo del reasoning verbale dell'LLM (Chain of Thought) nella roadmap esecutiva di breve termine.
+
+### File Modificati
+| File | Descrizione |
+|---|---|
+| `.gemini/WOLF_PROTOCOL.md` | Inserita Rule 1 (Strict Order Tracking). |
+| `.gemini/EVOLUTION.md` | Promosso LLM Rationale a Fase 4. |
+| `package.json` | Version bump `0.1.58`. |
 
 ---
 

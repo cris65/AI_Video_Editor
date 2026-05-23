@@ -63,6 +63,12 @@ The "heavy" pipeline (Speed 1) that runs only once to map the video.
 
 ---
 
+## 🟣 PHASE 4: Conversational Workflow (The Rationale Bridge)
+
+- [ ] **The LLM Rationale & Conversational Editing:** Transition from one-way JSON generation to a conversational interface. The VLM will generate a 'Chain of Thought' rationale before the JSON output, explaining its editing school choices and match-cut logic. The UI will expose this rationale and allow the HITL to prompt verbal adjustments (e.g., "make the cuts more aggressive") for dynamic fine-tuning.
+
+---
+
 ## 🌌 EPIC: Versioning, Cloud Persistence & Semantic Memory
 
 **Current Problem:** The system overwrites the `_final_edit.json` file on each regeneration. Although the Seed guarantees reproducibility for the same prompt, editing the prompt (e.g., adding a new directive) alters the LLM context, making it impossible to return to a previous edit unless the exact UI state is remembered.

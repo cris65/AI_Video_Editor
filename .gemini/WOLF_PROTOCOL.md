@@ -13,6 +13,12 @@ As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. 
 * **ROOT Directory** (`~/Development/AI_Video_Editor`): The Command Center for the web frontend. All `npm run` commands (including Supabase `sb:*` tasks) and `git` commands are executed here.
 * **ENGINE Directory** (`engine/`): The core of the AI Video Editor. This isolated Python environment contains all MLX API logic, YOLO/OpenCV scripts, and EDL processing workflows (`main.py`, `mlx_client.py`).
 
+### 🏷️ Rule 1: Strict Order Tracking (Directive Tagging)
+Ogni qualvolta un prompt (WOLF-ALERT) include un tag d'ordine numerato (es. `[ORD-XXX]`), Antigravity è **OBBLIGATO** a:
+1. Includere il medesimo tag nell'intestazione di ogni sua risposta in chat.
+2. Utilizzare il tag come suffisso o prefisso nel nome di tutti i file generati o esportati associati a quel task (es. `implementation_plan_[ORD-001].md`, `task_[ORD-001].md`).
+Questo garantisce la tracciabilità assoluta delle epiche e dei macro-task all'interno dell'ambiente locale e della pipeline di sviluppo.
+
 ### 🛠️ PHASE 1: Architecture (The Mind, The Senior Dev & AG)
 1. The Tech Lead explains the vision to the Senior Dev (Gemini).
 2. The Senior Dev elaborates the strategy and engages Antigravity to generate a detailed step-by-step plan.
