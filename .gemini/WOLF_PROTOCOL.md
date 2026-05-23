@@ -48,3 +48,43 @@ Questo garantisce la tracciabilità assoluta delle epiche e dei macro-task all'i
    From the `root` terminal run `npm run sb:push`
 2. **Code Deploy:**
    From the `root` terminal run `git push origin develop --no-verify`
+
+---
+
+## 🔗 Appendix: Automated Knowledge Base Sync (.git/hooks/post-commit)
+
+To guarantee that the Knowledge Base is always aligned between Antigravity (local) and Gemini Web or App, a Git `post-commit` hook is configured to sync the exported files to Google Drive automatically.
+
+### Script Details
+
+Location: `.git/hooks/post-commit` (configured as executable: `chmod +x .git/hooks/post-commit`)
+
+```bash
+#!/bin/bash
+# ==============================================================================
+# GIT POST-COMMIT HOOK - AUTOMATED KB SYNC TO GOOGLE DRIVE
+# ==============================================================================
+
+# Define local paths
+SOURCE_DIR="./WOLF_EXPORTS"
+TARGET_DIR="/Users/macbookm4cdv/Library/CloudStorage/GoogleDrive-criseclipse@gmail.com/My Drive/WOLF_KB"
+
+echo "🔄 Git commit detected. Syncing WOLF_EXPORTS to Google Drive..."
+
+# Ensure the target directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "⚠️ Target directory not found. Creating it..."
+    mkdir -p "$TARGET_DIR"
+fi
+
+# Sync files efficiently using rsync 
+rsync -av --delete "$SOURCE_DIR/" "$TARGET_DIR/"
+
+echo "✅ Sync complete. Google Drive app will handle cloud upload in background."
+```
+
+### Operational Behavior
+1. During the `/wolf_flow` execution, the Knowledge Base files (`.gemini/*.md` and `GEMINI.md`) are exported to `./WOLF_EXPORTS`.
+2. The Git commit triggers this hook.
+3. The hook performs a differential `rsync` of `./WOLF_EXPORTS` into the local Google Drive client folder.
+4. Google Drive synchronizes the updated files in the background, making them instantly available to the cloud LLMs (Gemini Web/App) to maintain a unified memory across agents.

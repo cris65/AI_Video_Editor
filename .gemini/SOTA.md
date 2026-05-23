@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.57 - 2026-05-23
+**Version:** v0.1.59 - 2026-05-23
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -99,4 +99,4 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 
 - **Trinity Startup:** `npm run wolf:dev` orchestra 3 sottoprocessi via `concurrently`: `dev:ui` (Vite :5173), `dev:api` (FastAPI :8000), `dev:llm` (MLX :8080 con gemma-4-e4b-it-4bit).
 - **`dev:all`:** Comando dormiente (Vite + Supabase Functions). Riservato alla futura integrazione del layer dati (autenticazione, profili). Non usare nella pipeline corrente.
-- **Release Flow:** `/wolf_flow` valida (ESLint + TSC), committa ed esporta localmente la KB.
+- **Release Flow:** `/wolf_flow` valida (ESLint + TSC), committa ed esporta localmente la KB in `WOLF_EXPORTS`. Un git hook `post-commit` sincronizza in modo differenziale `WOLF_EXPORTS` su Google Drive per allineare la memoria con Gemini Web/App.

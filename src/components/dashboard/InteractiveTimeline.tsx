@@ -279,8 +279,6 @@ export function InteractiveTimeline({
     setZoomWindow([newS, newS + newSpan]);
   }, [zoomWindow, duration]);
 
-  if (!timeline || duration <= 0) return null;
-
   // ─── P/L Modifiers Key Listener ───────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -411,6 +409,7 @@ export function InteractiveTimeline({
     return { cursor: 'grab' };
   };
 
+  if (!timeline || duration <= 0) return null;
 
   return (
     <div className="w-full flex flex-col gap-1.5">

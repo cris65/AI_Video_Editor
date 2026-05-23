@@ -1,8 +1,33 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.58 - 2026-05-23
+**Version:** v0.1.59 - 2026-05-23
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.58 → v0.1.59
+
+### Sommario
+This release introduces the automated Git `post-commit` hook to sync the exported Knowledge Base directly to Google Drive, ensuring memory alignment between local environments and cloud LLMs (Gemini Web/App). It also fixes a React Hooks rule violation in `InteractiveTimeline.tsx`.
+
+### Cambiamenti Core
+- **`post-commit` Git Hook**: Configured and documented `.git/hooks/post-commit` to sync the exported KB (`./WOLF_EXPORTS`) to Google Drive using `rsync` post-commit.
+- **`WOLF_PROTOCOL.md`**: Added a new Appendix detailing the script, location, permissions, and operational behavior of the `post-commit` synchronization.
+- **`SOTA.md`**: Updated SOTA version and Release Flow description to document the automated Google Drive sync.
+- **`InteractiveTimeline.tsx`**: Resolved a React "rules-of-hooks" violation where the early return was declared before `useEffect`. Moved the early return after all React Hook declarations.
+
+### File Modificati
+| File | Descrizione |
+|---|---|
+| `.gemini/WOLF_PROTOCOL.md` | Aggiunta appendice documentazione hook. |
+| `.gemini/SOTA.md` | Aggiornato Release Flow con il post-commit hook. |
+| `package.json` | Version bump a `0.1.59`. |
+| `src/components/dashboard/InteractiveTimeline.tsx` | Risolto bug di posizionamento dell'early return. |
+
+### Validazione
+- **ESLint**: PASS (0 errors, 13 react-hooks/exhaustive-deps warnings)
+- **TypeScript (TSC)**: PASS
 
 ---
 
