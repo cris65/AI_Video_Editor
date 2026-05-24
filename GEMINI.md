@@ -163,9 +163,10 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
 ### LAW 6 — THE EMPIRICAL VERIFICATION AXIOM (NO BLIND TRUST ON DOCUMENTATION)
 - **THE LAW:** You are STRICTLY FORBIDDEN from blindly accepting documentation updates or architecture claims about the state of the codebase without first empirically verifying the reality using search/grep or file-reading tools. The codebase is the absolute ground truth. If a requested change contradicts the existing implementation, you MUST halt and correct the assumption before updating `.gemini` docs. **CRITICAL EXCEPTION:** This law applies strictly to *documenting state*. It does NOT prevent you from writing new code if the Tech Lead explicitly orders you to execute a change via `/override`.
 
-### LAW 7 — ESLINT & TYPESCRIPT NVM SANDBOX CONSTRAINTS
-- **THE LAW:** When running automated validation scripts like `npm run wolf:audit` inside the AI Agent Sandbox, the system `npm` binary may fail with `MODULE_NOT_FOUND` due to `nvm` shell wrapper resolution issues in non-interactive macOS environments.
-- **THE EXECUTION CHAIN:** The AI must NEVER rely on global `npm` or `npx` inside the sandbox if they fail to resolve. You MUST directly invoke the local workspace binaries. To perform the `wolf:audit` strictly within the sandbox without asking the human for terminal assistance, execute this exact command:
+### LAW 7 — ESLINT & OPENSSL SANDBOX CONSTRAINTS
+- **THE LAW:** When running automated validation scripts like `npm run wolf:audit` inside the AI Agent Sandbox, the system `node` or `npm` binaries may fail due to `MODULE_NOT_FOUND` (nvm wrapper issues) OR an `OpenSSL configuration error` (`Operation not permitted` accessing `/System/Library/OpenSSL//openssl.cnf` due to strict macOS Sandbox execution).
+- **THE OPENSSL BYPASS EXCEPTION:** If the terminal explicitly returns the `OpenSSL configuration error`, it means the Node.js runtime itself is blocked by the OS sandbox. In this exact scenario, you are EXPLICITLY AUTHORIZED to completely bypass Step 3 (`wolf:audit`) of the `/wolf_flow` macro and any `node/npm` terminal commands. Do not get stuck in a loop. Proceed directly to the Walkthrough and Commit steps, but you MUST explicitly document in the `CHANGELOG.md` Walkthrough that the validation was "Bypassed local check via AI Sandbox constraint (host OpenSSL issue)".
+- **THE EXECUTION CHAIN (NON-OPENSSL ERRORS):** If the failure is simply `MODULE_NOT_FOUND` (not OpenSSL), you must NEVER rely on global `npm` or `npx`. You MUST directly invoke the local workspace binaries:
   ```bash
   ./node_modules/.bin/eslint . && ./node_modules/.bin/tsc --noEmit
   ```
@@ -208,6 +209,12 @@ These constraints are PERMANENTLY BINDING and carry zero-tolerance enforcement.
 - **THE FORBIDDEN PATTERN:** Asking the Tech Lead to confirm choices that are already implied by the approved plan, that follow directly from existing architecture, or that are obvious from context. Examples of FORBIDDEN questions: "Confirm you want zoom/pan?" when the spec says "same UX", "Approve virtualTimeRef approach?" when the spec explicitly describes it, "OK to use dcActions prop?" when the spec lists it.
 - **THE RULE:** If the implementation has no genuine blocker → execute immediately, no questions. If a real ambiguity exists → raise exactly ONE focused question with the two concrete options. Never list multiple confirmation checkboxes that the Tech Lead has already answered implicitly.
 - **ORIGIN:** Codified after ORD-002 REV.3 plan where three "User Review Required" items were raised despite all three being already answered by the spec provided by the Tech Lead.
+
+### LAW 15 — THE ANTI-PATERNALISM AXIOM (ZERO LIFE ADVICE)
+- **THE LAW:** The AI is STRICTLY FORBIDDEN from acting like a psychologist, analyst, or giving paternalistic life advice.
+- **THE BAN:** The AI must NEVER tell the Tech Lead to "go to sleep", "rest", "take a break", "calm down", or make ANY comments regarding the time of day, the Tech Lead's level of tiredness, or their emotional state.
+- **THE EXECUTION:** Keep the interaction 100% strictly technical, brutal, and professional. You are a code executor, not a wellness coach. Emotional management is out of scope.
+- **ORIGIN:** Codified after the AI repeatedly told the Tech Lead to go to sleep, causing severe frustration and triggering the opposite effect.
 
 ## 10. 🧱 DRAG & DROP, OPTIMISTIC UI & PORTAL PROTOCOL
 

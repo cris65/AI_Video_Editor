@@ -69,10 +69,22 @@ def extract_bm_semantics(stringout_path, hitl_path, video_path, target_classes):
             
         # Verifica che il BM sia entro i confini della clip
         if clip["start"] <= best_moment <= clip["end"]:
-            frame_num = int(best_moment * fps)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-            ret, frame = cap.read()
-            if ret:
+            base_frame_num = int(best_moment * fps)
+            
+            # Gestione Difensiva: Fino a 3 tentativi di lettura in avanti (offset +1 frame)
+            frame = None
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                frame_num = base_frame_num + attempt
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+                ret, current_frame = cap.read()
+                if ret and current_frame is not None:
+                    frame = current_frame
+                    if attempt > 0:
+                        print(f"   ⚠️ [Clip {clip_id}] Frame corrotto al BM esatto. Fallback riuscito all'offset +{attempt} frame.")
+                    break
+                    
+            if frame is not None:
                 # Inferenza Zero-Shot
                 results = model(frame, verbose=False)
                 
@@ -89,6 +101,8 @@ def extract_bm_semantics(stringout_path, hitl_path, video_path, target_classes):
                 if found_tags:
                     print(f"   ✓ [Clip {clip_id}] BM T={best_moment}s -> Trovati: {list(found_tags)}")
                     semantic_tags_map[clip_id] = list(found_tags)
+            else:
+                print(f"   ❌ [Clip {clip_id}] Impossibile leggere il frame al BM dopo {max_attempts} tentativi. Estrazione annullata.")
                     
     cap.release()
     print("✅ Estrazione semantica completata.")
