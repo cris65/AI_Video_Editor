@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import director
 import edl_parser
 import xml_exporter
+import semantic_extractor
 
 def update_cut(sequence):
     print(f"🔄 Avvio aggiornamento cut per la sequenza: {sequence}")
@@ -31,23 +32,42 @@ def update_cut(sequence):
         except Exception as e:
             print(f"⚠️ Impossibile leggere FPS da stringout, fallback a 25: {e}")
             
-    # Estrai export resolution da hitl_data se presente
+    # Estrai export resolution e vocabolario YOLOE da hitl_data
     export_width = 1920
     export_height = 1080
+    target_classes = []
+    
     if os.path.exists(hitl_path):
         import json
         try:
             with open(hitl_path, 'r') as f:
                 h_data = json.load(f)
-                res_str = h_data.get("director_config", {}).get("export_resolution", "1920x1080")
+                director_config = h_data.get("director_config", {})
+                
+                res_str = director_config.get("export_resolution", "1920x1080")
                 if "x" in res_str:
                     parts = res_str.split("x")
                     export_width = int(parts[0])
                     export_height = int(parts[1])
+                    
+                target_product = director_config.get("target_product", "")
+                secondary_elements = director_config.get("secondary_elements", "")
+                combined_str = f"{target_product},{secondary_elements}"
+                target_classes = [c.strip() for c in combined_str.split(",") if c.strip()]
+                
         except Exception as e:
-            print(f"⚠️ Impossibile leggere export_resolution da hitl_data, fallback a 1920x1080: {e}")
+            print(f"⚠️ Impossibile leggere hitl_data: {e}")
 
-    final_edit_json = director.generate_final_cut(stringout_path, hitl_path, beats_path, llm_export_dir, sequence)
+    # Estrai YOLOE Semantic Tags sui Best Moments
+    video_files = glob.glob(os.path.join(seq_dir, f"{sequence}.mov")) + glob.glob(os.path.join(seq_dir, f"{sequence}.mp4"))
+    video_path = video_files[0] if video_files else None
+    
+    semantic_tags_map = {}
+    if target_classes and video_path:
+        print(f"🧠 YOLOE Semantic Prompt loaded: {target_classes}")
+        semantic_tags_map = semantic_extractor.extract_bm_semantics(stringout_path, hitl_path, video_path, target_classes)
+
+    final_edit_json = director.generate_final_cut(stringout_path, hitl_path, beats_path, llm_export_dir, sequence, semantic_tags_map=semantic_tags_map)
     
     # 2. Recupera la clip_map originale dall'EDL di ingest
     # Cerchiamo un .edl nella root della sequenza che NON sia quello generato da noi

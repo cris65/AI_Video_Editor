@@ -6,6 +6,12 @@ import signal
 from main import run_pipeline
 from utils.telemetry import log_execution, get_estimated_eta
 import platform
+import asyncio
+import traceback
+import sys
+import argparse
+import glob
+import semantic_extractor
 import psutil
 import subprocess
 import json
@@ -155,6 +161,30 @@ ORCHESTRATION_TASKS = {}
 def orchestration_worker(task_id: str, stringout_path: str, hitl_path: str, beats_path: str, output_dir: str, sequence_name: str, seed: int, bypass_llm: bool):
     try:
         ORCHESTRATION_TASKS[task_id] = {"status": "processing"}
+        
+        # 1. Parsing YOLOE Vocabulary
+        target_classes = []
+        if os.path.exists(hitl_path):
+            try:
+                with open(hitl_path, 'r') as f:
+                    h_data = json.load(f)
+                    director_config = h_data.get("director_config", {})
+                    target_product = director_config.get("target_product", "")
+                    secondary_elements = director_config.get("secondary_elements", "")
+                    combined_str = f"{target_product},{secondary_elements}"
+                    target_classes = [c.strip() for c in combined_str.split(",") if c.strip()]
+            except Exception as e:
+                print(f"⚠️ Impossibile leggere hitl_data per vocabolario: {e}")
+                
+        # 2. Extract YOLOE Semantic Tags
+        video_files = glob.glob(os.path.join(output_dir, f"{sequence_name}.mov")) + glob.glob(os.path.join(output_dir, f"{sequence_name}.mp4"))
+        video_path = video_files[0] if video_files else None
+        
+        semantic_tags_map = {}
+        if target_classes and video_path:
+            print(f"🧠 [API Server] YOLOE Semantic Prompt loaded: {target_classes}")
+            semantic_tags_map = semantic_extractor.extract_bm_semantics(stringout_path, hitl_path, video_path, target_classes)
+
         output_path = director_module.generate_final_cut(
             stringout_path=stringout_path,
             hitl_path=hitl_path,
@@ -163,6 +193,7 @@ def orchestration_worker(task_id: str, stringout_path: str, hitl_path: str, beat
             sequence_name=sequence_name,
             seed=seed,
             bypass_llm=bypass_llm,
+            semantic_tags_map=semantic_tags_map,
         )
         ORCHESTRATION_TASKS[task_id] = {"status": "completed", "output_path": output_path}
     except Exception as e:

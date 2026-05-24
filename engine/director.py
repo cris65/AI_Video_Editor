@@ -97,10 +97,13 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
         gaze_direction = semantic.get('gaze_direction', 'Sconosciuto')
         emotional_tone = semantic.get('emotional_tone', 'Neutro')
         narrative_energy = semantic.get('narrative_energy_score', 5)
+        
+        yoloe_tags = c.get('yoloe_semantics')
+        yoloe_str = f" | YOLOE Tags: {yoloe_tags}" if yoloe_tags else ""
 
         clip_list_str.append(
             f"- ID: {c['start']} | Role: {role} | Score: {score}/10 | Scene: {scene} | Action: {action} "
-            f"| Subject Action: {subject_action} | Gaze: {gaze_direction} | Emotion: {emotional_tone} | Energy: {narrative_energy}/10"
+            f"| Subject Action: {subject_action} | Gaze: {gaze_direction} | Emotion: {emotional_tone} | Energy: {narrative_energy}/10{yoloe_str}"
         )
         
     clips_text = "\n".join(clip_list_str)
@@ -392,7 +395,7 @@ def extract_gaps(occupied, beats, limit):
     return gaps
 
 
-def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequence_name, seed: int = -1, bypass_llm: bool = False):
+def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequence_name, seed: int = -1, bypass_llm: bool = False, semantic_tags_map: dict | None = None):
     print(f"🎬 AI Director: Inizio Risoluzione Vincoli per {sequence_name}")
     
     stringout = load_json(stringout_path)
@@ -540,6 +543,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                         if virtual_clip.get('absolute_out') is None: virtual_clip['absolute_out'] = virtual_clip.get('_out_time') if virtual_clip.get('_out_time') is not None else clip['end']
                 virtual_clip['_locked'] = is_locked
                 virtual_clip['_locked_timeline_pos'] = locked_pos
+                if semantic_tags_map and str(clip['start']) in semantic_tags_map:
+                    virtual_clip['yoloe_semantics'] = semantic_tags_map[str(clip['start'])]
                 usable_clips.append(virtual_clip)
         else:
             clip['_virtual_id'] = clip_key
@@ -586,6 +591,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                     if clip.get('absolute_out') is None: clip['absolute_out'] = clip.get('_out_time') if clip.get('_out_time') is not None else clip['end']
             clip['_locked'] = is_locked
             clip['_locked_timeline_pos'] = locked_pos
+            if semantic_tags_map and str(clip['start']) in semantic_tags_map:
+                clip['yoloe_semantics'] = semantic_tags_map[str(clip['start'])]
             usable_clips.append(clip)
 
     # --- Separate locked walls from free clips ---

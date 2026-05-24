@@ -1,6 +1,6 @@
 # 🐺 State of the Architecture (SOTA)
 
-**Version:** v0.1.74 - 2026-05-24
+**Version:** v0.1.75 - 2026-05-24
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -11,7 +11,7 @@
 ## Architettura e Infrastruttura (Python AI Engine)
 
 - **Struttura:** Il cuore del motore è isolato nella cartella `engine/` ed eseguito in un Virtual Environment (Python 3.13).
-- **Core Tecnologico:** `OpenCV` (analisi Laplaciana, Optical Flow Farneback, K-Means palette), `Ultralytics YOLO26` (Person Detection `yolo26n` & Pose Estimation `yolo26n-pose`).
+- **Core Tecnologico:** `OpenCV` (analisi Laplaciana, Optical Flow Farneback, K-Means palette), `Ultralytics YOLO26` (Person Detection `yolo26n` & Pose Estimation `yolo26n-pose`), `YOLO-World` (`yolov8s-worldv2` per iniezione semantica Zero-Shot).
 - **Infrastruttura Dati (Drop Zone):** Architettura **Symmetrical Workflow** agnostica basata sul protocollo EDL (CMX3600) a 50fps. La cartella `engine/input/` funge da Drop-Zone a scansione automatica.
 - **Topologia Stagna:** Gli output sono confinati in `engine/output/{sequence_name}/LLM_Export_Package/`. I file d'ingresso vengono spostati nella stessa cartella di output al termine del processo (non in `archive/`).
 
@@ -52,11 +52,13 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 3. **`mlx_client.py`** — Fase B. Gateway nativo MLX locale per l'inferenza Vision LLM. Configura Gemma 4 in modalità Reasoning prepandendo il token `<|think|>` al prompt di sistema con parametri di campionamento specifici (`temperature=1.0`, `top_p=0.95`, `top_k=64`). Integra un parser regex greedy per isolare il payload JSON ignorando i tag e il testo di ragionamento (`<|channel>thought`). Inietta i 5 macro-oggetti annidati con fallback strutturato esplicito e salvataggio atomico progressivo.
 4. **`bgm_generator.py`** — Fase C. Genera la BGM (click track mock o MusicGen). Estrae keyword da `cinematography.scene_description` e `continuity.action_description` per costruire il prompt musicale.
 5. **`audio_analyzer.py`** — Fase C. Estrae i beat timestamps dalla BGM, calcola la Dual Waveform (Amplitude via np.abs e Energy via onset_env_b) a 80 pts/sec e li salva in `_audio_beats.json`.
-6. **`director.py`** — Fase D. AI Director ragionante. Riceve la lista clip con i dati semantici, interpella il modello LLM selezionato per una `editing_recipe`, poi applica la recipe su una griglia matematica di beat. Implementa il **Virtual Sub-Clipping**: clona in ram le clip sorgente se presentano marker multipli distanti >2.0s. Introduce il **Deterministic Bypass**: se invocato con `bypass_llm=True`, salta la chiamata LLM assemblando la timeline solo con clip marcate o in KEEP. Il sincronismo ritmico è garantito dalla **Geometra Math**, che calcola l'offset di taglio (`trim_in`) in base al ruolo del marker (IN, OUT, M/AUDIO) e all'allocazione del beat, applicando clamping di sicurezza. Gestisce il sistema Pillar/Filler e il Safety Net auto-fill. Output: `_final_edit.json` (symlink-like fallback pointer) + `_gemma_recipe.json`. **History Archive System (Non-Destructive Local Versioning):** ad ogni inferenza, salva l'iterazione in `LLM_Export_Package/` come `_final_edit_vN.json` e `_gemma_recipe_vN.json`, documentati nel `_version_log.json` che funge da indice con metadata (timestamp, user constraints, target duration, model, seed). Misura anche e registra con precisione millimetrica l'`inference_time_seconds` telemetrico.
-7. **`edl_exporter.py`** — Fase E. Export Stringout grezzo in CMX3600 EDL.
-8. **`xml_exporter.py`** — Fase E. Export Director's Cut in FCP7 XML (Resolution-Agnostic, legge risoluzione da `hitl_data.json`).
-9. **`api_server.py`** — Runtime server FastAPI (:8000). Espone `/api/system/profiler` (rilevamento hardware Apple Silicon), `/api/orchestrate` (endpoint POST che riceve il payload ibrido dalla UI e attiva la Fase D isolata), `/api/projects/completed` (Version-Aware con payload esteso LLM count), e i nuovi endpoint dell'Audio Rhythm Engine (`/api/audio/files`, `/api/audio/analyze`).
-10. **`main.py`** — Orchestratore CLI Zero-Click. Esegue in sequenza le 5 fasi, con skip automatico della Fase B se MLX Server è offline.
+6. **`semantic_extractor.py`** — Fase D (Pre-Inference). Modulo specializzato nel *Dynamic Vocabulary Injection*. Istanzia `yolov8s-worldv2.pt` (Zero-Shot) con classi fornite dall'utente nella UI (`TARGET PRODUCT` / `SECONDARY ELEMENTS`). Scansiona esclusivamente i frame associati a `best_moment`, popola una mappa semantica spaziale e la restituisce al Director per arricchire il prompt testuale finale.
+7. **`director.py`** — Fase D. Algoritmo di Editing Logico-Ritmico. Applica vincoli deterministici o passa la JSON recipe al LLM (Gemma 4/Llama 3). Con l'aggiornamento a *Geometra Math*, le clip isolate e bloccate vengono usate come muri ("locked walls"), e i vuoti intermedi vengono riempiti calcolando i delta ritmici. Implementa la divisione virtuale per clip con marker multipli e integra i tag semantici YOLO-World per massimizzare la precisione dell'LLM. Output: `_final_edit.json` (symlink-like fallback pointer) + `_gemma_recipe.json`. **History Archive System (Non-Destructive Local Versioning):** ad ogni inferenza, salva l'iterazione in `LLM_Export_Package/` come `_final_edit_vN.json` e `_gemma_recipe_vN.json`, documentati nel `_version_log.json` che funge da indice con metadata (timestamp, user constraints, target duration, model, seed). Misura anche e registra con precisione millimetrica l'`inference_time_seconds` telemetrico.
+8. **`update_cut.py`** — Fase E. Proxy script locale. Innescato dal Node Server (o in esecuzione stand-alone), fa il pooling di `_stringout.json`, `_hitl_data.json` e `_audio_beats.json`. Estrae il vocabolario per YOLO-World, invoca `semantic_extractor`, chiama il Director e inietta il final cut in `xml_exporter.py` per generare il FCP 7 XML finale usando la mappatura file dell'EDL originale.
+9. **`edl_exporter.py`** — Fase E. Export Stringout grezzo in CMX3600 EDL.
+10. **`xml_exporter.py`** — Fase E. Export Director's Cut in FCP7 XML (Resolution-Agnostic, legge risoluzione da `hitl_data.json`).
+11. **`api_server.py`** — Runtime server FastAPI (:8000). Espone `/api/system/profiler` (rilevamento hardware Apple Silicon), `/api/orchestrate` (endpoint POST che riceve il payload ibrido dalla UI e attiva la Fase D isolata), `/api/projects/completed` (Version-Aware con payload esteso LLM count), e i nuovi endpoint dell'Audio Rhythm Engine (`/api/audio/files`, `/api/audio/analyze`).
+12. **`main.py`** — Orchestratore CLI Zero-Click. Esegue in sequenza le 5 fasi, con skip automatico della Fase B se MLX Server è offline.
 
 ---
 
