@@ -1,5 +1,6 @@
-# 🧪 TESTING DOCTRINE: WOLF-PROTOCOL FOR E2E (PLAYWRIGHT)
-**Version:** v0.1.49 - 2026-05-22
+# 🐺 LOCAL-FIRST TESTING DOCTRINE
+
+**Version:** v0.1.66 - 2026-05-24
 This document functions as the programmable memory for E2E testing quirks, rules, and mandatory architectural guardrails specifically designed for the **Hybrid Immovable Local-First Architecture** (Dexie + Orchestrator + Supabase Realtime).
 
 Whenever a complex testing race condition or framework anomaly is encountered and resolved, the underlying rule strictly appending it to this living document must be codified.

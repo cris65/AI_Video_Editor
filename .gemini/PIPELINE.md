@@ -1,6 +1,6 @@
-# 🎬 AI Video Editor — Operational Pipeline & Production Flow
+# 🐺 PIPELINE & ORCHESTRATOR
 
-**Version:** v0.1.49 - 2026-05-22
+**Version:** v0.1.66 - 2026-05-24
 **Scope:** Operational guide for booting the development environment and executing the full video analysis pipeline.
 
 ---

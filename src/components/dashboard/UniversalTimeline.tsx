@@ -69,6 +69,7 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
   // Absolute drag tracking to prevent state batching drift
   const panDragRef = useRef<{ startX: number; startWindow: [number, number] } | null>(null);
   const scrubDragRef = useRef<{ startX: number; startWindow: [number, number]; startAbsoluteFrac: number } | null>(null);
+  const lastClickTimeRef = useRef<number>(0);
 
   const { isModifying, keysDownRef } = useTimelineModifiers();
 
@@ -160,6 +161,7 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
   // ─── Timeline click (seek) ───────────────────────────────────────────────
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (keysDownRef.current.has('KeyP') || keysDownRef.current.has('KeyL')) return;
+    lastClickTimeRef.current = Date.now();
     const rect = e.currentTarget.getBoundingClientRect();
     const screenFrac = (e.clientX - rect.left) / rect.width;
     const [s, en] = zoomWindow;
@@ -235,6 +237,7 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
   useEffect(() => {
     let rafId: number;
     let lastFormatted = '';
+    let lastSeqTime: number | null = null;
     const loop = () => {
       let t = 0;
       if (mode === 'stringout' && videoRef.current) {
@@ -253,17 +256,50 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
       // Move playhead DOM element
       if (playheadRef.current && totalDuration > 0) {
         let pct = 0;
+        let seqTimeForPan = 0;
+        let validTime = false;
+
         if (mode === 'stringout' && videoRef.current) {
           const currentSec = videoRef.current.currentTime;
           const hostClip = displayClips.find(c => currentSec >= c.sourceStart && currentSec < c.sourceEnd);
           if (hostClip) {
-            const seqTime = hostClip.displayStart + (currentSec - hostClip.sourceStart);
-            pct = (seqTime / totalDuration) * 100;
+            seqTimeForPan = hostClip.displayStart + (currentSec - hostClip.sourceStart);
+            pct = (seqTimeForPan / totalDuration) * 100;
+            validTime = true;
           }
         } else if (mode === 'director_cut' && virtualTimeRef) {
-          pct = (virtualTimeRef.current / totalDuration) * 100;
+          seqTimeForPan = virtualTimeRef.current;
+          pct = (seqTimeForPan / totalDuration) * 100;
+          validTime = true;
         }
-        playheadRef.current.style.left = `${pct}%`;
+
+        if (validTime) {
+          playheadRef.current.style.left = `${pct}%`;
+
+          // --- Auto-Pan / Center Playhead Logic ---
+          const playheadFrac = pct / 100;
+          const [s, en] = zoomWindow;
+          const windowSpan = en - s;
+          const isUserInteracting = panDragRef.current !== null || scrubDragRef.current !== null;
+          const timeSinceClick = Date.now() - lastClickTimeRef.current;
+
+          if (!isUserInteracting && windowSpan < 0.999 && timeSinceClick > 150) {
+            const isOutOfBounds = playheadFrac < s || playheadFrac > en;
+
+            if (isOutOfBounds) {
+              const movingRight = lastSeqTime !== null ? seqTimeForPan >= lastSeqTime : true;
+              let newS = movingRight 
+                ? playheadFrac - windowSpan * 0.25 
+                : playheadFrac - windowSpan * 0.75;
+              
+              newS = Math.max(0, Math.min(newS, 1 - windowSpan));
+              if (Math.abs(newS - s) > 0.001) {
+                setZoomWindow([newS, newS + windowSpan]);
+              }
+            }
+          }
+          lastSeqTime = seqTimeForPan;
+        }
       }
 
       rafId = requestAnimationFrame(loop);

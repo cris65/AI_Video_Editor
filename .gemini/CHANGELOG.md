@@ -1,8 +1,29 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.65 - 2026-05-24
+**Version:** v0.1.66 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.65 → v0.1.66
+
+### Summary — [UI-008] Fluid Timeline Auto-Pan & Click Muting
+
+Resolved rigidity issues with timeline navigation. Implemented a smart "Relative Anchoring" and Page Scroll system for the 60fps RAF loop in `UniversalTimeline`. Mouse clicks are now muted from triggering auto-pan, and keyboard jumps dynamically calculate whether to scroll the page (25%/75%) based on out-of-bounds detection, preserving user spatial memory.
+
+### Modified Files
+
+| File | +Lines | -Lines | Description |
+|---|---|---|---|
+| `package.json` | 1 | 1 | Version bumped to v0.1.66. |
+| `src/components/dashboard/UniversalTimeline.tsx` | 20 | 5 | Added `lastClickTimeRef` to mute clicks. Refactored RAF loop to apply Page Scroll ONLY when out-of-bounds, computing 25%/75% margins depending on jump direction (`movingRight`). |
+
+### Component Architecture
+* **UniversalTimeline (Auto-Pan)**: Separated the jump detection into "within bounds" vs "out of bounds". Mouse clicks register a `lastClickTime` to block auto-pan for 150ms.
+
+### Quality Control
+* `eslint . && tsc --noEmit` — **0 Errors**. 
 
 ---
 

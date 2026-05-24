@@ -1,6 +1,6 @@
-# 🐺 Functional Specifications (FEATURES.md)
+# 🐺 Features & Active Sprint
 
-**Version:** v0.1.65 - 2026-05-24
+**Version:** v0.1.66 - 2026-05-24
 
 > [!NOTE]
 > This document describes the **Features** — i.e., the functional value exposed to the end user, both as engine capabilities and UI interfaces. It does not describe how the data is structured (→ `STRUCTURE.md`) nor the temporal execution flow (→ `PIPELINE.md`).
