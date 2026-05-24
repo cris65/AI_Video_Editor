@@ -47,8 +47,8 @@ export default function App() {
 
   if (currentView === 'setup') {
     return (
-      <div className="h-screen bg-[#111111] flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-5xl">
+      <div className="min-h-screen bg-[#111111] flex flex-col items-center py-12 px-6">
+        <div className="w-full max-w-5xl my-auto">
           <ImageEngineControls onComplete={(seqName?: string, targetVersion?: number) => {
             if (seqName) {
               setSequenceName(seqName);

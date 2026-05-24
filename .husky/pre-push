@@ -16,8 +16,8 @@ if [ ! -d "$TARGET_DIR" ]; then
     mkdir -p "$TARGET_DIR"
 fi
 
-# Sync .gemini contents to target
-rsync -av --delete "$SOURCE_GEMINI/" "$TARGET_DIR/"
+# Sync .gemini contents to target, excluding GEMINI.md so it doesn't get deleted before the cp
+rsync -av --delete --exclude="GEMINI.md" "$SOURCE_GEMINI/" "$TARGET_DIR/"
 # Copy GEMINI.md to target
 cp "$SOURCE_GEMINI_MAIN" "$TARGET_DIR/"
 

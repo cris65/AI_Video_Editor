@@ -1,8 +1,30 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.69 - 2026-05-24
+**Version:** v0.1.70 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.69 → v0.1.70
+
+### Summary — [UI-010] Engine Control Layout & Scroll Bug
+
+Resolved a critical layout bug in the `ImageEngineControls` wrapper component (`App.tsx`). The main dashboard container was strictly bound to `h-screen` and `justify-center`. As the "Completed Projects" list dynamically grew, the content overflowed the fixed viewport height, but the `#111111` background color halted at `100vh`, exposing an unstyled break in the page when scrolling down.
+
+### Modified Files
+
+| File | Changes | Description |
+|---|---|---|
+| `src/App.tsx` | +2 -2 | Upgraded the main setup wrapper to use `min-h-screen py-12` instead of `h-screen justify-center`. The inner container received `my-auto` to perfectly retain vertical centering when the projects list is empty. |
+
+### Technical Adjustments
+- **Flexbox Safety Override:** Replaced the unsafe `justify-center` on the overflowing flex container with `my-auto` on its child. This ensures that when the content is taller than the screen, it aligns to the top allowing users to scroll naturally, rather than clipping the top of the interface out of reach.
+- **Dynamic Background Expansion:** Switched to `min-h-screen`, enabling the dark background to stretch indefinitely alongside the internal content.
+
+### Validation State
+- ✅ **ESLint / TypeScript (`npm run wolf:audit`)**: Passed (0 errors).
+- ✅ **Build Sync**: UI is fully responsive and safe against infinite vertical overflow.
 
 ---
 
