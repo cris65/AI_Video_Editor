@@ -741,7 +741,12 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     );
   }
 
-  const videoUrl = `/engine/output/${sequenceName}/${sequenceName}.mp4`;
+  const videoUrls = [
+    `/engine/output/${sequenceName}/${sequenceName}.mp4`,
+    `/engine/output/${sequenceName}/${sequenceName}.mov`,
+    `/engine/output/${sequenceName}/${sequenceName}.MOV`,
+    `/engine/output/${sequenceName}/${sequenceName}.MP4`
+  ];
   const audioUrl = `/engine/output/${sequenceName}/LLM_Export_Package/${sequenceName}_bgm.wav`;
 
   return (
@@ -931,7 +936,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
 
           <div className="flex-1 min-h-0 flex items-center justify-center relative">
             <VideoPlayerSync
-              src={videoUrl}
+              src={videoUrls}
               ref={videoRef}
               hideControls={isPreviewMode}
             />

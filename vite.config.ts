@@ -64,6 +64,7 @@ const engineAssetsPlugin = () => ({
         if (ext === '.json') contentType = 'application/json';
         else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
         else if (ext === '.mp4') contentType = 'video/mp4';
+        else if (ext === '.mov') contentType = 'video/quicktime';
 
         if (range) {
           const parts = range.replace(/bytes=/, '').split('-');

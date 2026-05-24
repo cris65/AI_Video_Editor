@@ -73,6 +73,24 @@
       "weight": 1171.63,
       "duration_sec": 127.64,
       "ratio": 0.1089
+    },
+    {
+      "timestamp": 1779657730.668976,
+      "weight": 1135.11,
+      "duration_sec": 124.41,
+      "ratio": 0.1096
+    },
+    {
+      "timestamp": 1779662899.7772732,
+      "weight": 130.12,
+      "duration_sec": 144.09,
+      "ratio": 1.1074
+    },
+    {
+      "timestamp": 1779664199.5723991,
+      "weight": 130.12,
+      "duration_sec": 118.07,
+      "ratio": 0.9074
     }
   ],
   "llm_inference": [
@@ -93,6 +111,24 @@
       "weight": 4456,
       "duration_sec": 1181.94,
       "ratio": 0.2652
+    },
+    {
+      "timestamp": 1779657730.670343,
+      "weight": 1311,
+      "duration_sec": 663.81,
+      "ratio": 0.5063
+    },
+    {
+      "timestamp": 1779662899.777993,
+      "weight": 1311,
+      "duration_sec": 650.64,
+      "ratio": 0.4963
+    },
+    {
+      "timestamp": 1779664199.57309,
+      "weight": 1311,
+      "duration_sec": 605.13,
+      "ratio": 0.4616
     }
   ]
 }

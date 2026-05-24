@@ -1,6 +1,6 @@
 # 🐺 State of the Architecture (SOTA)
 
-**Version:** v0.1.72 - 2026-05-24
+**Version:** v0.1.74 - 2026-05-24
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -11,7 +11,7 @@
 ## Architettura e Infrastruttura (Python AI Engine)
 
 - **Struttura:** Il cuore del motore è isolato nella cartella `engine/` ed eseguito in un Virtual Environment (Python 3.13).
-- **Core Tecnologico:** `OpenCV` (analisi Laplaciana, Optical Flow Farneback, K-Means palette), `Ultralytics YOLOv8n` (Person Detection).
+- **Core Tecnologico:** `OpenCV` (analisi Laplaciana, Optical Flow Farneback, K-Means palette), `Ultralytics YOLO26` (Person Detection `yolo26n` & Pose Estimation `yolo26n-pose`).
 - **Infrastruttura Dati (Drop Zone):** Architettura **Symmetrical Workflow** agnostica basata sul protocollo EDL (CMX3600) a 50fps. La cartella `engine/input/` funge da Drop-Zone a scansione automatica.
 - **Topologia Stagna:** Gli output sono confinati in `engine/output/{sequence_name}/LLM_Export_Package/`. I file d'ingresso vengono spostati nella stessa cartella di output al termine del processo (non in `archive/`).
 
@@ -48,7 +48,7 @@ Il `_stringout.json` usa uno schema a **due livelli di profondità**. Le chiavi 
 ## Moduli a Microservizi (Pipeline A→E)
 
 1. **`edl_parser.py`** — Ingest EDL puro. Estrae la mappa temporale (Record IN / Source IN) e il Naming Base dalla root della clip (`* FROM CLIP NAME`).
-2. **`pancake_editor.py`** — Motore semantico di Fase A. Center-Weighted Laplacian, Dual Threshold Soft Focus, Action Peak tracking, Cinematic Palette K-Means, Optical Flow Farneback, Semantic Storyboard (Native VLM Extraction a 896x896). Tutta la logica di finalizzazione è centralizzata nell'helper privato `_finalize_block()` per eliminare duplicazioni.
+2. **`pancake_editor.py`** — Motore semantico di Fase A. Center-Weighted Laplacian, Dual Threshold Soft Focus, Action Peak tracking, Cinematic Palette K-Means, Optical Flow Farneback, Semantic Storyboard. Integra pipeline YOLO26 a due livelli (Tier 1 `yolo26n.pt` Object, Tier 2 `yolo26n-pose.pt` Smart Switch per tracciamento facciale). Supporta l'esportazione automatica di `_yolo26_debug.mp4` attivabile via flag `debug_visuals`. Tutta la logica di finalizzazione è centralizzata nell'helper privato `_finalize_block()`.
 3. **`mlx_client.py`** — Fase B. Gateway nativo MLX locale per l'inferenza Vision LLM. Configura Gemma 4 in modalità Reasoning prepandendo il token `<|think|>` al prompt di sistema con parametri di campionamento specifici (`temperature=1.0`, `top_p=0.95`, `top_k=64`). Integra un parser regex greedy per isolare il payload JSON ignorando i tag e il testo di ragionamento (`<|channel>thought`). Inietta i 5 macro-oggetti annidati con fallback strutturato esplicito e salvataggio atomico progressivo.
 4. **`bgm_generator.py`** — Fase C. Genera la BGM (click track mock o MusicGen). Estrae keyword da `cinematography.scene_description` e `continuity.action_description` per costruire il prompt musicale.
 5. **`audio_analyzer.py`** — Fase C. Estrae i beat timestamps dalla BGM, calcola la Dual Waveform (Amplitude via np.abs e Energy via onset_env_b) a 80 pts/sec e li salva in `_audio_beats.json`.
@@ -82,7 +82,7 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 ## Frontend HITL (React/Vite)
 
 - **Version-Aware Home Screen:** La lista "Progetti Completati" espone un badge per informare l'utente sul numero di Director's Cut esistenti e il modello LLM usato nell'ultima inferenza (con relativo tempo espresso in `MM:SS`), senza entrare nel progetto. Integra i dati del `source_metadata` (risoluzione, framerate e durata sorgente) estratti dal motore Python, esibendo le card dei video con dettagli tecnici avanzati. La History è esplorabile tramite il componente universale DRY `VersionHistoryDropdown`, il quale espone nativamente la durata reale (`duration_seconds`) della singola iterazione di montaggio, ed è riutilizzabile ovunque grazie ai render props. Fallback strutturato (Zero `any` policy) per i progetti pre-versioning.
-- **Interfaccia Split-View NLE-style:** Video Player sincronizzato + Timeline Interattiva (Stringout & Director's Cut). Anti-Lag Engine 60fps via `requestAnimationFrame` sul DOM, scavalcando il React state globale. `React.memo` su tutte le clip card.
+- **Interfaccia Split-View NLE-style:** Video Player sincronizzato + Timeline Interattiva (Stringout & Director's Cut). Supporto universale multi-codec (fallback automatico su `.mov`, `.mp4` nei `<source>` tags). Anti-Lag Engine 60fps via `requestAnimationFrame` sul DOM, scavalcando il React state globale. `React.memo` su tutte le clip card.
 - **Timeline Orizzontale Interattiva — Absolute Tracking Engine:** `UniversalTimeline` con blocchi flex. Zoom Engine via rotella del mouse con `anchorFrac` matematico. Pan (`P`) e Scrub (`P+L`) operano tramite **Absolute Tracking Refs** (`panDragRef`, `scrubDragRef`): al primo `mousemove` si fotografa `startX` e `startWindow`, ogni successivo calcolo usa la differenza assoluta rispetto al punto di ancoraggio iniziale. Questo elimina il drift causato dal React State Batching durante movimenti lenti (mouse gaming ad alta frequenza). Il container di zoom nel `UniversalTimelineTrack` non ha transizioni CSS (`transition-all` rimosso) per garantire zoom istantaneo e playhead inchiodato. Durante pan/scrub, `isModifying` disabilita `pointer-events` sulle clip per prevenire D&D accidentale. Il playhead è un unico nodo `w-px` con SVG `absolute` annidato, eliminando il subpixel snapping differenziale.
 - **Audio Rhythm Engine & Dual Waveform:** Estrazione avanzata delle tracce audio (Percussive/Harmonic, Beats, BPM) tramite `librosa`. Overlay d'onda SVG proporzionale. Alert UI intelligente per il deflag forzato sul Target Duration in caso di mancata corrispondenza durata clip-audio.
 - **Clip Ghosting & Save Order:** Clip riposizionate assumono stato "Dirty" (trasparenza + alone scuro + bordo bianco). Il salvataggio è ottimistico: persiste l'ordine in `_hitl_data.json` sotto `clip_order_override` senza trigger re-fetch dell'engine.

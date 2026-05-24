@@ -22,7 +22,8 @@ class PancakeEditor:
         self.SAFE_LEFT = 0.30
         self.SAFE_RIGHT = 0.70
         
-        self.yolo_model = YOLO('yolov8n.pt')
+        self.yolo_model = YOLO('yolo26n.pt')
+        self.yolo_pose_model = YOLO('yolo26n-pose.pt')
         
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.output_dir = os.path.join(self.base_dir, 'output', sequence_name)
@@ -34,7 +35,7 @@ class PancakeEditor:
         self.storyboard_dir = os.path.join(self.output_dir, 'storyboards')
         os.makedirs(self.storyboard_dir, exist_ok=True)
 
-    def get_frame_tag(self, frame, prev_frame):
+    def get_frame_tag(self, frame, prev_frame, debug_visuals=False):
         """
         2. Nuova Funzione di Tagging
         """
@@ -46,7 +47,7 @@ class PancakeEditor:
         center_gray = gray[int(h*0.25):int(h*0.75), int(w*0.25):int(w*0.75)]
         lap_var = cv2.Laplacian(center_gray, cv2.CV_64F).var()
         if lap_var < self.BLUR_THRESHOLD:
-            return 'TRASH_BLUR', lap_var, 0, []
+            return 'TRASH_BLUR', lap_var, 0, [], [], None
             
         is_soft = (self.BLUR_THRESHOLD <= lap_var < self.SOFT_FOCUS_THRESHOLD)
             
@@ -54,7 +55,7 @@ class PancakeEditor:
         diff = cv2.absdiff(gray, prev_gray)
         motion_diff = np.mean(diff)
         if motion_diff > self.MOTION_THRESHOLD:
-            return 'TRASH_MOTION', lap_var, 0, []
+            return 'TRASH_MOTION', lap_var, 0, [], [], None
             
         # Analisi YOLO: raccoglie tutte le classi COCO (non solo person)
         results = self.yolo_model(frame, verbose=False, conf=self.CONFIDENCE_MIN)
@@ -78,10 +79,23 @@ class PancakeEditor:
         
         people_count = len(person_boxes)
         
+        poses = []
+        annotated_frame = None
+        if people_count > 0:
+            results_pose = self.yolo_pose_model(frame, verbose=False, conf=self.CONFIDENCE_MIN)
+            if hasattr(results_pose[0], 'keypoints') and results_pose[0].keypoints is not None:
+                if results_pose[0].keypoints.data is not None:
+                    poses = results_pose[0].keypoints.data.cpu().numpy().tolist()
+            if debug_visuals:
+                annotated_frame = results_pose[0].plot()
+        else:
+            if debug_visuals:
+                annotated_frame = results[0].plot()
+        
         suffix = '_SOFT' if is_soft else ''
         
         if not person_boxes:
-            return 'B-ROLL' + suffix, lap_var, people_count, detections
+            return 'B-ROLL' + suffix, lap_var, people_count, detections, poses, annotated_frame
             
         # Analisi Spaziale
         frame_width = frame.shape[1]
@@ -91,9 +105,9 @@ class PancakeEditor:
             norm_x = center_x / frame_width
             
             if self.SAFE_LEFT <= norm_x <= self.SAFE_RIGHT:
-                return 'MAIN_A' + suffix, lap_var, people_count, detections
+                return 'MAIN_A' + suffix, lap_var, people_count, detections, poses, annotated_frame
                 
-        return 'EDGE_DANGER' + suffix, lap_var, people_count, detections
+        return 'EDGE_DANGER' + suffix, lap_var, people_count, detections, poses, annotated_frame
 
     def extract_cinematic_palette(self, frames_list):
         """
@@ -254,12 +268,13 @@ class PancakeEditor:
         }
         block["yolo_omniscient_data"] = {
             "total_objects": people_count,
-            "detections": block.get("_detections", [])
+            "detections": block.get("_detections", []),
+            "pose_estimations": block.get("_poses", [])
         }
 
         # 7. Remove all temporary private keys
         for key in [
-            "_max_lap", "_people_count", "_detections", "_frame_in", "_frame_best",
+            "_max_lap", "_people_count", "_detections", "_poses", "_frame_in", "_frame_best",
             "_frame_out", "_sb_in", "_sb_best", "_sb_out",
             "_motion_samples", "_prev_gray_flow"
         ]:
@@ -288,7 +303,7 @@ class PancakeEditor:
                 break
         return f"{clip_base}_{tc_safe}"
 
-    def process_video(self, video_path, progress_callback=None):
+    def process_video(self, video_path, progress_callback=None, debug_visuals=False):
         """
         3. Logica di Costruzione Stringout
         """
@@ -300,6 +315,12 @@ class PancakeEditor:
         self.fps = cap.get(cv2.CAP_PROP_FPS)
         self.width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        
+        debug_writer = None
+        if debug_visuals:
+            debug_video_path = os.path.join(self.output_dir, f"{self.sequence_name}_yolo26_debug.mp4")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # type: ignore
+            debug_writer = cv2.VideoWriter(debug_video_path, fourcc, self.fps, (int(self.width), int(self.height)))
         self.video_path = video_path
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.total_frames = total_frames
@@ -317,7 +338,9 @@ class PancakeEditor:
             return []
             
         # Inizializziamo il primo blocco (frame a 0s)
-        tag, lap_var, people_count, detections = self.get_frame_tag(prev_frame, prev_frame)
+        tag, lap_var, people_count, detections, poses, annotated_frame = self.get_frame_tag(prev_frame, prev_frame, debug_visuals)
+        if debug_writer and annotated_frame is not None:
+            debug_writer.write(annotated_frame)
         if not tag.startswith('TRASH'):
             small_frame = cv2.resize(prev_frame, (100, 100))
             sb_frame = cv2.resize(prev_frame, (896, 896))
@@ -328,6 +351,7 @@ class PancakeEditor:
                 "best_moment": 0.0,
                 "_people_count": people_count,
                 "_detections": detections,
+                "_poses": poses,
                 "_max_lap": lap_var,
                 "_frame_in": small_frame,
                 "_frame_best": small_frame,
@@ -353,7 +377,9 @@ class PancakeEditor:
                 
             timestamp_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
             
-            tag, lap_var, people_count, detections = self.get_frame_tag(frame, prev_frame)
+            tag, lap_var, people_count, detections, poses, annotated_frame = self.get_frame_tag(frame, prev_frame, debug_visuals)
+            if debug_writer and annotated_frame is not None:
+                debug_writer.write(annotated_frame)
             
             if tag.startswith('TRASH'):
                 if current_block is not None:
@@ -385,6 +411,7 @@ class PancakeEditor:
                         "best_moment": timestamp_sec,
                         "_people_count": people_count,
                         "_detections": detections,
+                        "_poses": poses,
                         "_max_lap": lap_var,
                         "_frame_in": small_frame,
                         "_frame_best": small_frame,
@@ -400,6 +427,7 @@ class PancakeEditor:
                         current_trash["best_moment"] = timestamp_sec
                         current_trash["_people_count"] = people_count
                         current_trash["_detections"] = detections
+                        current_trash["_poses"] = poses
                         current_trash["_frame_best"] = cv2.resize(frame, (100, 100))
                         current_trash["_sb_best"] = cv2.resize(frame, (896, 896))
                         
@@ -437,6 +465,7 @@ class PancakeEditor:
                         "best_moment": timestamp_sec,
                         "_people_count": people_count,
                         "_detections": detections,
+                        "_poses": poses,
                         "_max_lap": lap_var,
                         "_frame_in": small_frame,
                         "_frame_best": small_frame,
@@ -452,6 +481,7 @@ class PancakeEditor:
                         current_block["best_moment"] = timestamp_sec
                         current_block["_people_count"] = people_count
                         current_block["_detections"] = detections
+                        current_block["_poses"] = poses
                         current_block["_frame_best"] = cv2.resize(frame, (100, 100))
                         current_block["_sb_best"] = cv2.resize(frame, (896, 896))
                         
@@ -505,6 +535,8 @@ class PancakeEditor:
             trash_timeline.append(current_trash)
                 
         cap.release()
+        if debug_writer:
+            debug_writer.release()
         if progress_callback:
             progress_callback("A_OPENCV", 100, f"Analisi Stringout completata. {len(timeline)} clip valide.")
         print(f"✅ Analisi Stringout completata. Trovati {len(timeline)} segmenti validi e {len(trash_timeline)} scarti.")
@@ -614,9 +646,9 @@ class PancakeEditor:
 # ==============================================================================
 # ENTRY POINT PER L'ORCHESTRATORE
 # ==============================================================================
-def process_pancake_video(video_path, sequence_name="Pancake_Sequence", clip_map=None, sampling_density_percent=0.15, vlm_model_id="google/gemma-4-E4B-it", llm_model_id="google/gemma-4-9b-it", progress_callback=None):
+def process_pancake_video(video_path, sequence_name="Pancake_Sequence", clip_map=None, sampling_density_percent=0.15, vlm_model_id="google/gemma-4-E4B-it", llm_model_id="google/gemma-4-9b-it", progress_callback=None, debug_visuals=False):
     editor = PancakeEditor(sequence_name, clip_map, sampling_density_percent, vlm_model_id, llm_model_id)
-    timeline, trash_timeline = editor.process_video(video_path, progress_callback)
+    timeline, trash_timeline = editor.process_video(video_path, progress_callback, debug_visuals)
     json_path = editor.generate_json(timeline, trash_timeline)
     preview_path = editor.generate_preview(video_path, timeline)
     trash_path = editor.generate_trash_preview(video_path, trash_timeline)

@@ -480,7 +480,8 @@ def run_phase_a_background(video_path: str, edl_path: str, density: float, vlm_m
         # Track Phase A OpenCV duration
         cv_start = time.time()
         editor = pancake_editor.PancakeEditor(sequence_name, clip_map, sampling_density_percent=density, vlm_model_id=vlm_model_id, llm_model_id=llm_model_id)
-        timeline, trash_timeline = editor.process_video(video_path, progress_callback=update_progress)
+        # TODO: RIMUOVERE DEBUG VISUALS DOPO IL TEST
+        timeline, trash_timeline = editor.process_video(video_path, progress_callback=update_progress, debug_visuals=True)
         json_path = editor.generate_json(timeline, trash_timeline)
         editor.generate_preview(video_path, timeline)
         editor.generate_trash_preview(video_path, trash_timeline)
