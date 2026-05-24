@@ -302,6 +302,8 @@ class PancakeEditor:
         self.height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.video_path = video_path
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.total_frames = total_frames
+        self.duration_sec = total_frames / self.fps if self.fps > 0 else 0
         
         timeline = []
         trash_timeline = []
@@ -519,6 +521,8 @@ class PancakeEditor:
                     "width": getattr(self, 'width', 1920),
                     "height": getattr(self, 'height', 1080)
                 },
+                "duration_seconds": getattr(self, 'duration_sec', 0.0),
+                "total_frames": getattr(self, 'total_frames', 0),
                 "vlm_model_id": self.vlm_model_id
             },
             "stringout_timeline": timeline,

@@ -305,6 +305,7 @@ def _update_version_log(
         "timestamp": metadata.get("timestamp"),
         "brain_model": metadata.get("brain_model"),
         "inference_time_seconds": metadata.get("inference_time_seconds"),
+        "duration_seconds": metadata.get("duration_seconds"),
         "director_vision": metadata.get("director_vision", "HEURISTIC_FALLBACK"),
         "clip_count": metadata.get("clip_count"),
         "director_config": metadata.get("director_config"),
@@ -1022,6 +1023,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
     with open(output_path, 'w') as f:
         json.dump({"version": next_v, "final_edit_timeline": export_data}, f, indent=2)
 
+    sequence_duration = max([item["timeline_out"] for item in export_data]) if export_data else 0.0
+
     # --- Update version log sidecar ---
     _update_version_log(
         output_dir=output_dir,
@@ -1031,6 +1034,7 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
             "timestamp": datetime.datetime.now().isoformat(),
             "brain_model": llm_model_id,
             "inference_time_seconds": recipe_dict.get("_inference_time_seconds") if recipe_dict else None,
+            "duration_seconds": sequence_duration,
             "director_vision": recipe_dict.get("director_vision") if recipe_dict else "HEURISTIC_FALLBACK",
             "clip_count": len(export_data),
             "director_config": director_config,

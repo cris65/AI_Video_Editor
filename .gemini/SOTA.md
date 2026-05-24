@@ -1,6 +1,6 @@
 # 🐺 State of the Architecture (SOTA)
 
-**Version:** v0.1.68 - 2026-05-24
+**Version:** v0.1.69 - 2026-05-24
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -81,7 +81,7 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 
 ## Frontend HITL (React/Vite)
 
-- **Version-Aware Home Screen:** La lista "Progetti Completati" espone un badge per informare l'utente sul numero di Director's Cut esistenti e il modello LLM usato nell'ultima inferenza (con relativo tempo espresso in `MM:SS`), senza entrare nel progetto. Fallback strutturato (Zero `any` policy) per i progetti flat pre-versioning.
+- **Version-Aware Home Screen:** La lista "Progetti Completati" espone un badge per informare l'utente sul numero di Director's Cut esistenti e il modello LLM usato nell'ultima inferenza (con relativo tempo espresso in `MM:SS`), senza entrare nel progetto. Integra i dati del `source_metadata` (risoluzione, framerate e durata sorgente) estratti dal motore Python, esibendo le card dei video con dettagli tecnici avanzati. La History è esplorabile tramite il componente universale DRY `VersionHistoryDropdown`, il quale espone nativamente la durata reale (`duration_seconds`) della singola iterazione di montaggio, ed è riutilizzabile ovunque grazie ai render props. Fallback strutturato (Zero `any` policy) per i progetti pre-versioning.
 - **Interfaccia Split-View NLE-style:** Video Player sincronizzato + Timeline Interattiva (Stringout & Director's Cut). Anti-Lag Engine 60fps via `requestAnimationFrame` sul DOM, scavalcando il React state globale. `React.memo` su tutte le clip card.
 - **Timeline Orizzontale Interattiva — Absolute Tracking Engine:** `UniversalTimeline` con blocchi flex. Zoom Engine via rotella del mouse con `anchorFrac` matematico. Pan (`P`) e Scrub (`P+L`) operano tramite **Absolute Tracking Refs** (`panDragRef`, `scrubDragRef`): al primo `mousemove` si fotografa `startX` e `startWindow`, ogni successivo calcolo usa la differenza assoluta rispetto al punto di ancoraggio iniziale. Questo elimina il drift causato dal React State Batching durante movimenti lenti (mouse gaming ad alta frequenza). Il container di zoom nel `UniversalTimelineTrack` non ha transizioni CSS (`transition-all` rimosso) per garantire zoom istantaneo e playhead inchiodato. Durante pan/scrub, `isModifying` disabilita `pointer-events` sulle clip per prevenire D&D accidentale. Il playhead è un unico nodo `w-px` con SVG `absolute` annidato, eliminando il subpixel snapping differenziale.
 - **Audio Rhythm Engine & Dual Waveform:** Estrazione avanzata delle tracce audio (Percussive/Harmonic, Beats, BPM) tramite `librosa`. Overlay d'onda SVG proporzionale. Alert UI intelligente per il deflag forzato sul Target Duration in caso di mancata corrispondenza durata clip-audio.

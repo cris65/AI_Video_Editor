@@ -1,8 +1,37 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.68 - 2026-05-24
+**Version:** v0.1.69 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.68 → v0.1.69
+
+### Summary — [UI-009 / ENG-002] Universal Version History & Source Metadata Sync
+
+Extracted a new DRY universal React component (`VersionHistoryDropdown`) to handle the project versioning UI consistently across both `PancakeDashboard` and `ImageEngineControls`. Backfilled legacy version logs via a Python crawler to correctly assign sequence durations to older cuts. Expanded the Python engine (`pancake_editor.py` and `director.py`) and FastAPI endpoints (`api_server.py`) to natively extract and inject source metadata (duration, FPS, resolution) inside the `_stringout.json` and the frontend React payloads, allowing the UI to beautifully display exact resolution and times for both the Raw Footage card and individual version history cuts.
+
+### Modified Files
+
+| File | Changes | Description |
+|---|---|---|
+| `engine/pancake_editor.py` | +4 -0 | Extracts `duration_sec` and `total_frames` via OpenCV and injects them into `_stringout.json` metadata block. |
+| `engine/director.py` | +4 -0 | Calculates true sequence duration based on timeline out bounds and writes it to `duration_seconds` in `_version_log.json`. |
+| `engine/api_server.py` | +12 -1 | Expands `get_completed_projects` to read `source_metadata` from the stringout JSON and propagates it to the UI payload. |
+| `src/hooks/usePancakeData.ts` | +12 -0 | Introduces `SourceMetadata` interface and maps `duration_seconds` to `VersionEntry`. |
+| `src/components/dashboard/VersionHistoryDropdown.tsx` | +135 -0 | **[NEW]** DRY component abstracting the version dropdown menu logic with `dropdownDirection` positioning. |
+| `src/components/dashboard/PancakeDashboard.tsx` | +7 -75 | Refactored to drop inline dropdown code in favor of `VersionHistoryDropdown`. |
+| `src/components/dashboard/ImageEngineControls.tsx` | +26 -5 | Integrated `VersionHistoryDropdown`, updated `CompletedProject` interface, and added duration/resolution rendering to the Raw Footage card and Project Card. |
+
+### Technical Adjustments
+- **Zero Hallucination UI:** Replaced inference time with true video sequence duration (`duration_seconds`) across all project cards.
+- **Legacy Backfill Migration:** Executed a silent loop to back-calculate `duration_seconds` for all pre-existing cuts directly from their JSON timelines, avoiding any UI display errors (`00:00`).
+- **DRY Architecture:** The `<select>` experiment was aborted in favor of a strictly styled Custom React Dropdown that passes all Tailwind layout rules and respects the dark mode aesthetics universally.
+
+### Validation State
+- ✅ **ESLint / TypeScript (`npm run wolf:audit`)**: Passed (0 errors).
+- ✅ **Build Sync**: Code runs cleanly locally and `SOTA.md` successfully updated with payload architectural shifts.
 
 ---
 

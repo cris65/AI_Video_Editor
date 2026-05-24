@@ -365,6 +365,17 @@ async def get_completed_projects():
                 director_cut_count = 0
                 latest_brain_model = None
                 latest_inference_time = None
+                version_history = []
+                source_metadata = None
+                
+                stringout_path = os.path.join(item_path, "LLM_Export_Package", f"{item}_stringout.json")
+                if os.path.exists(stringout_path):
+                    try:
+                        with open(stringout_path, 'r') as f:
+                            st_data = json.load(f)
+                            source_metadata = st_data.get("metadata")
+                    except Exception:
+                        pass
                 
                 version_log_path = os.path.join(item_path, "LLM_Export_Package", f"{item}_version_log.json")
                 if os.path.exists(version_log_path):
@@ -376,6 +387,7 @@ async def get_completed_projects():
                             if versions:
                                 latest_brain_model = versions[-1].get("brain_model")
                                 latest_inference_time = versions[-1].get("inference_time_seconds")
+                                version_history = versions
                     except Exception:
                         pass
                 else:
@@ -391,7 +403,9 @@ async def get_completed_projects():
                     "path": item_path,
                     "director_cut_count": director_cut_count,
                     "latest_brain_model": latest_brain_model,
-                    "latest_inference_time": latest_inference_time
+                    "latest_inference_time": latest_inference_time,
+                    "version_history": version_history,
+                    "source_metadata": source_metadata
                 })
                 
     # Sort by most recently modified

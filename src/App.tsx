@@ -14,6 +14,7 @@ export default function App() {
   const [sequenceName, setSequenceName] = useState<string>("RAW_BASE_SEQ_AMICI_DONDOLO"); // fallback
   const [hasProcessedOutput, setHasProcessedOutput] = useState<boolean>(false);
   const [showWorkflowModal, setShowWorkflowModal] = useState<boolean>(false);
+  const [initialTargetVersion, setInitialTargetVersion] = useState<number | undefined>();
 
   useEffect(() => {
     const fetchDefaultSequence = async () => {
@@ -48,10 +49,15 @@ export default function App() {
     return (
       <div className="h-screen bg-[#111111] flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-5xl">
-          <ImageEngineControls onComplete={(seqName?: string) => {
+          <ImageEngineControls onComplete={(seqName?: string, targetVersion?: number) => {
             if (seqName) {
               setSequenceName(seqName);
               setHasProcessedOutput(true);
+            }
+            if (targetVersion !== undefined) {
+              setInitialTargetVersion(targetVersion);
+            } else {
+              setInitialTargetVersion(undefined);
             }
             setCurrentView('editor');
           }} />
@@ -172,6 +178,7 @@ export default function App() {
       <PancakeDashboard
         sequenceName={sequenceName}
         onOpenEngine={() => setCurrentView('setup')}
+        initialTargetVersion={initialTargetVersion}
       />
     </ErrorBoundary>
   );

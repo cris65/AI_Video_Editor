@@ -8,7 +8,8 @@ import type { UniversalClip } from '../../types/UniversalClip';
 import { DirectorSettingsPanel } from './DirectorSettingsPanel';
 import { useSequencePlayer } from '../../hooks/useSequencePlayer';
 import { AudioSettingsModal } from './AudioSettingsModal';
-import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music, Cpu, History, ChevronDown, Clock, Bot } from 'lucide-react';
+import { VersionHistoryDropdown } from './VersionHistoryDropdown';
+import { LayoutGrid, AlertCircle, Loader2, CheckCircle2, CloudUpload, Filter, Film, PlaySquare, RefreshCw, Wand2, Eye, X, Activity, MapPin, Tag, Music, Cpu } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 
 function formatTime(seconds: number): string {
@@ -40,6 +41,7 @@ interface TelemetryRecord {
 interface PancakeDashboardProps {
   sequenceName: string;
   onOpenEngine?: () => void;
+  initialTargetVersion?: number;
 }
 
 export type ConstraintType = 'IN' | 'OUT' | 'BM' | 'AUDIO';
@@ -54,7 +56,7 @@ export interface AudioMarkerFilter {
   minEnergy: number;
 }
 
-export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName, onOpenEngine }) => {
+export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName, onOpenEngine, initialTargetVersion }) => {
   const {
     data, hitlData, finalCutTimeline, gemmaRecipe,
     audioBpm, audioDuration, audioWaveforms, audioBeats,
@@ -77,7 +79,6 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
   const [waveformView, setWaveformView] = useState<'amplitude' | 'energy'>('amplitude');
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
-  const [isVersionMenuOpen, setIsVersionMenuOpen] = useState(false);
   // Local mutable order — derived from immutable finalCutTimeline source.
   // Re-synced whenever the Director re-generates the cut.
   const [orderedFinalCut, setOrderedFinalCut] = useState<FinalCutClip[]>([]);
@@ -472,8 +473,19 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
         ai_model: config.ai_model,
       });
     }
-    setIsVersionMenuOpen(false);
   }, [loadVersion]);
+
+  // Auto-load targeted version if provided from EngineControls
+  const hasAutoLoadedTarget = useRef(false);
+  useEffect(() => {
+    if (initialTargetVersion !== undefined && versionHistory?.versions?.length && !hasAutoLoadedTarget.current) {
+      const entry = versionHistory.versions.find((v: VersionEntry) => v.version === initialTargetVersion);
+      if (entry) {
+        hasAutoLoadedTarget.current = true;
+        handleVersionSelect(entry);
+      }
+    }
+  }, [initialTargetVersion, versionHistory, handleVersionSelect]);
 
 
   // useSequencePlayer now consumes orderedFinalCut so playback respects manual reorder.
@@ -792,87 +804,12 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
 
           {/* Version History Dropdown */}
           {versionHistory && versionHistory.versions.length > 0 && (
-            <div className="relative ml-1">
-              <button
-                id="version-history-toggle"
-                onClick={() => setIsVersionMenuOpen(prev => !prev)}
-                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md transition-all ${isVersionMenuOpen
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                    : 'bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700'
-                  }`}
-                title="Version History — seleziona un taglio storico"
-              >
-                <History size={11} />
-                <span className="tabular-nums">{versionHistory.versions.length}</span>
-                <ChevronDown size={9} className={`transition-transform ${isVersionMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isVersionMenuOpen && (
-                <div
-                  id="version-history-menu"
-                  className="absolute top-full left-0 mt-1 w-80 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl shadow-black/60 z-50 overflow-hidden"
-                >
-                  <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
-                    <History size={11} className="text-amber-400" />
-                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Version History</span>
-                    <span className="ml-auto text-[9px] text-slate-500">{versionHistory.versions.length} cut{versionHistory.versions.length > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto">
-                    {[...versionHistory.versions].reverse().map((entry) => {
-                      const isActive = activeVersion === entry.version;
-                      const date = new Date(entry.timestamp);
-                      const dateLabel = date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
-                      const timeLabel = date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                      const modelShort = entry.brain_model
-                        .replace('mlx-community/', '')
-                        .replace('-it-4bit', '')
-                        .replace('-Instruct-4bit', '');
-                      return (
-                        <button
-                          key={entry.version}
-                          id={`version-entry-v${entry.version}`}
-                          onClick={() => handleVersionSelect(entry)}
-                          className={`w-full text-left px-3 py-2.5 border-b border-slate-800 last:border-0 transition-colors ${isActive
-                              ? 'bg-amber-500/10 border-l-2 border-l-amber-400'
-                              : 'hover:bg-slate-800'
-                            }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isActive ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'
-                              }`}>
-                              v{entry.version}
-                            </span>
-                            {entry.is_legacy && (
-                              <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-slate-700 text-slate-500 uppercase">legacy</span>
-                            )}
-                            <div className="flex items-center gap-1 ml-auto text-[9px] text-slate-500">
-                              <Clock size={8} />
-                              <span>{dateLabel} · {timeLabel}</span>
-                            </div>
-                          </div>
-                          <p className="text-[9px] text-slate-300 leading-relaxed line-clamp-2 mb-1">
-                            {entry.director_vision}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {entry.clip_count !== null && (
-                              <span className="text-[8px] text-slate-500">{entry.clip_count} clip</span>
-                            )}
-                            {entry.inference_time_seconds !== null && (
-                              <span className="text-[8px] text-slate-500">
-                                {Math.floor(entry.inference_time_seconds / 60).toString().padStart(2, '0')}:{Math.floor(entry.inference_time_seconds % 60).toString().padStart(2, '0')}
-                              </span>
-                            )}
-                            <div className="flex items-center gap-1 ml-auto">
-                              <Bot size={8} className="text-slate-600" />
-                              <span className="text-[8px] text-slate-600 font-mono truncate max-w-[120px]">{modelShort}</span>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+            <div className="ml-1 z-50">
+              <VersionHistoryDropdown
+                versions={versionHistory.versions}
+                activeVersion={activeVersion || undefined}
+                onSelectVersion={handleVersionSelect}
+              />
             </div>
           )}
         </div>

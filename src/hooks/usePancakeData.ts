@@ -134,10 +134,22 @@ export interface VersionEntry {
   timestamp: string;
   brain_model: string;
   inference_time_seconds: number | null;
+  duration_seconds?: number;
   director_vision: string;
   clip_count: number | null;
   director_config: VersionDirectorConfig | null;
   is_legacy?: boolean;
+}
+
+export interface SourceMetadata {
+  fps: number;
+  resolution: {
+    width: number;
+    height: number;
+  };
+  duration_seconds?: number;
+  total_frames?: number;
+  vlm_model_id?: string;
 }
 
 export interface VersionHistory {

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Film, FileCode2, CheckCircle2, HardDrive, Cpu, Activity, ChevronDown } from 'lucide-react';
+import { VersionHistoryDropdown } from './VersionHistoryDropdown';
+import type { VersionEntry, SourceMetadata } from '../../hooks/usePancakeData';
 
 interface VideoInfo {
   name: string;
@@ -30,11 +32,13 @@ interface CompletedProject {
   director_cut_count?: number;
   latest_brain_model?: string;
   latest_inference_time?: number;
+  version_history?: VersionEntry[];
+  source_metadata?: SourceMetadata;
 }
 
 
 interface ImageEngineControlsProps {
-  onComplete?: (sequenceName?: string) => void;
+  onComplete?: (sequenceName?: string, targetVersion?: number) => void;
 }
 
 export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComplete }) => {
@@ -289,7 +293,12 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Raw Footage</p>
                       {selectedClip ? (
-                        <p className="text-xs text-emerald-500 truncate font-mono">{selectedClip.video_path.split('/').pop()}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-emerald-500 truncate font-mono">{selectedClip.video_path.split('/').pop()}</p>
+                          <span className="text-[10px] text-emerald-500/70 font-mono whitespace-nowrap bg-emerald-950/30 px-1.5 py-0.5 rounded">
+                            {Math.floor((selectedClip.duration || 0) / 60).toString().padStart(2, '0')}:{Math.floor((selectedClip.duration || 0) % 60).toString().padStart(2, '0')}
+                          </span>
+                        </div>
                       ) : (
                         <p className="text-xs text-red-500 font-mono">Carica il file video</p>
                       )}
@@ -531,9 +540,36 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                     {proj.sequence_name}
                   </span>
                   
-                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    {proj.director_cut_count ? (
-                      <>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                    {proj.version_history && proj.version_history.length > 0 ? (
+                      <div className="flex items-center gap-3">
+                        <div className="relative group/select shadow-sm">
+                          <VersionHistoryDropdown
+                            versions={proj.version_history}
+                            dropdownDirection="up"
+                            onSelectVersion={(entry) => {
+                              if (onComplete) onComplete(proj.sequence_name, entry.version);
+                            }}
+                            triggerComponent={(isOpen) => (
+                              <button
+                                type="button"
+                                className="flex items-center justify-between w-full min-w-[120px] bg-[#13151a] border border-slate-700/50 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-200 outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500 hover:border-emerald-500/30 transition-all cursor-pointer"
+                              >
+                                <span>LATEST ({proj.director_cut_count})</span>
+                                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-emerald-400' : 'group-hover/select:text-emerald-400'}`} />
+                              </button>
+                            )}
+                          />
+                        </div>
+                        {proj.latest_brain_model && (
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Model: {proj.latest_brain_model.split('/').pop()} 
+                            {proj.latest_inference_time ? ` (${Math.floor(proj.latest_inference_time / 60).toString().padStart(2, '0')}:${Math.floor(proj.latest_inference_time % 60).toString().padStart(2, '0')})` : ''}
+                          </span>
+                        )}
+                      </div>
+                    ) : proj.director_cut_count ? (
+                      <div className="flex items-center gap-2">
                         <span className="px-1.5 py-0.5 rounded-sm bg-indigo-900/40 text-indigo-400 text-[9px] font-bold uppercase tracking-wider border border-indigo-500/30">
                           {proj.director_cut_count} Director's Cut{proj.director_cut_count > 1 ? 's' : ''}
                         </span>
@@ -543,15 +579,22 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                             {proj.latest_inference_time ? ` (${Math.floor(proj.latest_inference_time / 60).toString().padStart(2, '0')}:${Math.floor(proj.latest_inference_time % 60).toString().padStart(2, '0')})` : ''}
                           </span>
                         )}
-                      </>
+                      </div>
                     ) : (
                       <span className="text-[9px] text-slate-600 font-mono">Awaiting First Cut</span>
                     )}
                   </div>
                   
-                  <span className="text-[10px] text-slate-500 font-mono mt-1">
-                    Ultima modifica: {new Date(proj.last_modified * 1000).toLocaleString()}
-                  </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Ultima modifica: {new Date(proj.last_modified * 1000).toLocaleString()}
+                    </span>
+                    {proj.source_metadata && (
+                      <span className="text-[10px] text-slate-400 font-mono bg-slate-800/40 px-2 py-0.5 rounded-sm border border-slate-700/50">
+                        {proj.source_metadata.resolution.width}x{proj.source_metadata.resolution.height} • {Math.floor((proj.source_metadata.duration_seconds || 0) / 60).toString().padStart(2, '0')}:{Math.floor((proj.source_metadata.duration_seconds || 0) % 60).toString().padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <ChevronDown className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 -rotate-90 transition-transform" />
               </button>
