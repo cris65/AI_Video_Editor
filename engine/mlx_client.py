@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import json_repair
 import base64
 import re
 import time
@@ -54,8 +55,8 @@ def clean_json_response(raw_text):
     clean_json = clean_text[first_idx : last_idx + 1]
 
     try:
-        return json.loads(clean_json)
-    except json.JSONDecodeError as e:
+        return json_repair.loads(clean_json)
+    except Exception as e:
         print(f"      [MLX Client] Errore decodifica JSON: {e}")
         return {}
 

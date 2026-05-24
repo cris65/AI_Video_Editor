@@ -1,6 +1,6 @@
 # 🐺 LOCAL-FIRST TESTING DOCTRINE
 
-**Version:** v0.1.67 - 2026-05-24
+**Version:** v0.1.68 - 2026-05-24
 This document functions as the programmable memory for E2E testing quirks, rules, and mandatory architectural guardrails specifically designed for the **Hybrid Immovable Local-First Architecture** (Dexie + Orchestrator + Supabase Realtime).
 
 Whenever a complex testing race condition or framework anomaly is encountered and resolved, the underlying rule strictly appending it to this living document must be codified.

@@ -1,5 +1,6 @@
 import os
 import json
+import json_repair
 import re
 import time
 import datetime
@@ -40,20 +41,20 @@ def find_beat_index(time_sec, beats):
 
 def clean_json_response(raw_text):
     try:
-        return json.loads(raw_text)
-    except json.JSONDecodeError:
+        return json_repair.loads(raw_text)
+    except Exception:
         pass
     json_pattern = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
     if json_pattern:
         try:
-            return json.loads(json_pattern.group(1))
-        except json.JSONDecodeError:
+            return json_repair.loads(json_pattern.group(1))
+        except Exception:
             pass
     root_pattern = re.search(r'(\{.*?\})', raw_text, re.DOTALL)
     if root_pattern:
         try:
-            return json.loads(root_pattern.group(1))
-        except json.JSONDecodeError:
+            return json_repair.loads(root_pattern.group(1))
+        except Exception:
             pass
     return None
 
@@ -672,7 +673,10 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         occupied_by_locks, locked_entries = build_locked_grid(locked_clips, beats)
         print(f"🔒 [Director] {len(locked_entries)} muri locked piazzati sulla griglia.")
 
-    recipe = recipe_dict.get("recipe", []) if recipe_dict else None
+    recipe = recipe_dict.get("recipe", []) if isinstance(recipe_dict, dict) else []
+    if not isinstance(recipe, list):
+        print(f"⚠️ [Director] Recipe LLM ignorata perché non è una lista valida: {type(recipe)}")
+        recipe = []
 
     # Cursor starts at first non-occupied beat
     def _next_free_idx(start):
