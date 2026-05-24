@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useMemo } from 'react';
 import { SortableContext } from '@dnd-kit/sortable';
 import { UniversalTimelineSegment } from './UniversalTimelineSegment';
 import { TimelineWaveform } from './TimelineWaveform';
@@ -25,6 +25,7 @@ interface UniversalTimelineTrackProps {
   waveformView?: 'amplitude' | 'energy';
   audioDuration?: number;
   audioBeats?: { time: number; energy: number; type: string }[];
+  audioBpm?: number | null;
   audioMarkerFilters?: { types: string[]; minEnergy: number };
   userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM' | 'AUDIO'; time: number }>>;
   markerNumbers?: Map<string, number>;
@@ -43,6 +44,7 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
   waveformView = 'amplitude',
   audioDuration = 0,
   audioBeats = [],
+  audioBpm = null,
   audioMarkerFilters,
   userConstraints,
   markerNumbers,
@@ -51,7 +53,29 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
 }) => {
   const [zoomStart, zoomEnd] = zoomWindow;
   const zoomScale = 1 / (zoomEnd - zoomStart);
-  const panOffset = zoomStart * 100; // translateX is inherently relative to the element's scaled width
+  const panOffset = zoomStart * 100;
+
+  // ─── BPM Grid Extension (Scelta B — Tile matematico) ──────────────────────
+  // Real beats cover [0, audioDuration]. Synthetic beats tile the pattern
+  // beyond audioDuration up to totalDuration using the BPM interval.
+  // Visually distinct: real = opaque, synthetic = semi-transparent + dashed.
+  const extendedBpmBeats = useMemo(() => {
+    if (!audioBeats.length || audioDuration <= 0 || audioDuration >= totalDuration) return audioBeats;
+    const interval = audioBpm && audioBpm > 0
+      ? 60 / audioBpm
+      : audioDuration / Math.max(audioBeats.filter(b => b.type.includes('beat')).length, 1);
+    if (interval <= 0) return audioBeats;
+    const synthetic: { time: number; energy: number; type: string }[] = [...audioBeats];
+    let t = audioDuration + interval;
+    while (t <= totalDuration + interval) {
+      synthetic.push({ time: t, energy: 0, type: 'beat_synthetic' });
+      t += interval;
+    }
+    return synthetic;
+  }, [audioBeats, audioBpm, audioDuration, totalDuration]);
+
+  // Pre-compute audio scale fraction (waveform-aligned)
+  const audioScaleFrac = audioDuration > 0 ? Math.min(audioDuration, totalDuration) / totalDuration : 1;
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-900">
@@ -132,21 +156,17 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
               const isBeat = beat.type.includes('beat') && audioMarkerFilters.types.includes('beat');
               const isHarmonic = beat.type.includes('harmonic') && audioMarkerFilters.types.includes('harmonic');
               const isPercussive = beat.type.includes('percussive') && audioMarkerFilters.types.includes('percussive');
-              const showBpmGrid = beat.type.includes('beat') && audioMarkerFilters.types.includes('bpm_grid');
 
               const showFlag = (isBeat || isHarmonic || isPercussive) && (beat.energy >= audioMarkerFilters.minEnergy);
-              if (!showFlag && !showBpmGrid) return null;
+              if (!showFlag) return null;
 
-              const leftPct = (beat.time / totalDuration) * 100;
+              // Fix: scale beat.time relative to audio duration (not total duration)
+              const leftPct = audioDuration > 0
+                ? (beat.time / audioDuration) * audioScaleFrac * 100
+                : (beat.time / totalDuration) * 100;
 
               return (
                 <Fragment key={`audio-bm-${i}`}>
-                  {showBpmGrid && (
-                    <div
-                      className="absolute top-0 w-[1px] bg-white/40 z-[30] pointer-events-none"
-                      style={{ left: `${leftPct}%`, height: '40px' }}
-                    />
-                  )}
                   {showFlag && (() => {
                     let colorClasses = 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/60';
                     if (isHarmonic) colorClasses = 'bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/60';
@@ -212,6 +232,33 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
             })}
           </div>
 
+          {/* BPM Grid Overlay — spans full clip height, Scelta B: synthetic beats tile beyond audio */}
+          {audioMarkerFilters && audioMarkerFilters.types.includes('bpm_grid') && (
+            <div className="absolute top-[24px] bottom-0 left-0 right-0 z-[36] pointer-events-none">
+              {extendedBpmBeats.map((beat, i) => {
+                if (!beat.type.includes('beat')) return null;
+                const isSynthetic = beat.type === 'beat_synthetic';
+                // Real beats: scale to waveform-aligned audio fraction
+                // Synthetic beats: already in timeline space [audioDuration, totalDuration]
+                const leftPct = isSynthetic
+                  ? (beat.time / totalDuration) * 100
+                  : (beat.time / audioDuration) * audioScaleFrac * 100;
+                if (leftPct < 0 || leftPct > 100) return null;
+                return (
+                  <div
+                    key={`bpm-line-${i}`}
+                    className={`absolute top-0 bottom-0 pointer-events-none ${
+                      isSynthetic
+                        ? 'w-[1px] bg-white/10 border-l border-white/20 border-dashed'
+                        : 'w-[1px] bg-white/30'
+                    }`}
+                    style={{ left: `${leftPct}%` }}
+                  />
+                );
+              })}
+            </div>
+          )}
+
           {/* Waveform */}
           {audioWaveforms && audioDuration > 0 && (
             <TimelineWaveform
@@ -219,9 +266,7 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
               waveformView={waveformView}
               videoDuration={totalDuration}
               audioDuration={audioDuration}
-              className={`absolute left-0 right-0 opacity-80 pointer-events-none z-[15] mix-blend-screen overflow-hidden ${
-                mode === 'director_cut' ? 'top-[72px] bottom-0' : 'top-[24px] bottom-0'
-              }`}
+              className={`absolute left-0 right-0 opacity-80 pointer-events-none z-[15] mix-blend-screen overflow-hidden top-[24px] bottom-0`}
             />
           )}
 

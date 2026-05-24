@@ -28,7 +28,8 @@ interface UniversalTimelineProps {
     onBookendStart: () => void;
     onBookendEnd: () => void;
     onLockToggle: () => void;
-    onDirectExportDC: () => void;
+    onDirectExportDC: (newOrderedClips?: UniversalClip[]) => void;
+    onSeek: (time: number) => void;
   };
   // Audio
   audioWaveforms?: { amplitude: number[], energy: number[] } | null;
@@ -36,6 +37,7 @@ interface UniversalTimelineProps {
   setWaveformView?: (view: 'amplitude' | 'energy') => void;
   audioDuration?: number;
   audioBeats?: { time: number; energy: number; type: string }[];
+  audioBpm?: number | null;
   markerNumbers?: Map<string, number>;
   audioMarkerFilters?: { types: string[]; minEnergy: number };
   setAudioMarkerFilters?: (filters: { types: string[]; minEnergy: number }) => void;
@@ -163,8 +165,11 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
     const [s, en] = zoomWindow;
     const absoluteFrac = s + screenFrac * (en - s);
     const seekTime = absoluteFrac * totalDuration;
-    
-    if (videoRef.current) {
+
+    // DC: delegate to sequence player seek (timeline time, not source time)
+    if (mode === 'director_cut' && props.dcActions?.onSeek) {
+      props.dcActions.onSeek(seekTime);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = seekTime;
     }
   };
@@ -293,7 +298,7 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
       <div 
         ref={containerRef}
         className={`relative w-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden group shadow-inner ${isModifying === 'pan' ? 'cursor-grab' : isModifying === 'scrub' ? 'cursor-col-resize' : 'cursor-pointer'}`}
-        style={{ height: mode === 'director_cut' ? '120px' : '64px' }}
+        style={{ height: '64px' }}
         tabIndex={0}
         onClick={handleTimelineClick}
         onMouseMove={handleTimelineMouseMove}
@@ -321,6 +326,7 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
             markerNumbers={props.markerNumbers}
             hiddenMarkers={hiddenMarkers}
             audioBeats={props.audioBeats}
+            audioBpm={props.audioBpm}
             audioMarkerFilters={props.audioMarkerFilters}
           />
           <DragOverlay>

@@ -1,6 +1,6 @@
 # 🐺 Functional Specifications (FEATURES.md)
 
-**Version:** v0.1.49 - 2026-05-22
+**Version:** v0.1.65 - 2026-05-24
 
 > [!NOTE]
 > This document describes the **Features** — i.e., the functional value exposed to the end user, both as engine capabilities and UI interfaces. It does not describe how the data is structured (→ `STRUCTURE.md`) nor the temporal execution flow (→ `PIPELINE.md`).
@@ -65,3 +65,6 @@ The Director is the module that closes the loop between AI analysis and human de
 - **Director Settings Panel & Advanced Modal**: The user can access an advanced panel `🎨 AI Director Creative Settings` (via createPortal to bypass z-index limits) to set *Target Product*, *Expected Subjects*, *Focus Area*, and NLP parameters, saved inside the `DirectorConfig`.
 - **Dynamic Hardware Profiler & Trinity Startup**: The entire ecosystem (React + Python) boots in parallel with a single command (`npm run wolf:dev`). The integrated hardware widget no longer uses mocked data but reads the profile from the backend (`/api/system/profiler`), which extracts the exact chip model and Unified RAM by querying the macOS kernel (`sysctl`) natively. ETA and inference batches (Chunks) are calculated mathematically in real-time.
 - **Pannello di Telemetria delle Performance**: Visualizza sopra il Video Player i dati dell'ultima elaborazione eseguita dalla pipeline Python (inclusi modello VLM compatto, frame analizzati e durata formattata in minuti/secondi) leggendo dinamicamente il file `performance_history.json`.
+- **DRY Universal Timeline (UI-006)**: Unifies rendering, height (64px), Wave/Audio/Shortcut controls, and Ripple Edit physics across Stringout and Director's Cut modes. Implements mode-based dynamic legends (A-ROLL/B-ROLL/REJECTED vs PILLAR/FILLER) and accurate Click-to-Seek via target time translation.
+- **BPM Grid Coordinate Fix & Propagation (UI-007)**: Restores precise alignment of analyzed audio BPM markers with the visual waveform when audio duration is shorter than video duration. Synthetically propagates the BPM grid beyond the audio timeline boundary up to the total video length, using a dashed, semi-transparent metronome styling for visual distinction.
+

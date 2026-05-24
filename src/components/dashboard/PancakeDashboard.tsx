@@ -986,13 +986,22 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                 setWaveformView={setWaveformView}
                 audioDuration={audioDuration}
                 audioBeats={audioBeats}
+                audioBpm={audioBpm}
                 markerNumbers={globalMarkerNumbers}
                 dcActions={{
                   onBookendStart: () => handleGlobalBookend('START', currentTimelineTime),
                   onBookendEnd: () => handleGlobalBookend('END', currentTimelineTime),
                   onLockToggle: () => { /* Lock logic implemented via ClipCard currently */ },
-                  onDirectExportDC: () => handleDirectExport(orderedFinalCut.map(c => c.source_clip_start))
+                  onDirectExportDC: (newOrderedClips?: UniversalClip[]) => {
+                    const clipStarts = newOrderedClips
+                      ? newOrderedClips.map(c => c.sourceClipStart)
+                      : orderedFinalCut.map(c => c.source_clip_start);
+                    handleDirectExport(clipStarts);
+                  },
+                  onSeek: seekToTimelineTime
                 }}
+                audioMarkerFilters={audioMarkerFilters}
+                setAudioMarkerFilters={setAudioMarkerFilters}
               />
             ) : (
               <UniversalTimeline
@@ -1009,6 +1018,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                 setWaveformView={setWaveformView}
                 audioDuration={audioDuration}
                 audioBeats={audioBeats}
+                audioBpm={audioBpm}
                 markerNumbers={globalMarkerNumbers}
                 audioMarkerFilters={audioMarkerFilters}
                 setAudioMarkerFilters={setAudioMarkerFilters}

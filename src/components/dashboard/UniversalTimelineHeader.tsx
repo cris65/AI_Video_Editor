@@ -1,6 +1,7 @@
 import React from 'react';
 import { TimelineKeyboardShortcuts } from './TimelineKeyboardShortcuts';
 import { SlidersHorizontal, Save } from 'lucide-react';
+import type { UniversalClip } from '../../types/UniversalClip';
 
 interface UniversalTimelineHeaderProps {
   mode: 'stringout' | 'director_cut';
@@ -19,7 +20,8 @@ interface UniversalTimelineHeaderProps {
     onBookendStart: () => void;
     onBookendEnd: () => void;
     onLockToggle: () => void;
-    onDirectExportDC: () => void;
+    onDirectExportDC: (newOrderedClips?: UniversalClip[]) => void;
+    onSeek: (time: number) => void;
   };
 }
 
@@ -58,31 +60,42 @@ export const UniversalTimelineHeader: React.FC<UniversalTimelineHeaderProps> = (
       {/* ── Center: Clip Legend + Controls ──────────────────── */}
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 z-[100]">
 
-        {/* Clip color legend — stringout only */}
-        {mode === 'stringout' && (
-          <div className="flex items-center gap-3 text-[9px] uppercase font-bold tracking-widest">
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-slate-500">A-ROLL</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              <span className="text-slate-500">B-ROLL</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              <span className="text-slate-500">REJECTED</span>
-            </div>
-          </div>
-        )}
+        {/* Clip color legend — data-driven by mode (DRY — UI-006) */}
+        <div className="flex items-center gap-3 text-[9px] uppercase font-bold tracking-widest">
+          {mode === 'stringout' ? (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-slate-500">A-ROLL</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <span className="text-slate-500">B-ROLL</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="text-slate-500">REJECTED</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="text-slate-500">PILLAR</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-slate-500">FILLER</span>
+              </div>
+            </>
+          )}
+        </div>
 
-        {/* Separator between legend and controls — stringout only */}
-        {mode === 'stringout' && (
-          <span className="text-slate-700 select-none">|</span>
-        )}
+        {/* Separator between legend and controls */}
+        <span className="text-slate-700 select-none">|</span>
 
-        {/* Waveform Control — stringout only */}
-        {mode === 'stringout' && setWaveformView && (
+        {/* Waveform Control — universal (DRY — UI-006) */}
+        {setWaveformView && (
           <div className="relative flex items-center justify-center">
             <button
               onClick={() => {
@@ -132,8 +145,8 @@ export const UniversalTimelineHeader: React.FC<UniversalTimelineHeaderProps> = (
           </div>
         )}
 
-        {/* Audio Marker Control — stringout only */}
-        {mode === 'stringout' && audioMarkerFilters && setAudioMarkerFilters && (
+        {/* Audio Marker Control — universal (DRY — UI-006) */}
+        {audioMarkerFilters && setAudioMarkerFilters && (
           <div className="relative flex items-center justify-center">
             <button
               onClick={() => {
@@ -251,7 +264,7 @@ export const UniversalTimelineHeader: React.FC<UniversalTimelineHeaderProps> = (
           </div>
         ) : (
           <button
-            onClick={dcActions?.onDirectExportDC}
+            onClick={() => dcActions?.onDirectExportDC?.()}
             className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-[11px] font-bold shadow-lg shadow-indigo-900/20 transition-all border border-indigo-500"
           >
             <Save size={14} />

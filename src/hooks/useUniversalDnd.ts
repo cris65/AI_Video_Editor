@@ -13,7 +13,7 @@ interface UseUniversalDndOptions {
   onSaveStringoutOrder?: (validClips: PancakeClip[]) => void;
   
   // director_cut-specific
-  onDirectExportDC?: (newOrderedClips: UniversalClip[]) => void;
+  onDirectExportDC?: (newOrderedClips?: UniversalClip[]) => void;
 }
 
 export function useUniversalDnd({
@@ -68,23 +68,22 @@ export function useUniversalDnd({
   const sortableItems = optimisticIds;
   const displayClips = useMemo(() => {
     let result = optimisticIds.map(id => clips.find(c => c.id === id)!).filter(Boolean);
-    
-    // OVERRIDE FOR STRINGOUT: Force sequential gapless layout
-    if (mode === 'stringout') {
-      let cursor = 0;
-      result = result.map(clip => {
-        const duration = clip.sourceEnd - clip.sourceStart;
-        const newClip = {
-          ...clip,
-          displayStart: cursor,
-          displayEnd: cursor + duration
-        };
-        cursor += duration;
-        return newClip;
-      });
-    }
+
+    // Universal Ripple Edit: pack clips gapless for ALL modes (DRY — UI-006)
+    let cursor = 0;
+    result = result.map(clip => {
+      const duration = clip.sourceEnd - clip.sourceStart;
+      const newClip = {
+        ...clip,
+        displayStart: cursor,
+        displayEnd: cursor + duration
+      };
+      cursor += duration;
+      return newClip;
+    });
+
     return result;
-  }, [clips, optimisticIds, mode]);
+  }, [clips, optimisticIds]);
 
   // Map for 1-based badges (SO mode only, ignores trash)
   const exportOrderMap = useMemo(() => {

@@ -1,8 +1,64 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.63 - 2026-05-24
+**Version:** v0.1.65 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.64 → v0.1.65
+
+### Summary — [UI-006] & [UI-007] DRY Universal Timeline, BPM Grid Alignment & Synthetic Propagation
+
+Completed the application of the DRY (Don't Repeat Yourself) principle to the `UniversalTimeline` component. The Director's Cut now mirrors the Stringout in visual layout, UI controls, drag-and-drop physics, and interactive scrubbing. Addressed 5 critical layout bugs and implemented precise coordinate calculations for Librosa BPM beats along with mathematical beat propagation beyond the soundtrack duration (Option B).
+
+### Modified Files
+
+| File | +Lines | -Lines | Description |
+|---|---|---|---|
+| `src/hooks/useUniversalDnd.ts` | +13 | -17 | Ripple Edit enabled globally for all modes (removed `mode === 'stringout'` guard). Made `onDirectExportDC` optional (`?`). Removed `mode` dependency from `displayClips` memo. |
+| `src/components/dashboard/UniversalTimeline.tsx` | +8 | -6 | Height unified to `64px` for both modes. Delegated DC click-to-seek to `dcActions.onSeek`. Added `audioBpm` prop to pass-through. |
+| `src/components/dashboard/UniversalTimelineHeader.tsx` | +52 | -20 | Made Wave, Audio, and Shortcuts buttons universal. Implemented data-driven clip legend (`A-ROLL/B-ROLL/REJECTED` for Stringout, `PILLAR/FILLER` for Director's Cut). Wrapped `onClick` for SAVE ORDER in lambda to prevent event forwarding. |
+| `src/components/dashboard/UniversalTimelineTrack.tsx` | +73 | -15 | Relocated BPM lines to overlay `top-[24px]/bottom-0` spanning full clip height. Unified waveform to `top-[24px]/bottom-0`. Corrected `leftPct` for audio markers using `audioDuration` scaling. Implemented `useMemo` synthetic beat generator (Option B) for post-audio BPM grid propagation. |
+| `src/components/dashboard/PancakeDashboard.tsx` | +12 | -2 | Passed `audioBpm` to both timelines. Added `onSeek: seekToTimelineTime` and audio filters to Director's Cut timeline configuration. |
+| `.gemini/SOTA.md` | +6 | -2 | Updated SOTA knowledge base for DRY Timeline, Click Seek, and BPM propagation. |
+| `.gemini/FEATURES.md` | +6 | -2 | Updated features documentation for DRY Universal Timeline and BPM grid improvements. |
+| `.gemini/EVOLUTION.md` | +1 | -1 | Updated evolutionary roadmap version indicator. |
+| `package.json` | +1 | -1 | Version bump to v0.1.65 |
+
+### Change Details
+
+#### 1. Universal Ripple Edit (DRY — useUniversalDnd.ts)
+- **Before:** `displayClips` applied the gapless layout exclusively `if (mode === 'stringout')`. Director's Cut clips retained raw `timeline_in/out` coordinates.
+- **After:** Gapless packing is applied universally without conditional guarding. Removed `mode` from deps.
+- **Result:** Director's Cut clips now pack sequentially without empty gaps on DnD reordering.
+
+#### 2. DRY UI Header & Dynamic Legend (UniversalTimelineHeader.tsx)
+- **Before:** Wave, Audio, and Shortcuts controls were visible only in Stringout mode.
+- **After:** All controls are universal. The legend is data-driven: displays `A-ROLL/B-ROLL/REJECTED` in Stringout, and `PILLAR/FILLER` in Director's Cut mode.
+- **Fix:** Wrapped `onClick={dcActions?.onDirectExportDC}` in a lambda `() => dcActions?.onDirectExportDC?.()` to prevent passing click Event arguments to the handler.
+
+#### 3. Unified Track Height & Waveform (UniversalTimeline.tsx)
+- **Before:** Track height had a conditional ternary `mode === 'director_cut' ? '120px' : '64px'`.
+- **After:** Height is fixed to `64px` for both modes. Waveform in Director's Cut is moved from `top-[72px]` to `top-[24px] bottom-0` to fit inside the track.
+
+#### 4. Director's Cut Click-to-Seek (UniversalTimeline.tsx + PancakeDashboard.tsx)
+- **Before:** Clicking the timeline directly mutated `videoRef.current.currentTime = seekTime`, which is incorrect for Director's Cut due to non-continuous source intervals.
+- **After:** DC mode now routes seek events via `props.dcActions.onSeek(seekTime)` which invokes `seekToTimelineTime` in `useSequencePlayer` to correctly calculate source clip offsets.
+
+#### 5. BPM Grid Alignment & Tiling Propagation (UniversalTimelineTrack.tsx)
+- **Before:** Audio beats were scaled to `totalDuration` (`(beat.time / totalDuration) * 100`), causing severe compression to the left when `audioDuration < totalDuration`. Additionally, beat lines stopped at the end of the audio track.
+- **After:** Scale `leftPct` calculation to `audioDuration` and adjust by the audio scale fraction. Created a `useMemo` synthetic beat generator (`extendedBpmBeats`) to tile rhythmic lines beyond the audio track up to `totalDuration` using the BPM interval. Synthetic beats are styled as dashed, semi-transparent lines (`bg-white/10 border-white/20 border-dashed`) to distinguish them from real beats.
+
+### Validation
+
+| Check | Result |
+|---|---|
+| ESLint | ✅ Exit 0 — 0 errors (11 warnings resolved as safe hooks warnings) |
+| TypeScript `tsc --noEmit` | ✅ Exit 0 — 0 type errors |
+| Visual QA DC Timeline | ✅ 64px height parity, Wave/Audio visible, playhead correctly visible |
+| BPM Alignment | ✅ Audio-relative beats perfectly aligned with physical waveform |
+| BPM Tiling Propagation | ✅ Synthetic beat metronome grid active beyond the soundtrack boundaries |
 
 ---
 
