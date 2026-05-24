@@ -1,8 +1,30 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.66 - 2026-05-24
+**Version:** v0.1.67 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.66 → v0.1.67
+
+### Summary — [KB-001] Knowledge Base Purification & Obsolete Plans Removal
+
+Executed a root-level cleanup of the AI Sandbox's workspace hygiene. Deleted the `.gemini/plans/` folder and all obsolete historical architecture plans, relying instead on the IDE's automated backend artifact system (`~/.gemini/antigravity-ide/brain/`). Updated the `GEMINI.md` core directive to enforce strict usage of the system artifacts moving forward, ensuring the Git-synced Knowledge Base (WOLF_KB) remains pristine and free of hallucination-inducing outdated plans.
+
+### Modified Files
+
+| File | +Lines | -Lines | Description |
+|---|---|---|---|
+| `package.json` | 1 | 1 | Version bumped to v0.1.67. |
+| `GEMINI.md` | 1 | 1 | Updated "Workspace Hygiene" rule to ban manual `.md` file creation in `.gemini/plans/` and delegate planning to the IDE's internal `implementation_plan.md` artifact engine. |
+| `.gemini/plans/*` | 0 | 540 | (Deleted) Removed 9 obsolete markdown files representing old decisions that pollute context. |
+
+### Component Architecture
+* **Knowledge Base**: Removed static `plans/` directory. Future Gemini Web context loading will only parse the living SOTA, SCHEMA, FEATURES, and CHANGELOG to guarantee accuracy.
+
+### Quality Control
+* `eslint . && tsc --noEmit` — **0 Errors** (No source code modified).
 
 ---
 

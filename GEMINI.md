@@ -87,7 +87,7 @@ From this exact moment, your operational protocol regarding any Database, Sync, 
 - **Complete Output & Chat Hygiene:** Provide the COMPLETE code using the internal system tools (Atomic File Protocol). You are STRICTLY FORBIDDEN from printing raw code blocks in the chat response unless explicitly requested by the Tech Lead. This saves tokens and keeps the chat clean.
 - **700 Lines Limit:** If a file approaches 700 lines, you MUST proactively propose a refactoring plan.
 - **ZERO-TRACE DEBUGGING:** You are strictly forbidden from leaving behind temporary scripts (`.js`, `.py`, `.sql`) or test files. Every debug action must conclude with a cleanup (`rm`) in the same execution block before moving on.
-- **Workspace Hygiene & Output Paths:** Whenever generating a scouting report, schema analysis, or architectural plan, you MUST save the `.md` file directly into `.gemini/plans/`. NEVER write these files to the root directory.
+- **Workspace Hygiene & Output Paths:** Architectural plans (e.g. `implementation_plan.md`) are handled automatically by the IDE artifacts system and stored outside the project tree. DO NOT generate `.md` plans in the project directory, and DO NOT create or use a `.gemini/plans/` folder.
 
 ## 6.5 🧹 WORKSPACE SANITIZATION (THE WOLF-CLEANER)
 

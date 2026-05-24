@@ -1,6 +1,6 @@
 # 🐺 PIPELINE & ORCHESTRATOR
 
-**Version:** v0.1.66 - 2026-05-24
+**Version:** v0.1.67 - 2026-05-24
 **Scope:** Operational guide for booting the development environment and executing the full video analysis pipeline.
 
 ---
