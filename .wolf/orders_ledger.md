@@ -8,7 +8,7 @@ This file tracks the current progressive numbering sequence for tasks, architect
     *   Current: `[UI-000]`
 
 *   **[WOLF]** CI/CD, Guardian hooks, and Git workflow tasks
-    *   Current: `[WOLF-001]` (Active: WOLF Guardian System v1)
+    *   Current: `[WOLF-001.1]` (Active: WOLF Guardian System: Self-Learning Log Structure)
 
 *   **[ENG]** Python / YOLO / Backend engine tasks
     *   Current: `[ENG-000]`

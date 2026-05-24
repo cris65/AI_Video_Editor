@@ -6,6 +6,39 @@ This file logs the cumulative release walkthroughs, detailing code changes, arch
 
 ---
 
+## 🐺 Walkthrough — v0.1.63 → v0.1.64
+
+### Sommario — [WOLF-001.1] WOLF Guardian System: Self-Learning Log Structure & Order Versioning
+
+Implementato il registro di autoapprendimento del sistema WOLF Guardian e integrata la gestione strutturata degli Order Versioning Namespaces.
+
+### Modified Files
+
+| File | +Lines | -Lines | Description |
+|---|---|---|---|
+| `.wolf/orders_ledger.md` | +20 | -0 | Creazione file per tracking versioni task (es. `[UI-XXX]`, `[WOLF-XXX]`). |
+| `scripts/wolf_guardian/logger.js` | +58 | -0 | Implementazione modulo per memoria persistente `guardian_memory.json` (init, log, read). |
+| `.gemini/SOTA.md` | +2 | -0 | Integrazione documentazione architettura WOLF Guardian System & Orders Ledger. |
+| `package.json` | +1 | -1 | Version bump a v0.1.64 |
+
+### Change Details
+
+#### 1. WOLF Guardian System: Self-Learning Log Structure
+- **Nuovo modulo (`logger.js`)**: Sviluppato in puro JS (ESM) per gestire in locale tramite `fs` e `path` il file JSON `.wolf/guardian_memory.json`.
+- **Inizializzazione Sicura**: Creazione automatica della directory `.wolf` se mancante e gestione di corruzioni JSON con ripristino autonomo.
+- **Schema Dati**: Tracking rigido di timestamp, violation_type, file_path, escalation_level, action_taken, agent_diff_snippet, guardian_rationale.
+
+#### 2. Order Versioning & Namespace Rules
+- **Orders Ledger (`.wolf/orders_ledger.md`)**: Introdotto file centrale per tenere traccia dello stato corrente delle direttive (Epic e iterazioni).
+- **Nuova policy**: Gestione tramite namespace strict (`[UI-XXX]`, `[WOLF-XXX]`, `[ENG-XXX]`) e incrementi decimali per bugfix o task di una Epic (`[WOLF-001.1]`).
+
+### Validation
+
+| Check | Result |
+|---|---|
+| ESLint (src/) | ✅ 0 errors (11 warnings pre-esistenti in `PancakeDashboard.tsx` ignorati) |
+| TypeScript `tsc --noEmit` | ✅ 0 errors |
+
 ## 🐺 Walkthrough — v0.1.62 → v0.1.63
 
 ### Sommario — [ORD-005] NLE Header/Footer Architecture Overhaul
