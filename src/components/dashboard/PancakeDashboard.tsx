@@ -428,7 +428,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
 
   // Direct Export (Deterministic Bypass): sends the current D&D order directly to Python.
   // Always visible — the user can trigger it even without reordering (just tagging TRASH/KEEP).
-  const handleDirectExport = useCallback(async (stringoutOrder: number[]) => {
+  const handleDirectExport = useCallback(async (stringoutOrder: number[], switchToPreview = true) => {
     setIsRegenerating(true);
     try {
       const orchestratePayload = {
@@ -449,7 +449,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       if (!result.ok) throw new Error((result as { error?: string }).error ?? 'Director error');
       await refetchFinalCut();
       await fetchVersionHistory();
-      setIsPreviewMode(true);
+      if (switchToPreview) setIsPreviewMode(true);
     } catch (err) {
       console.error('Direct Export failed:', err);
     } finally {
@@ -1012,7 +1012,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                 markerNumbers={globalMarkerNumbers}
                 audioMarkerFilters={audioMarkerFilters}
                 setAudioMarkerFilters={setAudioMarkerFilters}
-                onSaveStringoutOrder={(validClips) => handleDirectExport(validClips.map(c => c.start))}
+                onSaveStringoutOrder={(validClips) => handleDirectExport(validClips.map(c => c.start), false)}
               />
             )}
           </div>

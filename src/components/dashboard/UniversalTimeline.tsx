@@ -322,6 +322,8 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
             userConstraints={userConstraints}
             markerNumbers={props.markerNumbers}
             hiddenMarkers={hiddenMarkers}
+            audioBeats={props.audioBeats}
+            audioMarkerFilters={props.audioMarkerFilters}
           />
           <DragOverlay>
             {activeClip ? (

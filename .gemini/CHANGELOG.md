@@ -1,8 +1,40 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.61 - 2026-05-24
+**Version:** v0.1.62 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.61 → v0.1.62
+
+### Sommario — Bug Fix: D&D Stringout non switcha in DC + Audio Marker Control ripristinato
+
+Due bug indipendenti risolti chirurgicamente: il Drag & Drop nella Stringout portava erroneamente in modalità Director's Cut, e i marker audio non rispondevano ai filtri del popup "Audio Marker Control".
+
+### Modified Files
+
+| File | +/- | Description |
+|---|---|---|
+| `PancakeDashboard.tsx` | +3 / -3 | `switchToPreview` param in `handleDirectExport`, Stringout D&D passa `false` |
+| `UniversalTimeline.tsx` | +2 / -0 | `audioBeats` e `audioMarkerFilters` passati a `UniversalTimelineTrack` |
+
+### Cambiamenti Core
+
+#### 1. D&D Stringout → switch accidentale in DC (Bug Fix)
+
+- **Issue:** `handleDirectExport` era condivisa tra il flusso DC e il flusso Stringout D&D. Al completamento chiamava incondizionatamente `setIsPreviewMode(true)`, portando l'utente in modalità Director's Cut anche dopo un semplice riordino nella Stringout.
+- **Fix:** Aggiunto parametro opzionale `switchToPreview = true`. Il callback `onSaveStringoutOrder` passa `false`, mantenendo l'utente nella tab Stringout. Il flusso DC rimane invariato (default `true`).
+
+#### 2. Audio Marker Control → popup senza effetto (Bug Fix)
+
+- **Issue:** `UniversalTimeline` riceveva `audioBeats` e `audioMarkerFilters` dal Dashboard e li passava correttamente all'`UniversalTimelineHeader` (il popup), ma dimenticava di passarli a `UniversalTimelineTrack` (il renderer dei marker). La condizione `audioBeats && audioMarkerFilters &&` era sempre `false` → zero marker visualizzati.
+- **Fix:** Aggiunti i due prop mancanti a `UniversalTimelineTrack`. Il popup ora controlla il renderer in tempo reale.
+
+### Validation
+
+- **ESLint:** ✅ 0 errori, 0 warning
+- **TSC:** ✅ 0 errori
 
 ---
 
