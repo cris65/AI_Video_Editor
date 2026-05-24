@@ -417,6 +417,24 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       if (!res.ok) throw new Error('Orchestration failed');
       const result = await res.json();
       if (!result.ok) throw new Error(result.error ?? 'Director error');
+      if (!result.task_id) throw new Error('No task ID returned');
+
+      let status = 'processing';
+      while (status === 'processing') {
+        await new Promise(r => setTimeout(r, 3000));
+        const statusRes = await fetch(`http://localhost:8000/api/orchestrate/status/${result.task_id}`);
+        if (!statusRes.ok) throw new Error('Failed to fetch status');
+        const statusData = await statusRes.json();
+        
+        status = statusData.status;
+        if (status === 'failed') {
+          throw new Error(statusData.error || 'Director error in background task');
+        }
+        if (status === 'not_found') {
+          throw new Error('Task was lost or not found');
+        }
+      }
+
       await refetchFinalCut();
       await fetchVersionHistory();
       setIsPreviewMode(true);
@@ -448,6 +466,24 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       if (!res.ok) throw new Error('Direct Export failed');
       const result = await res.json();
       if (!result.ok) throw new Error((result as { error?: string }).error ?? 'Director error');
+      if (!result.task_id) throw new Error('No task ID returned');
+
+      let status = 'processing';
+      while (status === 'processing') {
+        await new Promise(r => setTimeout(r, 3000));
+        const statusRes = await fetch(`http://localhost:8000/api/orchestrate/status/${result.task_id}`);
+        if (!statusRes.ok) throw new Error('Failed to fetch status');
+        const statusData = await statusRes.json();
+        
+        status = statusData.status;
+        if (status === 'failed') {
+          throw new Error(statusData.error || 'Director error in background task');
+        }
+        if (status === 'not_found') {
+          throw new Error('Task was lost or not found');
+        }
+      }
+
       await refetchFinalCut();
       await fetchVersionHistory();
       if (switchToPreview) setIsPreviewMode(true);

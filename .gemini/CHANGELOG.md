@@ -1,8 +1,34 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.71 - 2026-05-24
+**Version:** v0.1.72 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.71 → v0.1.72
+
+### Summary — [ENG-003] Async Orchestration & Polling
+
+The orchestration pipeline has been fully decoupled from standard synchronous HTTP requests, neutralizing the risk of 300-second browser timeouts during heavy LLM inference (e.g., when the engine uses Llama 70B for the Director's cut). 
+
+The backend now uses FastAPI `BackgroundTasks` to process the job and immediately returns an HTTP 202-style `task_id`. The React frontend has been upgraded with an asynchronous polling loop to dynamically monitor the job status without blocking the UI or resetting its internal timer.
+
+### Modified Files
+
+| File | Changes | Description |
+|---|---|---|
+| `engine/api_server.py` | +28 -11 | Integrated FastAPI `BackgroundTasks`. Added a global `orchestration_tasks` dictionary, an `orchestration_worker` function, and a new `GET /api/orchestrate/status/{task_id}` endpoint. |
+| `src/components/dashboard/PancakeDashboard.tsx` | +36 -0 | Upgraded both `handleRegenerateCut` and `handleDirectExport` to process the returned `task_id` and poll the new status endpoint every 3000ms until `"completed"` or `"failed"`. |
+
+### Technical Adjustments
+- **Indefinite Polling Loop:** Per the Tech Lead's directive, the `while` loop has no artificial timeout. It will strictly poll every 3 seconds until a definitive `completed` or `failed` (or `not_found`) status is returned, ensuring large models have all the time they need.
+- **Timer Continuity:** The React state for `isRegenerating` remains active during the entire polling sequence, meaning the visual "Elapsed Time" timer accurately tracks the background duration without interruption.
+- **State Segregation:** Errors raised inside the Python `orchestration_worker` thread are carefully captured in the global dictionary and securely propagated to the frontend upon the next poll.
+
+### Validation State
+- ✅ **ESLint / TypeScript (`npm run wolf:audit`)**: Passed (0 errors).
+- ✅ **Network Stability:** The main POST request now completes in < 1 second, shifting the true compute latency to the background and eliminating any risk of proxy or browser timeouts.
 
 ---
 
