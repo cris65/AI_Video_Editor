@@ -283,8 +283,6 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
         totalDuration={totalDuration}
         showShortcutsPopup={showShortcutsPopup}
         setShowShortcutsPopup={setShowShortcutsPopup}
-        hiddenMarkers={hiddenMarkers}
-        toggleMarkerVisibility={toggleMarkerVisibility}
         waveformView={props.waveformView}
         setWaveformView={props.setWaveformView}
         audioMarkerFilters={props.audioMarkerFilters}
@@ -345,22 +343,86 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
         />
       </div>
 
-      {/* ── Legend ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 items-center justify-center text-[10px] uppercase font-bold tracking-wider text-slate-500 mt-3">
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500/80"></span> Valid (MAIN)</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500/80"></span> B-ROLL</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500/80"></span> Trash (Rejected)</div>
-        <span className="text-slate-700">|</span>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4CAF50' }}></span> Marker IN</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#E53935' }}></span> Marker OUT</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FF6D00' }}></span> Marker BM</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FFC107' }}></span> Marker Audio</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Bookend [ IN</div>
-        <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Bookend OUT ]</div>
+      {/* ── Active Marker Toolbar ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-3 mt-3 px-1">
+
+          {/* Human Constraints Group */}
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] uppercase tracking-widest font-bold text-slate-600">Human</span>
+            <div className="flex items-center gap-1">
+              {([
+                { type: 'IN',  label: 'IN',  color: '#4CAF50' },
+                { type: 'OUT', label: 'OUT', color: '#E53935' },
+                { type: 'BM',  label: 'M',   color: '#FF6D00' },
+              ] as { type: string; label: string; color: string }[]).map(({ type, label, color }) => {
+                const isHidden = hiddenMarkers.includes(type);
+                return (
+                  <button
+                    key={type}
+                    onClick={() => toggleMarkerVisibility(type)}
+                    title={isHidden ? `Show ${label} markers` : `Hide ${label} markers`}
+                    className={`px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+                      isHidden
+                        ? 'opacity-35 border-slate-700 bg-slate-800/60 text-slate-500'
+                        : 'opacity-100'
+                    }`}
+                    style={isHidden ? {} : { color, borderColor: `${color}50`, backgroundColor: `${color}18` }}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: isHidden ? '#475569' : color }}
+                    />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <span className="text-slate-700 select-none">|</span>
+
+          {/* Machine Analysis Group */}
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] uppercase tracking-widest font-bold text-slate-600">Machine</span>
+            <div className="flex items-center gap-1">
+              {/* AUDIO: Librosa machine marker */}
+              <button
+                onClick={() => toggleMarkerVisibility('AUDIO')}
+                title={hiddenMarkers.includes('AUDIO') ? 'Show Audio markers' : 'Hide Audio markers'}
+                className={`px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+                  hiddenMarkers.includes('AUDIO')
+                    ? 'opacity-35 border-slate-700 bg-slate-800/60 text-slate-500'
+                    : 'border-[#FFC107]/30 bg-[#FFC107]/10 text-[#FFC107]'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  hiddenMarkers.includes('AUDIO') ? 'bg-slate-600' : 'bg-[#FFC107]'
+                }`} />
+                A
+              </button>
+              {/* YOLO BM Analysis */}
+              <button
+                onClick={() => toggleMarkerVisibility('YOLO_BM')}
+                title={hiddenMarkers.includes('YOLO_BM') ? 'Show BM Analysis markers' : 'Hide BM Analysis markers'}
+                className={`px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+                  hiddenMarkers.includes('YOLO_BM')
+                    ? 'opacity-35 border-slate-700 bg-slate-800/60 text-slate-500'
+                    : 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  hiddenMarkers.includes('YOLO_BM') ? 'bg-slate-600' : 'bg-blue-500'
+                }`} />
+                BM Analysis
+              </button>
+            </div>
+          </div>
+
+        {/* Reset Zoom */}
         {(zoomWindow[1] - zoomWindow[0]) < 0.99 && (
           <button
             onClick={() => setZoomWindow([0, 1])}
-            className="text-slate-500 hover:text-slate-300 transition-colors normal-case font-mono text-[9px] border border-slate-700 px-1.5 py-0.5 rounded ml-2"
+            className="text-slate-500 hover:text-slate-300 transition-colors font-mono text-[9px] border border-slate-700 px-1.5 py-0.5 rounded"
           >
             Reset Zoom
           </button>

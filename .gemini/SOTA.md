@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.62 - 2026-05-24
+**Version:** v0.1.63 - 2026-05-24
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -91,7 +91,9 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 - **Director Settings Panel & Orchestrazione:** Sidebar rapida che invia l'intero stato ibrido (Seed, Constraints, Overrides) all'endpoint FastAPI `/api/orchestrate`. Creative Settings Portal (`AdvancedDirectorModal`) full-screen per prompt e parametri NLP. Include visualizzatori vettoriali (SVG) per la `Rhythmic Strictness` (onde di Bezier + clip tolleranza). Il selettore modello AI espone 3 opzioni mappate su modelli MLX.
 - **Interfaccia TypeScript `PancakeClip`:** Rispecchia fedelmente lo schema JSON annidato v0.1.34 con 7 sotto-interfacce typed. Zero chiavi piatte legacy.
 - **Integrazione Telemetrica del Dashboard:** Middleware in Vite per servire staticamente `/system_logs/performance_history.json`. Visualizzazione delle performance dell'ultimo run.
-- **Keyboard Shortcuts Panel:** Pannello popup color-coded con palette Premiere. Legenda footer timeline completa con 8 item.
+- **NLE Header Layout (ORD-005):** `UniversalTimelineHeader` usa una struttura flex `justify-between` con tre zone: LEFT (timecode monocromatico), CENTER (absolute + centered: clip legend A-ROLL/B-ROLL/REJECTED solo in Stringout → separatore `|` → 3 bottoni Wave / Audio / Shortcuts senza container ridondante), RIGHT (durata totale o SAVE ORDER in DC). I bottoni sono label single-word per evitare text-wrap.
+- **Active Marker Toolbar Footer:** `UniversalTimeline` ha un footer `justify-center` con due gruppi semantici: HUMAN (`IN`, `OUT`, `M`) e MACHINE (`A` per audio Librosa, `BM Analysis` per YOLO). Ogni bottone funge da toggle `hiddenMarkers` passato al renderer della traccia. Il marker `AUDIO` è classificato come MACHINE perché generato da `audio_analyzer.py` (Librosa), non da constraint umani.
+- **Keyboard Shortcuts Panel:** `TimelineKeyboardShortcuts` espone solo la reference keyboard, senza toggle marker (rimossi e spostati nel footer toolbar).
 
 ---
 

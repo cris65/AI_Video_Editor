@@ -8,8 +8,6 @@ interface TimelineKeyboardShortcutsProps {
   onToggle: () => void;
   /** DC mode adds: L (lock), Alt+I/O (bookend). Stringout mode adds: Audio marker, Zoom scroll. */
   mode: 'stringout' | 'director_cut';
-  hiddenMarkers?: string[];
-  toggleMarkerVisibility?: (type: string) => void;
 }
 
 const KBD: React.FC<{ children: React.ReactNode; variant?: 'default' | 'green' | 'red' | 'blue' | 'amber' | 'orange' | 'yellow' }> = ({ children, variant = 'default' }) => {
@@ -45,8 +43,6 @@ export const TimelineKeyboardShortcuts: React.FC<TimelineKeyboardShortcutsProps>
   isOpen,
   onToggle,
   mode,
-  hiddenMarkers = [],
-  toggleMarkerVisibility,
 }) => (
   <div className="relative">
     <button
@@ -56,54 +52,22 @@ export const TimelineKeyboardShortcuts: React.FC<TimelineKeyboardShortcutsProps>
           ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
           : 'bg-slate-800/80 text-slate-400 hover:text-slate-300 border-slate-700/40'
         }`}
-      title="Marker & Navigation Control"
+      title="Shortcuts"
     >
       <Keyboard size={12} className="text-blue-400/80" />
-      <span className="tracking-wider uppercase font-sans">Marker & Navigation Control</span>
+      <span className="tracking-wider uppercase font-sans">Shortcuts</span>
     </button>
 
     {isOpen && (
       <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[520px] p-4 bg-slate-900 border border-slate-700 rounded-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]">
         <div className="flex justify-between items-center mb-3">
           <h4 className="text-slate-200 font-bold text-[11px] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Marker & Navigation Control
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Shortcuts
           </h4>
           <button onClick={onToggle} className="text-slate-500 hover:text-slate-300">✕</button>
         </div>
 
         <div className="space-y-4 text-slate-400 text-[10px] font-sans">
-          {/* Marker Visibility */}
-          {toggleMarkerVisibility && (
-            <div>
-              <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-pink-400/80">Marker Visibility</h5>
-              <div className="flex gap-2 items-center flex-wrap">
-                {[
-                  { type: 'IN', label: 'IN', color: 'bg-green-500', text: 'text-green-500', border: 'border-green-500' },
-                  { type: 'OUT', label: 'OUT', color: 'bg-red-500', text: 'text-red-500', border: 'border-red-500' },
-                  { type: 'BM', label: 'M#', color: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500' },
-                  { type: 'AUDIO', label: '♪', color: 'bg-yellow-500', text: 'text-yellow-500', border: 'border-yellow-500' },
-                  { type: 'YOLO_BM', label: 'BM Analysis', color: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500' }
-                ].map((marker) => {
-                  const isHidden = hiddenMarkers.includes(marker.type);
-                  return (
-                    <button
-                      key={marker.type}
-                      onClick={() => toggleMarkerVisibility(marker.type)}
-                      className={`px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase transition-all flex items-center gap-1
-                        ${isHidden 
-                          ? 'opacity-40 border-slate-600 bg-slate-800 text-slate-400' 
-                          : `opacity-100 ${marker.border}/30 ${marker.color}/10 ${marker.text}`
-                        }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isHidden ? 'bg-slate-500' : marker.color}`} />
-                      {marker.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Navigation */}
           <div>
             <h5 className="text-slate-300 font-bold mb-1.5 border-b border-slate-700/50 pb-1 uppercase text-[9px] tracking-wider text-blue-400/80">Global Navigation</h5>

@@ -1,10 +1,53 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.62 - 2026-05-24
+**Version:** v0.1.63 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
 
 ---
+
+## 🐺 Walkthrough — v0.1.62 → v0.1.63
+
+### Sommario — [ORD-005] NLE Header/Footer Architecture Overhaul
+
+Refactoring UI completo del layer `UniversalTimeline` secondo la direttiva ORD-005. L'header ottiene un layout NLE professionale a 3 zone centrate, il footer acquisisce un Active Marker Toolbar semantico con separazione HUMAN/MACHINE, e il popup Shortcuts viene ripulito dai toggle marker.
+
+### Modified Files
+
+| File | +Lines | -Lines | Description |
+|---|---|---|---|
+| `UniversalTimelineHeader.tsx` | ~155 | ~110 | Layout NLE: LEFT=time, CENTER=legend+3bottoni, RIGHT=duration/save. Label single-word. File riscritto per eliminare JSX struttura corrotta. |
+| `UniversalTimeline.tsx` | ~55 | ~35 | Footer: `justify-center` + Active Marker Toolbar con gruppi HUMAN/MACHINE. AUDIO spostato da HUMAN a MACHINE. |
+| `TimelineKeyboardShortcuts.tsx` | 2 | 35 | Rimossa sezione "Marker Visibility" dal popup. Label bottone → "Shortcuts". |
+
+### Change Details
+
+#### 1. Header — 3-Zone NLE Layout
+- **LEFT:** Timecode monocromatico solo (`00:00.43`), senza legenda.
+- **CENTER (absolute):** Clip legend `● A-ROLL ● B-ROLL ● REJECTED` (solo Stringout) + separatore `|` + 3 bottoni `🌊 Wave / ⚙ Audio / ⌨ Shortcuts`. Rimosso il container `bg-slate-800/50 rounded-lg` ridondante. Label accorciate da "Waveform Control"→"Wave", "Audio Marker Control"→"Audio", "Marker & Navigation Control"→"Shortcuts" per evitare text-wrap.
+- **RIGHT:** Durata totale (Stringout) o bottone `SAVE ORDER` (DC).
+
+#### 2. Footer — Active Marker Toolbar (centrato)
+- **Prima:** `justify-between` con gruppi laterali.
+- **Dopo:** `justify-center` con due cluster semantici:
+  - `HUMAN [ ● IN ] [ ● OUT ] [ ● M ]`
+  - `|`
+  - `MACHINE [ ● A ] [ ● BM Analysis ]`
+- Il marker `AUDIO (♪→A)` è stato riclassificato da HUMAN a MACHINE perché prodotto da `audio_analyzer.py` (Librosa), non da un constraint editoriale umano.
+
+#### 3. TimelineKeyboardShortcuts — Pulizia
+- Rimossa intera sezione "Marker Visibility" toggle dal popup (l'accesso è ora esclusivo dal footer toolbar).
+- Rimossi props `hiddenMarkers` e `toggleMarkerVisibility` dall'interfaccia TypeScript.
+
+### Validation
+
+| Check | Result |
+|---|---|
+| ESLint (src/) | ✅ 0 errors (11 warnings pre-esistenti in `PancakeDashboard.tsx`) |
+| TypeScript `tsc --noEmit` | ✅ 0 errors |
+
+---
+
 
 ## 🐺 Walkthrough — v0.1.61 → v0.1.62
 
