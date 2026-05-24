@@ -530,10 +530,18 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {completedProjects.map((proj, idx) => (
-              <button
+              <div
                 key={idx}
-                onClick={() => onComplete && onComplete(proj.sequence_name)}
-                className="flex items-center justify-between p-4 bg-[#111318] hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/30 rounded-xl transition-all shadow-sm hover:shadow-emerald-900/20 text-left group"
+                role="button"
+                tabIndex={0}
+                onClick={() => onComplete?.(proj.sequence_name)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onComplete?.(proj.sequence_name);
+                  }
+                }}
+                className="flex items-center justify-between p-4 bg-[#111318] hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/30 rounded-xl transition-all shadow-sm hover:shadow-emerald-900/20 text-left group cursor-pointer"
               >
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-200 break-words group-hover:text-emerald-400 transition-colors">
@@ -597,7 +605,7 @@ export const ImageEngineControls: React.FC<ImageEngineControlsProps> = ({ onComp
                   </div>
                 </div>
                 <ChevronDown className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 -rotate-90 transition-transform" />
-              </button>
+              </div>
             ))}
           </div>
         </div>

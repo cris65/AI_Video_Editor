@@ -330,8 +330,20 @@ def build_locked_grid(locked_clips, beats):
         if pos_sec is None:
             pos_sec = 0.0
             
-        src_in = clip.get('absolute_in', clip['start'])
-        src_out = clip.get('absolute_out', clip['end'])
+        src_in = clip.get('absolute_in')
+        if src_in is None:
+            src_in = clip.get('start', 0.0)
+            
+        src_out = clip.get('absolute_out')
+        if src_out is None:
+            src_out = clip.get('end', 0.0)
+            
+        try:
+            src_in = float(src_in)
+            src_out = float(src_out)
+        except (TypeError, ValueError):
+            src_in, src_out = 0.0, 0.0
+            
         clip_dur = src_out - src_in
         
         is_global_out = clip.get('_is_global_out', False)
@@ -512,20 +524,20 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                     if override.get('locked', False):
                         is_locked = True
                         locked_pos = override.get('timeline_position')
-                        virtual_clip['absolute_in'] = override.get('absolute_in', clip['start'])
-                        virtual_clip['absolute_out'] = override.get('absolute_out', clip['end'])
+                        virtual_clip['absolute_in'] = override.get('absolute_in') if override.get('absolute_in') is not None else clip['start']
+                        virtual_clip['absolute_out'] = override.get('absolute_out') if override.get('absolute_out') is not None else clip['end']
                     if override.get('is_global_start'):
                         is_locked = True
                         locked_pos = 0.0
                         virtual_clip['_is_global_in'] = True
-                        if not virtual_clip.get('absolute_in'): virtual_clip['absolute_in'] = virtual_clip.get('_in_time', clip['start'])
-                        if not virtual_clip.get('absolute_out'): virtual_clip['absolute_out'] = virtual_clip.get('_out_time', clip['end'])
+                        if virtual_clip.get('absolute_in') is None: virtual_clip['absolute_in'] = virtual_clip.get('_in_time') if virtual_clip.get('_in_time') is not None else clip['start']
+                        if virtual_clip.get('absolute_out') is None: virtual_clip['absolute_out'] = virtual_clip.get('_out_time') if virtual_clip.get('_out_time') is not None else clip['end']
                     if override.get('is_global_end'):
                         is_locked = True
                         locked_pos = target_duration
                         virtual_clip['_is_global_out'] = True
-                        if not virtual_clip.get('absolute_in'): virtual_clip['absolute_in'] = virtual_clip.get('_in_time', clip['start'])
-                        if not virtual_clip.get('absolute_out'): virtual_clip['absolute_out'] = virtual_clip.get('_out_time', clip['end'])
+                        if virtual_clip.get('absolute_in') is None: virtual_clip['absolute_in'] = virtual_clip.get('_in_time') if virtual_clip.get('_in_time') is not None else clip['start']
+                        if virtual_clip.get('absolute_out') is None: virtual_clip['absolute_out'] = virtual_clip.get('_out_time') if virtual_clip.get('_out_time') is not None else clip['end']
                 virtual_clip['_locked'] = is_locked
                 virtual_clip['_locked_timeline_pos'] = locked_pos
                 usable_clips.append(virtual_clip)
@@ -558,20 +570,20 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
                 if override.get('locked', False):
                     is_locked = True
                     locked_pos = override.get('timeline_position')
-                    clip['absolute_in'] = override.get('absolute_in', clip['start'])
-                    clip['absolute_out'] = override.get('absolute_out', clip['end'])
+                    clip['absolute_in'] = override.get('absolute_in') if override.get('absolute_in') is not None else clip['start']
+                    clip['absolute_out'] = override.get('absolute_out') if override.get('absolute_out') is not None else clip['end']
                 if override.get('is_global_start'):
                     is_locked = True
                     locked_pos = 0.0
                     clip['_is_global_in'] = True
-                    if not clip.get('absolute_in'): clip['absolute_in'] = clip.get('_in_time', clip['start'])
-                    if not clip.get('absolute_out'): clip['absolute_out'] = clip.get('_out_time', clip['end'])
+                    if clip.get('absolute_in') is None: clip['absolute_in'] = clip.get('_in_time') if clip.get('_in_time') is not None else clip['start']
+                    if clip.get('absolute_out') is None: clip['absolute_out'] = clip.get('_out_time') if clip.get('_out_time') is not None else clip['end']
                 if override.get('is_global_end'):
                     is_locked = True
                     locked_pos = target_duration
                     clip['_is_global_out'] = True
-                    if not clip.get('absolute_in'): clip['absolute_in'] = clip.get('_in_time', clip['start'])
-                    if not clip.get('absolute_out'): clip['absolute_out'] = clip.get('_out_time', clip['end'])
+                    if clip.get('absolute_in') is None: clip['absolute_in'] = clip.get('_in_time') if clip.get('_in_time') is not None else clip['start']
+                    if clip.get('absolute_out') is None: clip['absolute_out'] = clip.get('_out_time') if clip.get('_out_time') is not None else clip['end']
             clip['_locked'] = is_locked
             clip['_locked_timeline_pos'] = locked_pos
             usable_clips.append(clip)

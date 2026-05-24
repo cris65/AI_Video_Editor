@@ -1,8 +1,37 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.72 - 2026-05-24
+**Version:** v0.1.73 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.72 → v0.1.73
+
+### Summary — [ENG-003.1] Async & Error Surfacing Fixes
+
+Resolved a mathematical crash during Director Inference and synchronized the background worker's status with the React UI.
+
+The `TypeError` in `director.py` was caused by a mismatch in dictionary fallback resolution (Python vs JS) when explicit `null` values (`None`) were passed from the frontend for `absolute_in` and `absolute_out`. This caused Geometra Math to crash on `src_out - src_in`. We introduced a mathematically safe float-casting envelope.
+In `api_server.py`, the worker returned `"running"` instead of `"processing"`, which prematurely broke the React polling loop and dropped the UI loading screen while inference was still active.
+
+### Modified Files
+
+| File | Changes | Description |
+|---|---|---|
+| `engine/director.py` | +22 -12 | Strict `None` fallback and `float()` try-catch casting applied to `src_in`/`src_out` in `build_locked_grid` and `usable_clips` initialization. |
+| `engine/api_server.py` | +2 -1 | Changed orchestration task status from `"running"` to `"processing"`. Initialized task entry synchronously before firing the background thread to prevent race conditions. |
+| `src/components/dashboard/ImageEngineControls.tsx` | +10 -3 | Resolved `validateDOMNesting` by converting project list `<button>` elements to `<div>` with ARIA roles and keyboard handlers. |
+| `src/components/dashboard/PancakeDashboard.tsx` | +31 -29 | Resolved `react-hooks/exhaustive-deps` and TDZ on `triggerSave` by memoizing it and correctly placing dependencies. |
+
+### Technical Adjustments
+- **Python Dictionary Strict Fallback**: Enforced explicit `if src_in is None:` overrides, bypassing Python's native `dict.get(key, default)` behavior which returns `None` if the key physically exists but its value is `None`.
+- **Bulletproof Geometra Casting**: Wrapped boundary calculations in a standard `try...except (TypeError, ValueError):` block. Even catastrophic JSON corruption will now safely clamp lengths to `0.0` rather than crashing the thread.
+- **Async Status String Synchronization**: Aligning the background task state with the frontend's strict string comparator (`status === 'processing'`) completely stabilizes the infinite polling architecture.
+
+### Validation State
+- ✅ **ESLint / TypeScript (`npm run wolf:audit`)**: Passed (0 errors).
+- ✅ **LLM Pipeline Stability:** The Director now executes successfully without crashing on override extraction, and the UI correctly holds the loading state for the entire multi-minute duration of the 70B model.
 
 ---
 

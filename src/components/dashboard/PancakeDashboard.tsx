@@ -95,6 +95,28 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     setHiddenMarkers(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
   }, []);
 
+  const triggerSave = useCallback(async (
+    constraintsToSave: Record<string, UserConstraint[]>,
+    overridesToSave: Record<string, any>,
+    configToSave: DirectorConfig
+  ) => {
+    setSaveStatus('saving');
+    try {
+      const payload = { hitl_constraints: constraintsToSave, clip_overrides: overridesToSave, director_config: configToSave };
+      const res = await fetch(`/api/save-hitl?sequence=${sequenceName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload, null, 2)
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error('Failed to save HITL data:', err);
+      setSaveStatus('idle');
+    }
+  }, [sequenceName]);
+
   const latestStateRef = useRef({ userConstraints, clipOverrides, directorConfig });
   useEffect(() => {
     latestStateRef.current = { userConstraints, clipOverrides, directorConfig };
@@ -113,7 +135,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       }
     }, 500); // 500ms debounce
     return () => clearTimeout(handler);
-  }, [audioMarkerFilters.minEnergy]);
+  }, [audioMarkerFilters.minEnergy, triggerSave]);
 
   const formatModelName = (modelId: string) => {
     if (!modelId) return "VLM";
@@ -173,7 +195,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
         minEnergy: hitlData.director_config.energy_threshold ?? 0.4
       }));
     }
-  }, [hitlData]);
+  }, [hitlData, userConstraints, clipOverrides]);
 
   // Sync orderedFinalCut from source whenever finalCutTimeline is refreshed (e.g. after Update Cut)
   useEffect(() => {
@@ -206,7 +228,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
         hasAutoSuggested.current = true;
       }
     }
-  }, [audioBpm]);
+  }, [audioBpm, directorConfig.style_prompt, userConstraints, clipOverrides, triggerSave]);
 
   // Precision Stopwatch
   const [regenerationElapsed, setRegenerationElapsed] = useState(0);
@@ -229,7 +251,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     return `${m}:${s}`;
   };
 
-  const combinedTimeline = data?.stringout_timeline || [];
+  const combinedTimeline = useMemo(() => data?.stringout_timeline || [], [data?.stringout_timeline]);
   const fps = data?.metadata?.fps || 25;
 
   const handleConstraint = useCallback((type: ConstraintType | 'CLEAR' | 'CLEAR_ALL' | 'CLEAR_TYPE_IN' | 'CLEAR_TYPE_OUT' | 'CLEAR_TYPE_BM' | 'CLEAR_TYPE_AUDIO', time: number) => {
@@ -286,7 +308,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
         return next;
       });
     }
-  }, [combinedTimeline, fps, clipOverrides, directorConfig]);
+  }, [combinedTimeline, fps, clipOverrides, directorConfig, triggerSave]);
 
   const handleRemoveSpecificConstraint = useCallback((clipKey: string, time: number) => {
     setUserConstraints(prev => {
@@ -301,7 +323,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
       triggerSave(next, clipOverrides, directorConfig);
       return next;
     });
-  }, [clipOverrides, directorConfig]);
+  }, [clipOverrides, directorConfig, triggerSave]);
 
   const handleGlobalBookend = useCallback((type: 'START' | 'END', time: number) => {
     const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
@@ -353,7 +375,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     } else {
       console.log(`[handleGlobalBookend] No clip found at time ${time}`);
     }
-  }, [combinedTimeline, userConstraints, directorConfig]);
+  }, [combinedTimeline, userConstraints, directorConfig, triggerSave]);
 
   const handleOverride = useCallback((type: 'KEEP' | 'TRASH' | 'BROLL' | 'CLEAR', time: number) => {
     const clipIndex = combinedTimeline.findIndex(c => time >= c.start && time < c.end);
@@ -376,29 +398,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
         return next;
       });
     }
-  }, [combinedTimeline, userConstraints, directorConfig]);
-
-  async function triggerSave(
-    constraintsToSave: Record<string, UserConstraint[]>,
-    overridesToSave: Record<string, any>,
-    configToSave: DirectorConfig
-  ) {
-    setSaveStatus('saving');
-    try {
-      const payload = { hitl_constraints: constraintsToSave, clip_overrides: overridesToSave, director_config: configToSave };
-      const res = await fetch(`/api/save-hitl?sequence=${sequenceName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload, null, 2)
-      });
-      if (!res.ok) throw new Error('Save failed');
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (err) {
-      console.error('Failed to save HITL data:', err);
-      setSaveStatus('idle');
-    }
-  };
+  }, [combinedTimeline, userConstraints, directorConfig, triggerSave]);
 
   const handleRegenerateCut = async () => {
     setIsRegenerating(true);
@@ -707,7 +707,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
     if (videoRef.current) {
       videoRef.current.currentTime = time;
     }
-  }, []);
+  }, [isPreviewMode]);
 
   if (loading) {
     return (

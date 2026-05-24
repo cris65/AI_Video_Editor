@@ -18,6 +18,9 @@ import uvicorn
 import os
 import director as director_module
 import logging
+import uuid
+import traceback
+from fastapi import BackgroundTasks
 
 class ProgressEndpointFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
@@ -147,8 +150,27 @@ class AudioAnalyzePayload(BaseModel):
     filename: str
     project_id: str
 
+ORCHESTRATION_TASKS = {}
+
+def orchestration_worker(task_id: str, stringout_path: str, hitl_path: str, beats_path: str, output_dir: str, sequence_name: str, seed: int, bypass_llm: bool):
+    try:
+        ORCHESTRATION_TASKS[task_id] = {"status": "processing"}
+        output_path = director_module.generate_final_cut(
+            stringout_path=stringout_path,
+            hitl_path=hitl_path,
+            beats_path=beats_path,
+            output_dir=output_dir,
+            sequence_name=sequence_name,
+            seed=seed,
+            bypass_llm=bypass_llm,
+        )
+        ORCHESTRATION_TASKS[task_id] = {"status": "completed", "output_path": output_path}
+    except Exception as e:
+        traceback.print_exc()
+        ORCHESTRATION_TASKS[task_id] = {"status": "failed", "error": str(e)}
+
 @app.post("/api/orchestrate")
-async def orchestrate_director_cut(payload: OrchestratePayload):
+async def orchestrate_director_cut(payload: OrchestratePayload, background_tasks: BackgroundTasks):
     """
     Triggers Phase D (AI Director) exclusively.
     The heavy compute (Phases A/B) is already done. This only rearranges JSON.
@@ -191,20 +213,29 @@ async def orchestrate_director_cut(payload: OrchestratePayload):
     except Exception as write_err:
         return {"ok": False, "error": f"Failed to write HITL data: {write_err}"}
 
-    try:
-        output_path = director_module.generate_final_cut(
-            stringout_path=stringout_path,
-            hitl_path=hitl_path,
-            beats_path=beats_path,
-            output_dir=seq_llm_dir,
-            sequence_name=payload.sequence_name,
-            seed=seed,
-            bypass_llm=payload.bypass_llm,
-        )
-        return {"ok": True, "output_path": output_path}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    task_id = str(uuid.uuid4())
+    ORCHESTRATION_TASKS[task_id] = {"status": "processing"}
+    background_tasks.add_task(
+        orchestration_worker,
+        task_id=task_id,
+        stringout_path=stringout_path,
+        hitl_path=hitl_path,
+        beats_path=beats_path,
+        output_dir=seq_llm_dir,
+        sequence_name=payload.sequence_name,
+        seed=seed,
+        bypass_llm=payload.bypass_llm,
+    )
+    
+    return {"ok": True, "task_id": task_id}
 
+@app.get("/api/orchestrate/status/{task_id}")
+async def get_orchestrate_status(task_id: str):
+    """Returns the status of a background orchestration task."""
+    task = ORCHESTRATION_TASKS.get(task_id)
+    if not task:
+        return {"status": "not_found"}
+    return task
 
 @app.get("/api/history/{sequence_name}")
 async def get_version_history(sequence_name: str):
