@@ -999,6 +999,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
                   config={directorConfig}
                   audioBeats={audioBeats}
                   audioBpm={audioBpm}
+                  audioDuration={audioDuration}
                   onSave={(newConfig) => {
                     setDirectorConfig(newConfig);
                     setAudioMarkerFilters(prev => ({ ...prev, minEnergy: newConfig.energy_threshold ?? 0.4 }));

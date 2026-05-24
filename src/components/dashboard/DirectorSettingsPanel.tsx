@@ -7,6 +7,7 @@ interface DirectorSettingsPanelProps {
   config: DirectorConfig;
   audioBeats?: AudioBeat[];
   audioBpm?: number | null;
+  audioDuration?: number | null;
   sourceResolution?: { width: number; height: number };
   onSave: (newConfig: DirectorConfig) => void;
   onRegenerate: () => void;
@@ -19,6 +20,7 @@ export function DirectorSettingsPanel({
   config,
   audioBeats,
   audioBpm,
+  audioDuration,
   sourceResolution,
   onSave,
   onRegenerate,
@@ -125,6 +127,7 @@ export function DirectorSettingsPanel({
           config={config} 
           audioBeats={audioBeats}
           audioBpm={audioBpm}
+          audioDuration={audioDuration}
           sourceResolution={sourceResolution}
           onClose={(newConfig) => {
             setIsAdvancedModalOpen(false);

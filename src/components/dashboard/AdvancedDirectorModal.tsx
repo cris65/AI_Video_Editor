@@ -148,13 +148,16 @@ interface AdvancedDirectorModalProps {
   config: DirectorConfig;
   audioBeats?: AudioBeat[];
   audioBpm?: number | null;
+  audioDuration?: number | null;
   sourceResolution?: { width: number; height: number };
   onClose: (newConfig?: DirectorConfig) => void;
 }
 
-export function AdvancedDirectorModal({ config, audioBeats, audioBpm, sourceResolution, onClose }: AdvancedDirectorModalProps) {
+export function AdvancedDirectorModal({ config, audioBeats, audioBpm, audioDuration, sourceResolution, onClose }: AdvancedDirectorModalProps) {
   const [localConfig, setLocalConfig] = useState<DirectorConfig>(config);
   const [activeTab, setActiveTab] = useState<'visual' | 'audio' | 'system'>('visual');
+
+  const isAudioLocked = Boolean(audioDuration && localConfig.target_duration === audioDuration);
 
   // Sync if needed, though mostly it runs isolated
   useEffect(() => {
@@ -566,10 +569,20 @@ export function AdvancedDirectorModal({ config, audioBeats, audioBpm, sourceReso
                     <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-2">Target Duration (sec)</label>
                     <input 
                       type="number" 
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg text-lg font-mono font-bold px-4 py-3 text-sky-400 focus:border-sky-500 focus:outline-none text-center" 
+                      disabled={isAudioLocked}
+                      className={`w-full rounded-lg text-lg font-mono font-bold px-4 py-3 border text-center transition-colors ${
+                        isAudioLocked 
+                          ? 'opacity-50 cursor-not-allowed bg-slate-800/50 text-slate-500 border-slate-700' 
+                          : 'bg-slate-950 border-slate-700 text-sky-400 focus:border-sky-500 focus:outline-none'
+                      }`}
                       value={localConfig.target_duration || 60}
                       onChange={(e) => handleChange('target_duration', Number(e.target.value))}
                     />
+                    {isAudioLocked && (
+                      <div className="flex items-center justify-center gap-1.5 mt-2 text-[10px] font-bold text-amber-500 bg-amber-500/10 py-1 rounded">
+                        <span>🔒 Locked to Audio Track</span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="pt-4 border-t border-slate-800">

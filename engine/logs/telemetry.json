@@ -67,6 +67,12 @@
       "weight": 311.54,
       "duration_sec": 29.39,
       "ratio": 0.0943
+    },
+    {
+      "timestamp": 1779636236.996649,
+      "weight": 1171.63,
+      "duration_sec": 127.64,
+      "ratio": 0.1089
     }
   ],
   "llm_inference": [
@@ -81,6 +87,12 @@
       "weight": 927,
       "duration_sec": 261.82,
       "ratio": 0.2824
+    },
+    {
+      "timestamp": 1779636236.998145,
+      "weight": 4456,
+      "duration_sec": 1181.94,
+      "ratio": 0.2652
     }
   ]
 }

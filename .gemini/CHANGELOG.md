@@ -1,8 +1,37 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.70 - 2026-05-24
+**Version:** v0.1.71 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.70 → v0.1.71
+
+### Summary — [UI-011] Target Duration Audio Lock
+
+Resolved a UX conflict where the Target Duration input within the `AdvancedDirectorModal` remained freely editable despite being mathematically synchronized to an audio track via the `AudioSettingsModal`. This could cause unintentional desynchronization of the cut. 
+
+We implemented a secure prop-drilling chain to inject the Audio Engine's status deep into the Director's config modal, rendering the input read-only and visually alerting the user when an audio lock is active.
+
+### Modified Files
+
+| File | Changes | Description |
+|---|---|---|
+| `src/components/dashboard/PancakeDashboard.tsx` | +1 -0 | Prop-drilled `audioDuration` into `DirectorSettingsPanel`. |
+| `src/components/dashboard/DirectorSettingsPanel.tsx` | +4 -0 | Received `audioDuration` and passed it down to `AdvancedDirectorModal`. |
+| `src/components/dashboard/AdvancedDirectorModal.tsx` | +12 -1 | Computed `isAudioLocked`. Applied `disabled` state, custom Tailwind styling, and rendered the "🔒 Locked to Audio Track" badge. |
+
+### Technical Adjustments
+- **Prop Drilling Architecture:** The top-level `PancakeDashboard` now accurately cascades the `audioDuration` (fetched by `usePancakeData`) down the component tree.
+- **Boolean State Resolution:** In the `AdvancedDirectorModal`, the system dynamically calculates `isAudioLocked = Boolean(audioDuration && localConfig.target_duration === audioDuration)`.
+- **UI Lockdown:** When locked:
+  - The input field is assigned `disabled={true}` and shifts visually to `opacity-50 cursor-not-allowed bg-slate-800/50`.
+  - A small amber badge explicitly displays the text `🔒 Locked to Audio Track` directly below the input, ensuring absolute clarity regarding the duration's immutability.
+
+### Validation State
+- ✅ **ESLint / TypeScript (`npm run wolf:audit`)**: Passed (0 errors).
+- ✅ **State Integrity:** Target duration is correctly immutable when locked, requiring the user to explicitly release the lock via the Audio Settings Engine if they wish to return to a manual timeline.
 
 ---
 
