@@ -1,5 +1,7 @@
 # 🐺 Database Schema & Interfaces
 
+**Version:** v0.1.66 - 2026-05-24
+
 ## MVP Entity: `video_tasks`
 
 | Column | Type | Modifier | Description |

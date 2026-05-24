@@ -1,5 +1,7 @@
 # 📘 VISION
 
+**Version:** v0.1.66 - 2026-05-24
+
 > [!NOTE]
 > AG: Local-First project for AI Video Editing focused on offline automation and high professional standards (zero cloud dependencies).
 

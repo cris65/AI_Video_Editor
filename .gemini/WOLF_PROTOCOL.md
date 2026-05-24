@@ -1,5 +1,7 @@
 # 🐺 THE WOLF PROTOCOL: The Trinity Ecosystem & Definitive Workflow
 
+**Version:** v0.1.66 - 2026-05-24
+
 This document defines the immutable lifecycle of every feature or bugfix within the **AI Video Editor** project. Responsibilities are strictly divided among a "Trinity" of entities collaborating in perfect synchronization. 
 
 As **Google Antigravity (AG)**, you are the official agent-first IDE ecosystem. You must adhere strictly to these operational boundaries.
