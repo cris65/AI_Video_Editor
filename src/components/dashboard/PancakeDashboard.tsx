@@ -589,7 +589,7 @@ export const PancakeDashboard: React.FC<PancakeDashboardProps> = ({ sequenceName
         sourceStart: clip.start,
         sourceEnd: clip.end,
         sourceClipStart: clip.start,
-        bestMoment: clip.best_moment
+        bestMoment: clip.best_moment !== undefined && clip.best_moment > clip.start && clip.best_moment < clip.end && !isTrash ? clip.best_moment : undefined
       };
     });
   }, [filteredTimeline, clipOverrides]);

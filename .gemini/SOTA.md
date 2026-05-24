@@ -1,6 +1,6 @@
 # 🐺 SOTA (State of the Art)
 
-**Version:** v0.1.59 - 2026-05-23
+**Version:** v0.1.61 - 2026-05-24
 
 > [!NOTE]
 > AG: Questo documento riflette lo stato corrente dell'architettura e delle automazioni locali del AI Video Editor.
@@ -83,7 +83,7 @@ Il sistema applica una separazione netta tra i due tipi di operazione:
 
 - **Version-Aware Home Screen:** La lista "Progetti Completati" espone un badge per informare l'utente sul numero di Director's Cut esistenti e il modello LLM usato nell'ultima inferenza (con relativo tempo espresso in `MM:SS`), senza entrare nel progetto. Fallback strutturato (Zero `any` policy) per i progetti flat pre-versioning.
 - **Interfaccia Split-View NLE-style:** Video Player sincronizzato + Timeline Interattiva (Stringout & Director's Cut). Anti-Lag Engine 60fps via `requestAnimationFrame` sul DOM, scavalcando il React state globale. `React.memo` su tutte le clip card.
-- **Timeline Orizzontale Interattiva (Auto-Pan & Zoom Engine):** `FinalCutTimeline` con blocchi flex. Zoom Engine `1x-50x` via slider o `Ctrl+Scroll`. Auto-pan intelligente al `seeked` event per mantenere la playhead centrata durante la navigazione da tastiera. Rendering matematico isolato per separare area marker (ruler) dalle tracce clip.
+- **Timeline Orizzontale Interattiva — Absolute Tracking Engine:** `UniversalTimeline` con blocchi flex. Zoom Engine via rotella del mouse con `anchorFrac` matematico. Pan (`P`) e Scrub (`P+L`) operano tramite **Absolute Tracking Refs** (`panDragRef`, `scrubDragRef`): al primo `mousemove` si fotografa `startX` e `startWindow`, ogni successivo calcolo usa la differenza assoluta rispetto al punto di ancoraggio iniziale. Questo elimina il drift causato dal React State Batching durante movimenti lenti (mouse gaming ad alta frequenza). Il container di zoom nel `UniversalTimelineTrack` non ha transizioni CSS (`transition-all` rimosso) per garantire zoom istantaneo e playhead inchiodato. Durante pan/scrub, `isModifying` disabilita `pointer-events` sulle clip per prevenire D&D accidentale. Il playhead è un unico nodo `w-px` con SVG `absolute` annidato, eliminando il subpixel snapping differenziale.
 - **Audio Rhythm Engine & Dual Waveform:** Estrazione avanzata delle tracce audio (Percussive/Harmonic, Beats, BPM) tramite `librosa`. Overlay d'onda SVG proporzionale. Alert UI intelligente per il deflag forzato sul Target Duration in caso di mancata corrispondenza durata clip-audio.
 - **Clip Ghosting & Save Order:** Clip riposizionate assumono stato "Dirty" (trasparenza + alone scuro + bordo bianco). Il salvataggio è ottimistico: persiste l'ordine in `_hitl_data.json` sotto `clip_order_override` senza trigger re-fetch dell'engine.
 - **Sistema Multi-Anchor (BM/IN/OUT/AUDIO) + Bookend globali:** Vincoli multipli per clip via shortcut. I Bookend globali utilizzano `clipOverrides` con marcatore posizionato al timestamp esatto della playhead.

@@ -1,8 +1,51 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.60 - 2026-05-24
+**Version:** v0.1.61 - 2026-05-24
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.60 → v0.1.61
+
+### Sommario — Timeline Interaction Engine: Absolute Tracking & UX Hardening
+
+This release focuses on the interactive stability of the `UniversalTimeline`. Three independent bugs were isolated and eliminated: CSS transition wobble during zoom, state-batching drift during P/P+L modifier drags, and accidental Drag & Drop activation during pan/scrub operations.
+
+### Modified Files
+
+| File | +/- | Description |
+|---|---|---|
+| `UniversalTimeline.tsx` | +82 / -31 | Absolute tracking refs, flushSync for P+L, D&D shield prop |
+| `UniversalTimelineTrack.tsx` | +13 / -13 | Removed CSS transition, added `isModifying` prop and `pointer-events-none` guard |
+| `PancakeDashboard.tsx` | +1 / -1 | Minor adjustment (bestMoment filter) |
+
+### Cambiamenti Core
+
+#### 1. Zoom Wobble — CSS `transition-all` rimossa dal container
+
+- **Issue:** Il container di zoom in `UniversalTimelineTrack` aveva la classe `transition-all ease-out duration-100`. Questo faceva animare la `width` e la `translateX` durante ogni zoom a rotella, generando una traiettoria non-lineare che faceva "rollare" visivamente il playhead (effetto barca).
+- **Fix:** Rimossa la classe `transition-all ease-out duration-100`. Lo zoom è ora istantaneo e la playhead resta inchiodata al suo pixel.
+
+#### 2. Pan/Scrub Drift — `movementX` sostituito con Absolute Tracking Refs
+
+- **Issue:** I handler `P` e `P+L` usavano `e.movementX` (delta relativo). Durante movimenti lenti del mouse, il React State Batching raggruppava più eventi e perdeva i delta intermedi, causando uno slittamento cumulativo tra cursore e playhead.
+- **Fix:** Introdotti `panDragRef` e `scrubDragRef`. Al primo `mousemove`, si fotografa `startX: e.clientX` e `startWindow`. Ogni calcolo successivo usa la differenza assoluta (`e.clientX - drag.startX`), garantendo che nessun delta venga mai perso a prescindere dalla velocità del mouse o dal batching di React.
+
+#### 3. Accidental D&D — `isModifying` shield sul layer clip
+
+- **Issue:** Durante il pan con `P`, se il cursore passava sopra una clip, `dnd-kit` intercettava l'evento e avviava il Drag & Drop, portando erroneamente in modalità Director's Cut.
+- **Fix:** Passato `isModifying={isModifying !== null}` da `UniversalTimeline` a `UniversalTimelineTrack`. Quando attivo, il container delle clip riceve `pointer-events-none`, neutralizzando completamente il D&D durante pan e scrub.
+
+#### 4. P+L Scrub — `flushSync` per sincronizzazione DOM
+
+- **Issue:** Durante lo scrub `P+L`, il pan della timeline e il riposizionamento della playhead avvenivano in cicli di rendering separati, causando un lag visibile di 1 frame.
+- **Fix:** Avvolto `setZoomWindow` in `flushSync` e aggiornato manualmente `playheadRef.current.style.left` nella stessa istruzione, forzando il browser a risolvere entrambe le operazioni nello stesso pixel cycle.
+
+### Validation
+
+- **ESLint:** ✅ 0 errori, 0 warning
+- **TSC:** ✅ 0 errori
 
 ---
 

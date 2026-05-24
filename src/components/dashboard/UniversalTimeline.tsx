@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { DndContext, PointerSensor, useSensor, useSensors, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { useUniversalDnd } from '../../hooks/useUniversalDnd';
 import { useTimelineModifiers } from '../../hooks/useTimelineModifiers';
@@ -63,6 +64,10 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
   const [showShortcutsPopup, setShowShortcutsPopup] = useState(false);
   const [currentTimeFormatted, setCurrentTimeFormatted] = useState('00:00.00');
 
+  // Absolute drag tracking to prevent state batching drift
+  const panDragRef = useRef<{ startX: number; startWindow: [number, number] } | null>(null);
+  const scrubDragRef = useRef<{ startX: number; startWindow: [number, number]; startAbsoluteFrac: number } | null>(null);
+
   const { isModifying, keysDownRef } = useTimelineModifiers();
 
   // ─── P/L Modifiers Mouse Move Logic ───────────────────────────────────────
@@ -71,35 +76,82 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
     const isL = keysDownRef.current.has('KeyL');
 
     if (isP && isL) {
+      panDragRef.current = null; // Clear pan if they switch to scrub
       const track = containerRef.current;
       if (!track || !videoRef.current) return;
-      const deltaX = e.movementX;
+      
+      if (!scrubDragRef.current) {
+        const currentAbsoluteFrac = (mode === 'director_cut' && virtualTimeRef ? virtualTimeRef.current : videoRef.current.currentTime) / totalDuration;
+        scrubDragRef.current = {
+          startX: e.clientX,
+          startWindow: [...zoomWindow],
+          startAbsoluteFrac: currentAbsoluteFrac
+        };
+        return;
+      }
+      
+      const drag = scrubDragRef.current;
+      const deltaX = e.clientX - drag.startX;
       if (deltaX === 0) return;
       
       const rect = track.getBoundingClientRect();
-      const [s, en] = zoomWindow;
-      const span = en - s;
-      
+      const span = drag.startWindow[1] - drag.startWindow[0];
       const deltaFrac = (-deltaX / rect.width) * span;
-      const newS = Math.max(0, Math.min(s + deltaFrac, 1 - span));
-      setZoomWindow([newS, newS + span]);
       
-      const currentAbsoluteFrac = (mode === 'director_cut' && virtualTimeRef ? virtualTimeRef.current : videoRef.current.currentTime) / totalDuration;
-      const newAbsoluteFrac = Math.max(0, Math.min(currentAbsoluteFrac + deltaFrac, 1));
-      videoRef.current.currentTime = newAbsoluteFrac * totalDuration;
+      const newAbsoluteFrac = Math.max(0, Math.min(drag.startAbsoluteFrac + deltaFrac, 1));
+      const newS = Math.max(0, Math.min(drag.startWindow[0] + deltaFrac, 1 - span));
+      
+      // Update DOM synchronously to prevent 1-frame wobble
+      flushSync(() => {
+        setZoomWindow([newS, newS + span]);
+      });
+      
+      const newTime = newAbsoluteFrac * totalDuration;
+      if (mode === 'director_cut' && virtualTimeRef) {
+        virtualTimeRef.current = newTime;
+      } else if (videoRef.current) {
+        videoRef.current.currentTime = newTime;
+      }
+      
+      // Manually update playhead DOM instantly in the same paint cycle
+      if (playheadRef.current && totalDuration > 0) {
+        let pct = 0;
+        if (mode === 'stringout') {
+          const hostClip = displayClips.find(c => newTime >= c.sourceStart && newTime < c.sourceEnd);
+          if (hostClip) {
+            pct = ((hostClip.displayStart + (newTime - hostClip.sourceStart)) / totalDuration) * 100;
+          }
+        } else {
+          pct = (newTime / totalDuration) * 100;
+        }
+        playheadRef.current.style.left = `${pct}%`;
+      }
       
     } else if (isP) {
+      scrubDragRef.current = null; // Clear scrub if they switch to pan
       const track = containerRef.current;
       if (!track) return;
-      const deltaX = e.movementX;
-      if (deltaX === 0) return;
-      const rect = track.getBoundingClientRect();
-      const [s, en] = zoomWindow;
-      const span = en - s;
       
+      if (!panDragRef.current) {
+        panDragRef.current = {
+          startX: e.clientX,
+          startWindow: [...zoomWindow]
+        };
+        return;
+      }
+      
+      const drag = panDragRef.current;
+      const deltaX = e.clientX - drag.startX;
+      if (deltaX === 0) return;
+      
+      const rect = track.getBoundingClientRect();
+      const span = drag.startWindow[1] - drag.startWindow[0];
       const deltaFrac = (-deltaX / rect.width) * span;
-      const newS = Math.max(0, Math.min(s + deltaFrac, 1 - span));
+      const newS = Math.max(0, Math.min(drag.startWindow[0] + deltaFrac, 1 - span));
       setZoomWindow([newS, newS + span]);
+    } else {
+      panDragRef.current = null;
+      scrubDragRef.current = null;
     }
   };
 
@@ -120,6 +172,8 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
   // ─── Wheel zoom on track ──────────────────────────────────────────────────
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
+    panDragRef.current = null;
+    scrubDragRef.current = null;
     if (!videoRef.current) return;
 
     const [s, en] = zoomWindow;
@@ -261,6 +315,7 @@ export function UniversalTimeline(props: UniversalTimelineProps) {
             totalDuration={totalDuration}
             zoomWindow={zoomWindow}
             playheadRef={playheadRef}
+            isModifying={isModifying !== null}
             audioWaveforms={props.audioWaveforms}
             waveformView={props.waveformView}
             audioDuration={props.audioDuration}

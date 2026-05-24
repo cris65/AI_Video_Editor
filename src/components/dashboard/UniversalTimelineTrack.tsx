@@ -29,6 +29,7 @@ interface UniversalTimelineTrackProps {
   userConstraints: Record<string, Array<{ type: 'IN' | 'OUT' | 'BM' | 'AUDIO'; time: number }>>;
   markerNumbers?: Map<string, number>;
   hiddenMarkers: string[];
+  isModifying?: boolean;
 }
 
 export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
@@ -45,11 +46,12 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
   audioMarkerFilters,
   userConstraints,
   markerNumbers,
-  hiddenMarkers
+  hiddenMarkers,
+  isModifying
 }) => {
   const [zoomStart, zoomEnd] = zoomWindow;
   const zoomScale = 1 / (zoomEnd - zoomStart);
-  const panOffset = zoomStart * 100 * zoomScale;
+  const panOffset = zoomStart * 100; // translateX is inherently relative to the element's scaled width
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-900">
@@ -57,7 +59,7 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
       <div className="absolute top-0 left-0 right-0 h-[24px] bg-black/75 border-b border-slate-800/80 z-[10] pointer-events-none" />
 
       <div 
-        className="absolute inset-y-0 left-0 h-full z-[20] transition-all ease-out duration-100"
+        className="absolute inset-y-0 left-0 h-full z-[20]"
         style={{ 
           width: `${zoomScale * 100}%`,
           transform: `translateX(-${panOffset}%)`
@@ -74,7 +76,7 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
               const constraintKey = clip.sourceClipStart.toString();
               const constraints = (userConstraints[constraintKey] ?? []).filter(c => !hiddenMarkers.includes(c.type));
               const yoloVisible = !hiddenMarkers.includes('YOLO_BM');
-              const bm = yoloVisible && clip.bestMoment !== undefined && !clip.isTrash ? clip.bestMoment : null;
+              const bm = yoloVisible && clip.bestMoment !== undefined ? clip.bestMoment : null;
 
               return (
                 <Fragment key={`ruler-${clip.id}`}>
@@ -166,7 +168,7 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
           </div>
 
           {/* D&D Segments */}
-          <div className="absolute top-[24px] bottom-0 left-0 right-0 z-[20]">
+          <div className={`absolute top-[24px] bottom-0 left-0 right-0 z-[20] ${isModifying ? 'pointer-events-none' : ''}`}>
             <SortableContext items={sortableItems}>
               {displayClips.map((clip) => (
                 <UniversalTimelineSegment 
@@ -226,22 +228,16 @@ export const UniversalTimelineTrack: React.FC<UniversalTimelineTrackProps> = ({
           {/* Playhead */}
           <div
             ref={playheadRef}
-            className="absolute top-[24px] bottom-0 z-[50] pointer-events-none flex flex-col items-center"
+            className="absolute top-[24px] bottom-0 z-[50] pointer-events-none w-px"
             style={{
               left: '0%',
-              transform: 'translateX(-50%)',
+              backgroundColor: 'white',
+              boxShadow: '0 0 5px 2px rgba(255,255,255,0.4), 0 0 1px 0px rgba(0,0,0,1)',
             }}
           >
-            {/* Thin pin line */}
-            <div
-              className="w-px flex-1"
-              style={{
-                backgroundColor: 'white',
-                boxShadow: '0 0 5px 2px rgba(255,255,255,0.4), 0 0 1px 0px rgba(0,0,0,1)',
-              }}
-            />
             {/* Pentagon handle — pointing up */}
             <svg
+              className="absolute bottom-0 left-1/2 -translate-x-1/2"
               width="10"
               height="11"
               viewBox="0 0 10 11"
