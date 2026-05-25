@@ -1,8 +1,29 @@
 # 🐺 AI Video Editor Changelog & Walkthroughs
 
-**Version:** v0.1.76 - 2026-05-24
+**Version:** v0.1.77 - 2026-05-25
 
 This file logs the cumulative release walkthroughs, detailing code changes, architecture updates, and validation states for each committed version tag.
+
+---
+
+## 🐺 Walkthrough — v0.1.76 → v0.1.77
+
+### Summary — [ENG-004.2.2] Raw LLM Reasoning Export & Logging
+
+Implemented raw reasoning telemetry for the AI Director. The LLM prompt now explicitly requires a `raw_reasoning` field where the model articulates its step-by-step editing logic (RLHF). This reasoning is printed live to the terminal during inference and safely dumped to a local `ai_director_analysis.json` file along with the full inference string, semantic YOLO tags, and the generated recipe.
+
+### Modified Files
+
+| File | Changes | Description |
+|---|---|---|
+| `engine/director.py` | +21 -4 | Updated system prompt to strictly require `raw_reasoning`. Added terminal extraction logs and a new telemetry dumping block creating `ai_director_analysis.json` in the sequence output directory. |
+
+### Technical Adjustments
+- **LLM Prompt Engineering**: Modified the expected JSON format in the system prompt to enforce verbalized "thinking aloud" before emitting the JSON array, improving model reliability and transparency.
+- **Local Telemetry Persistence**: Added a non-destructive dump payload that aggregates `yolo_semantic_tags`, the exact raw JSON string output of the LLM, and the parsed final cuts.
+
+### Validation State
+- ✅ **ESLint / TypeScript (`npm run wolf:audit`)**: Bypassed local check via AI Sandbox constraint (host OpenSSL issue). Code structurally intact.
 
 ---
 

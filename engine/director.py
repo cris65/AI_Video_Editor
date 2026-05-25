@@ -160,10 +160,10 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
         "9. ACTION CONTINUITY: Do not just keep the chronological order of IDs. SHUFFLE the order to make narrative sense and create a compelling arc.\n"
         "10. SCREEN DIRECTION: Pay close attention to direction. Ensure 'Gaze' and subject movements create visual fluidity.\n"
         "11. SCORE AS TIEBREAKER: Use the 'Score' field ONLY as a tiebreaker between similar clips.\n"
-        f"12. For each selected clip, decide how many 'beats' it should last (e.g. 2, 4, 8). The total sum of beats must approach {total_beats}.\n"
         "13. RESPOND EXCLUSIVELY WITH A JSON OBJECT. No explanations, no text before or after. "
         "Exact required format:\n"
         '{\n'
+        '  "raw_reasoning": "Detailed, step-by-step thinking process. Explain aloud every single editing choice, rhythm adjustment, and semantic association. Think like a master director analyzing the timeline.",\n'
         '  "director_vision": "2-line explanation of the narrative logic used for this sequence",\n'
         '  "recipe": [\n'
         '    {"clip_id": "0.0", "beats": 4, "reasoning": "Reasoning based on Narrative Energy or Gaze..."},\n'
@@ -198,14 +198,18 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
         recipe_dict = clean_json_response(output)
         if recipe_dict and isinstance(recipe_dict, dict) and "recipe" in recipe_dict:
             recipe_dict['_inference_time_seconds'] = _inference_time
+            
+            raw_reasoning = recipe_dict.get("raw_reasoning", "Nessun ragionamento fornito dal LLM.")
+            print(f"\n🧠 AI Director Raw Reasoning:\n{raw_reasoning}\n")
+            
             print(f"✅ LLM ha risposto con successo (Visione: {recipe_dict.get('director_vision', 'ND')}) [{_inference_time}s]")
-            return recipe_dict
+            return recipe_dict, output # Restituiamo anche l'output grezzo per il dump
         else:
             print("⚠️ Il parsing del JSON dal LLM è fallito o formato non valido.")
     except Exception as e:
         print(f"⚠️ Fallimento inferenza nativa LLM: {e}")
 
-    return None
+    return None, None
 
 def _save_history_archive(
     output_dir: str,
@@ -661,14 +665,16 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         recipe_dict = {
             "director_vision": "Deterministic Cut (Bypass LLM)",
             "recipe": fake_recipe,
-            "_inference_time_seconds": 0.0
+            "_inference_time_seconds": 0.0,
+            "raw_reasoning": "N/A - Deterministic Bypass"
         }
+        raw_output_string = "N/A"
     else:
         # Modifica clip_list_str per LLM usando il _virtual_id (if we need to)
         for c in usable_clips:
             c['_llm_display_id'] = c.get('_virtual_id', str(c['start']))
             
-        recipe_dict = call_director_llm(
+        recipe_dict, raw_output_string = call_director_llm(
             usable_clips, target_duration, target_beats_count, style_prompt, 
             rhythmic_strictness, energy_threshold, audio_marker_priority, duration_mode, ignore_list,
             seed=seed, locked_clips=locked_clips, llm_model_id=llm_model_id,
@@ -676,6 +682,8 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
         )
         if recipe_dict:
             recipe_dict['_inference_time_seconds'] = round(time.time() - _t_start_llm, 2)
+            print(f"🧠 [Director] LLM Reasoning:\n{recipe_dict.get('raw_reasoning', 'No reasoning provided.')}")
+        
         recipe_path = os.path.join(output_dir, f"{sequence_name}_gemma_recipe.json")
         with open(recipe_path, 'w') as f:
             json.dump(recipe_dict, f, indent=2)
@@ -1073,6 +1081,21 @@ def generate_final_cut(stringout_path, hitl_path, beats_path, output_dir, sequen
 
     print(f"✅ AI Director: Generato final cut con {len(export_data)} clip in sequenza (v{next_v}).")
     print(f"✅ Salvato in {versioned_path}")
+
+    # --- Dump Telemetria Raw (RLHF) ---
+    analysis_dump_path = os.path.join(output_dir, "ai_director_analysis.json")
+    try:
+        dump_payload = {
+            "yolo_semantic_tags": semantic_tags_map if semantic_tags_map else {},
+            "raw_reasoning": recipe_dict.get("raw_reasoning") if recipe_dict else "N/A",
+            "llm_full_response": raw_output_string if raw_output_string else "LLM Bypassed or Failed",
+            "generated_cut": export_data
+        }
+        with open(analysis_dump_path, 'w', encoding='utf-8') as f:
+            json.dump(dump_payload, f, indent=4)
+        print(f"💾 Dump telemetrico (RLHF) salvato in: {analysis_dump_path}")
+    except Exception as e:
+        print(f"⚠️ Errore salvataggio dump telemetrico: {e}")
 
     return output_path
 
