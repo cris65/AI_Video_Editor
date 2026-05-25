@@ -61,7 +61,7 @@ def clean_json_response(raw_text):
 def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, rhythmic_strictness=50, energy_threshold=0.4, audio_marker_priority="DYNAMIC_PRIORITY", duration_mode="ORGANIC", ignore_list="None", seed: int = -1, locked_clips=None, llm_model_id="meta-llama/Meta-Llama-3-70B-Instruct", audio_bpm=None, audio_beats=None):
     if not check_director_llm_available():
         print("⚠️  [Director] Libreria mlx_lm non disponibile. Fallback euristico.")
-        return None
+        return None, None
 
     print(f"⏳ Downloading / Loading {llm_model_id} (Director's Brain)...")
     try:
@@ -71,7 +71,7 @@ def call_director_llm(usable_clips, target_duration, total_beats, style_prompt, 
         print("✅ Director Model loaded successfully!")
     except Exception as e:
         print(f"❌ Impossibile caricare il modello LLM: {e}")
-        return None
+        return None, None
 
     clip_list_str = []
     for c in usable_clips:
